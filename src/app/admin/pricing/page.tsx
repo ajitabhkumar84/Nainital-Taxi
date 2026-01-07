@@ -31,6 +31,8 @@ interface Season {
 
 const VEHICLE_TYPES: VehicleType[] = ["sedan", "suv_normal", "suv_deluxe", "suv_luxury"];
 
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
+
 export default function PricingPage() {
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -144,12 +146,19 @@ export default function PricingPage() {
 
       if (existingEntry) {
         // Update existing
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase.from("pricing") as any)
-          .update({ price: newPrice })
-          .eq("id", existingEntry.id);
+        const response = await fetch("/api/admin/pricing", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-auth": ADMIN_PASSWORD,
+          },
+          body: JSON.stringify({ id: existingEntry.id, price: newPrice }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to update price");
+        }
 
         setPricing((prev) =>
           prev.map((p) =>
@@ -158,19 +167,26 @@ export default function PricingPage() {
         );
       } else {
         // Insert new
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.from("pricing") as any)
-          .insert({
+        const response = await fetch("/api/admin/pricing", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-auth": ADMIN_PASSWORD,
+          },
+          body: JSON.stringify({
             package_id: packageId,
             vehicle_type: vehicleType,
             season_id: seasonId,
             price: newPrice,
-            is_active: true,
-          })
-          .select("*, seasons(name)")
-          .single();
+          }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to create price");
+        }
+
+        const { data } = await response.json();
 
         if (data) {
           setPricing((prev) => [

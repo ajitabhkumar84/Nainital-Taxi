@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
+import { useEffect, useState, useMemo, memo, useCallback } from 'react';
+import Image from 'next/image';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import { getVehicles, getPackagePrices, getSeasonForDate } from '@/lib/supabase/queries_enhanced';
+import { getVehicles, getPackagePrices, getSeasonForDate, getPackages } from '@/lib/supabase/queries_enhanced';
 import type { Vehicle, Season } from '@/lib/supabase/types';
-import { Car, Users, Music, Wind, Baby, Luggage, ArrowRight } from 'lucide-react';
+import { Car, Users, Music, Wind, Baby, Luggage, ArrowRight, Shield, UserCheck, Heart, Award } from 'lucide-react';
 import Link from 'next/link';
 
 // Vehicle type display mapping
@@ -61,88 +62,70 @@ export default function FleetContent() {
     loadFleetData();
   }, []);
 
-  async function loadFleetData() {
+  const loadFleetData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('1. Starting loadFleetData');
 
-      // Initialize Supabase client first (this seems to help)
       const { supabase } = await import('@/lib/supabase/client');
-      console.log('1.5. Supabase client loaded');
-
-      // Get all active vehicles
-      console.log('2. Fetching vehicles...');
-      const vehiclesData = await getVehicles();
-      console.log('3. Got vehicles:', vehiclesData.length);
-      const activeVehicles = vehiclesData.filter((v) => v.is_active);
-      console.log('4. Active vehicles:', activeVehicles.length);
-      setVehicles(activeVehicles);
-
-      // Get current season and all seasons
-      console.log('5. Fetching current season...');
       const today = new Date().toISOString().split('T')[0];
-      const season = await getSeasonForDate(today);
-      console.log('6. Got season:', season);
-      setCurrentSeason(season);
 
-      // Fetch all seasons to show date ranges
-      console.log('7. Fetching all seasons...');
-      const { data: seasons } = await supabase
-        .from('seasons')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: false }); // 'Season' before 'Off-Season'
+      // Parallel fetch: vehicles, season, seasons, and packages
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [vehiclesData, currentSeasonData, seasonsResult, packagesData] = await Promise.all([
+        getVehicles(),
+        getSeasonForDate(today),
+        (supabase.from('seasons') as any).select('*').eq('is_active', true).order('name', { ascending: false }),
+        getPackages('tour'),
+      ]);
 
-      console.log('8. Got seasons:', seasons?.length);
-      if (seasons && seasons.length >= 2) {
+      const activeVehicles = vehiclesData.filter((v) => v.is_active);
+      setVehicles(activeVehicles);
+      setCurrentSeason(currentSeasonData);
+
+      const seasons = seasonsResult.data as Season[] | null;
+      let offSeasonObj: Season | null = null;
+      let peakSeasonObj: Season | null = null;
+
+      if (seasons && seasons.length >= 1) {
+        peakSeasonObj = seasons.find((s) => s.name === 'Season') || null;
+        offSeasonObj = seasons.find((s) => s.name === 'Off-Season') || null;
         setSeasonData({
-          peakSeason: seasons.find((s: Season) => s.name === 'Season') || null,
-          offSeason: seasons.find((s: Season) => s.name === 'Off-Season') || null,
+          peakSeason: peakSeasonObj,
+          offSeason: offSeasonObj,
         });
       }
 
-      // Import getPackages to fetch a reference package
-      console.log('9. Fetching packages...');
-      const { getPackages } = await import('@/lib/supabase/queries_enhanced');
-
-      // Get first popular tour package as reference for pricing
-      const packages = await getPackages('tour');
-      console.log('10. Got packages:', packages.length);
-      const referencePackage = packages.find(p => p.is_popular) || packages[0];
-      console.log('11. Reference package:', referencePackage?.title);
+      const referencePackage = packagesData.find(p => p.is_popular) || packagesData[0];
 
       if (!referencePackage) {
-        console.log('12. No reference package found, exiting');
         setLoading(false);
         return;
       }
 
-      console.log('13. Starting pricing fetch...');
+      // Use actual season start dates from database instead of hardcoded dates
+      const offSeasonDate = offSeasonObj?.start_date || today;
+      const peakSeasonDate = peakSeasonObj?.start_date || today;
 
-      // Fetch pricing for each vehicle type
+      // Fetch pricing for all vehicle types in parallel
       const pricingPromises = Object.keys(VEHICLE_TYPE_INFO).map(async (vehicleType) => {
         try {
-          // Get pricing for both seasons
-          // We'll use specific dates that fall in each season
-          const offSeasonDate = '2025-01-15'; // Sample off-season date
-          const seasonDate = '2025-05-15'; // Sample peak season date
+          const [offSeasonPriceData, peakSeasonPriceData] = await Promise.all([
+            getPackagePrices(referencePackage.id, offSeasonDate),
+            getPackagePrices(referencePackage.id, peakSeasonDate),
+          ]);
 
-          const offSeasonData = await getPackagePrices(referencePackage.id, offSeasonDate);
-          const seasonData = await getPackagePrices(referencePackage.id, seasonDate);
-
-          const offSeasonPrice = offSeasonData.find(p => p.vehicle_type === vehicleType)?.price || null;
-          const seasonPrice = seasonData.find(p => p.vehicle_type === vehicleType)?.price || null;
+          const offSeasonPrice = offSeasonPriceData.find(p => p.vehicle_type === vehicleType)?.price || null;
+          const seasonPrice = peakSeasonPriceData.find(p => p.vehicle_type === vehicleType)?.price || null;
 
           return {
             vehicleType,
             pricing: {
               offSeasonPrice,
               seasonPrice,
-              currentSeasonName: season?.name || 'Off-Season',
+              currentSeasonName: currentSeasonData?.name || 'Off-Season',
             },
           };
-        } catch (error) {
-          console.error(`❌ Fleet: Error fetching pricing for ${vehicleType}:`, error);
+        } catch {
           return {
             vehicleType,
             pricing: {
@@ -161,31 +144,28 @@ export default function FleetContent() {
       }, {} as Record<string, PricingData>);
 
       setPricingData(pricingMap);
-      console.log('14. Pricing data set successfully');
     } catch (error) {
-      console.error('ERROR in loadFleetData:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Error loading fleet data:', error);
     } finally {
-      console.log('15. Setting loading to false');
       setLoading(false);
     }
-  }
+  }, []);
 
-  const vehicleTypes = ['all', ...Object.keys(VEHICLE_TYPE_INFO)];
-  const filteredVehicles = selectedType === 'all'
-    ? vehicles
-    : vehicles.filter(v => v.vehicle_type === selectedType);
+  const vehicleTypes = useMemo(() => ['all', ...Object.keys(VEHICLE_TYPE_INFO)], []);
 
-  // Group vehicles by type for display
-  const vehiclesByType = Object.keys(VEHICLE_TYPE_INFO).reduce((acc, type) => {
-    acc[type] = vehicles.filter(v => v.vehicle_type === type);
-    return acc;
-  }, {} as Record<string, Vehicle[]>);
+  const filteredVehicles = useMemo(() => {
+    return selectedType === 'all'
+      ? vehicles
+      : vehicles.filter(v => v.vehicle_type === selectedType);
+  }, [vehicles, selectedType]);
 
-  console.log('FleetContent rendering, loading:', loading, 'vehicles:', vehicles.length);
+  // Group vehicles by type for display - memoized
+  const vehiclesByType = useMemo(() => {
+    return Object.keys(VEHICLE_TYPE_INFO).reduce((acc, type) => {
+      acc[type] = vehicles.filter(v => v.vehicle_type === type);
+      return acc;
+    }, {} as Record<string, Vehicle[]>);
+  }, [vehicles]);
 
   if (loading) {
     return (
@@ -205,19 +185,180 @@ export default function FleetContent() {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      {/* Hero Section */}
+      {/* 1. Hero Section */}
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-display text-ink mb-4">
-          Premium Taxi Rental in Nainital 🚗
+          Premium Taxi Rental in Nainital
         </h1>
-        <p className="text-lg md:text-xl text-ink/70 max-w-2xl mx-auto">
-          Book comfortable, well-maintained vehicles with experienced drivers
+        <p className="text-lg md:text-xl text-ink/70 max-w-2xl mx-auto mb-6">
+          Book comfortable, well-maintained vehicles with verified, professional drivers
           <br />
-          for your perfect Nainital tour
+          for your safe and memorable Nainital tour
         </p>
+        {/* Trust Badges */}
+        <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm">
+          <div className="flex items-center gap-2 bg-teal/10 px-4 py-2 rounded-full">
+            <Shield className="w-4 h-4 text-teal" />
+            <span className="text-ink/80">Verified Drivers</span>
+          </div>
+          <div className="flex items-center gap-2 bg-coral/10 px-4 py-2 rounded-full">
+            <UserCheck className="w-4 h-4 text-coral" />
+            <span className="text-ink/80">Zero Alcohol Policy</span>
+          </div>
+          <div className="flex items-center gap-2 bg-sunshine/30 px-4 py-2 rounded-full">
+            <Award className="w-4 h-4 text-ink" />
+            <span className="text-ink/80">10,000+ Safe Trips</span>
+          </div>
+        </div>
       </div>
 
-      {/* SEO Content Section */}
+      {/* 2. Safety Promise Section - MOVED UP */}
+      <div className="max-w-5xl mx-auto mb-12 bg-gradient-to-br from-ink to-ink/95 rounded-2xl p-8 shadow-retro border-3 border-ink">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-4">
+            <Shield className="w-5 h-5 text-sunshine" />
+            <span className="text-white/90 text-sm font-medium">Our Safety Promise</span>
+          </div>
+          <h2 className="text-2xl md:text-3xl font-display text-white mb-2">
+            Your Safety Matters More Than Cheap Fares
+          </h2>
+          <p className="text-white/60 max-w-xl mx-auto">
+            We invest in quality because your family deserves the best
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white/5 rounded-xl p-5 text-center hover:bg-white/10 transition-colors">
+            <Shield className="w-10 h-10 text-teal mx-auto mb-3" />
+            <h3 className="font-display text-white mb-1">Zero Alcohol</h3>
+            <p className="text-white/60 text-sm">Strict sobriety policy with no exceptions</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-5 text-center hover:bg-white/10 transition-colors">
+            <UserCheck className="w-10 h-10 text-coral mx-auto mb-3" />
+            <h3 className="font-display text-white mb-1">Verified Drivers</h3>
+            <p className="text-white/60 text-sm">Background-checked & professionally trained</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-5 text-center hover:bg-white/10 transition-colors">
+            <Heart className="w-10 h-10 text-sunshine mx-auto mb-3" />
+            <h3 className="font-display text-white mb-1">Family-First Care</h3>
+            <p className="text-white/60 text-sm">Drivers who treat you like family</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-5 text-center hover:bg-white/10 transition-colors">
+            <Car className="w-10 h-10 text-lake mx-auto mb-3" />
+            <h3 className="font-display text-white mb-1">Spotless Cars</h3>
+            <p className="text-white/60 text-sm">Daily sanitized & well-maintained</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Rates Section - Season Toggle + Filters + Vehicle Cards */}
+      <section className="mb-16">
+        <h2 className="text-3xl md:text-4xl font-display text-ink mb-8 text-center">
+          Our Rates & Fleet
+        </h2>
+
+        {/* Season Toggle with Date Ranges */}
+        <div className="flex flex-col items-center mb-8 gap-4">
+          <div className="bg-white/80 backdrop-blur border-3 border-ink rounded-xl p-2 inline-flex shadow-retro">
+            <button
+              onClick={() => setShowSeasonPricing(false)}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                !showSeasonPricing
+                  ? 'bg-sunshine text-ink shadow-retro'
+                  : 'text-ink/60 hover:text-ink'
+              }`}
+            >
+              Off-Season Rates
+            </button>
+            <button
+              onClick={() => setShowSeasonPricing(true)}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                showSeasonPricing
+                  ? 'bg-sunshine text-ink shadow-retro'
+                  : 'text-ink/60 hover:text-ink'
+              }`}
+            >
+              Peak Season Rates
+            </button>
+          </div>
+
+          {/* Season Date Ranges */}
+          <div className="flex flex-wrap gap-4 justify-center text-sm">
+            {seasonData.offSeason && (
+              <div className="bg-white/60 backdrop-blur border-2 border-ink/20 rounded-lg px-4 py-2">
+                <span className="font-semibold text-ink">Off-Season:</span>{' '}
+                <span className="text-ink/70">
+                  {new Date(seasonData.offSeason.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(seasonData.offSeason.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+            )}
+            {seasonData.peakSeason && (
+              <div className="bg-white/60 backdrop-blur border-2 border-ink/20 rounded-lg px-4 py-2">
+                <span className="font-semibold text-ink">Peak Season:</span>{' '}
+                <span className="text-ink/70">
+                  {new Date(seasonData.peakSeason.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(seasonData.peakSeason.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Current Season Indicator */}
+        {currentSeason && (
+          <div className="text-center mb-8">
+            <Badge variant="secondary" className="text-lg px-4 py-2">
+              Currently: {currentSeason.name}
+            </Badge>
+          </div>
+        )}
+
+        {/* Vehicle Type Filter */}
+        <div className="flex flex-wrap gap-3 justify-center mb-12">
+          {vehicleTypes.map((type) => (
+            <button
+              key={type}
+              onClick={() => setSelectedType(type)}
+              className={`px-6 py-3 rounded-xl font-semibold border-3 transition-all ${
+                selectedType === type
+                  ? 'bg-sunshine border-ink text-ink shadow-retro'
+                  : 'bg-white border-ink/20 text-ink/60 hover:border-ink/40 hover:text-ink'
+              }`}
+            >
+              {type === 'all' ? '🚙 All Vehicles' : VEHICLE_TYPE_INFO[type as keyof typeof VEHICLE_TYPE_INFO].icon + ' ' + VEHICLE_TYPE_INFO[type as keyof typeof VEHICLE_TYPE_INFO].displayName}
+            </button>
+          ))}
+        </div>
+
+        {/* Vehicle Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {Object.entries(VEHICLE_TYPE_INFO).map(([vehicleType, typeInfo]) => {
+            const typeVehicles = vehiclesByType[vehicleType] || [];
+            const pricing = pricingData[vehicleType];
+
+            if (selectedType !== 'all' && selectedType !== vehicleType) return null;
+
+            return (
+              <div key={vehicleType} className="flex flex-col">
+                {typeVehicles.length > 0 ? (
+                  <VehicleCard
+                    vehicle={typeVehicles[0]}
+                    pricing={pricing}
+                    showSeasonPricing={showSeasonPricing}
+                    vehicleType={vehicleType}
+                    typeInfo={typeInfo}
+                  />
+                ) : (
+                  <div className="text-center py-12 bg-white/50 backdrop-blur border-3 border-ink rounded-xl">
+                    <p className="text-ink/40">No vehicles available</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 4. SEO Content Section - MOVED DOWN */}
       <div className="max-w-4xl mx-auto mb-12 bg-white/80 backdrop-blur border-3 border-ink rounded-2xl p-8 shadow-retro">
         <h2 className="text-2xl md:text-3xl font-display text-ink mb-4">
           Why Book a Taxi for Your Complete Nainital Tour?
@@ -244,136 +385,8 @@ export default function FleetContent() {
         </div>
       </div>
 
-      {/* Season Toggle with Date Ranges */}
-      <div className="flex flex-col items-center mb-8 gap-4">
-        <div className="bg-white/80 backdrop-blur border-3 border-ink rounded-xl p-2 inline-flex shadow-retro">
-          <button
-            onClick={() => setShowSeasonPricing(false)}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              !showSeasonPricing
-                ? 'bg-sunshine text-ink shadow-retro'
-                : 'text-ink/60 hover:text-ink'
-            }`}
-          >
-            Off-Season Rates
-          </button>
-          <button
-            onClick={() => setShowSeasonPricing(true)}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              showSeasonPricing
-                ? 'bg-sunshine text-ink shadow-retro'
-                : 'text-ink/60 hover:text-ink'
-            }`}
-          >
-            Peak Season Rates
-          </button>
-        </div>
-
-        {/* Season Date Ranges */}
-        <div className="flex flex-wrap gap-4 justify-center text-sm">
-          {seasonData.offSeason && (
-            <div className="bg-white/60 backdrop-blur border-2 border-ink/20 rounded-lg px-4 py-2">
-              <span className="font-semibold text-ink">Off-Season:</span>{' '}
-              <span className="text-ink/70">
-                {new Date(seasonData.offSeason.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(seasonData.offSeason.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-          )}
-          {seasonData.peakSeason && (
-            <div className="bg-white/60 backdrop-blur border-2 border-ink/20 rounded-lg px-4 py-2">
-              <span className="font-semibold text-ink">Peak Season:</span>{' '}
-              <span className="text-ink/70">
-                {new Date(seasonData.peakSeason.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(seasonData.peakSeason.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Current Season Indicator */}
-      {currentSeason && (
-        <div className="text-center mb-8">
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            Currently: {currentSeason.name}
-          </Badge>
-        </div>
-      )}
-
-      {/* Vehicle Type Filter */}
-      <div className="flex flex-wrap gap-3 justify-center mb-12">
-        {vehicleTypes.map((type) => (
-          <button
-            key={type}
-            onClick={() => setSelectedType(type)}
-            className={`px-6 py-3 rounded-xl font-semibold border-3 transition-all ${
-              selectedType === type
-                ? 'bg-sunshine border-ink text-ink shadow-retro'
-                : 'bg-white border-ink/20 text-ink/60 hover:border-ink/40 hover:text-ink'
-            }`}
-          >
-            {type === 'all' ? '🚙 All Vehicles' : VEHICLE_TYPE_INFO[type as keyof typeof VEHICLE_TYPE_INFO].icon + ' ' + VEHICLE_TYPE_INFO[type as keyof typeof VEHICLE_TYPE_INFO].displayName}
-          </button>
-        ))}
-      </div>
-
-      {/* Vehicle Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-        {Object.entries(VEHICLE_TYPE_INFO).map(([vehicleType, typeInfo]) => {
-          const typeVehicles = vehiclesByType[vehicleType] || [];
-          const pricing = pricingData[vehicleType];
-
-          if (selectedType !== 'all' && selectedType !== vehicleType) return null;
-
-          return (
-            <div key={vehicleType} className="flex flex-col">
-              {/* Vehicle Card */}
-              {typeVehicles.length > 0 ? (
-                <VehicleCard
-                  vehicle={typeVehicles[0]}
-                  pricing={pricing}
-                  showSeasonPricing={showSeasonPricing}
-                  vehicleType={vehicleType}
-                  typeInfo={typeInfo}
-                />
-              ) : (
-                <div className="text-center py-12 bg-white/50 backdrop-blur border-3 border-ink rounded-xl">
-                  <p className="text-ink/40">No vehicles available</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Bottom CTA */}
-      <div className="mt-16 text-center bg-gradient-to-r from-sunrise to-lake border-3 border-ink rounded-2xl p-8 shadow-retro">
-        <h3 className="text-2xl md:text-3xl font-display text-ink mb-4">
-          Not sure which vehicle to choose?
-        </h3>
-        <p className="text-ink/70 mb-6 max-w-2xl mx-auto">
-          Our team will help you select the perfect vehicle based on your group size,
-          luggage, and journey requirements. Get in touch now!
-        </p>
-        <div className="flex flex-wrap gap-4 justify-center">
-          <Button asChild variant="whatsapp" size="lg">
-            <a
-              href="https://wa.me/918445206116?text=Hi! I need help choosing the right vehicle for my trip."
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Chat on WhatsApp
-            </a>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href="tel:+918445206116">
-              Call Us Now
-            </a>
-          </Button>
-        </div>
-      </div>
-
-      {/* FAQs Section */}
-      <div className="mt-16 max-w-4xl mx-auto">
+      {/* 5. FAQs Section */}
+      <div className="max-w-4xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-display text-ink mb-8 text-center">
           Frequently Asked Questions
         </h2>
@@ -470,20 +483,24 @@ interface VehicleCardProps {
   typeInfo: typeof VEHICLE_TYPE_INFO[keyof typeof VEHICLE_TYPE_INFO];
 }
 
-function VehicleCard({ vehicle, pricing, showSeasonPricing, vehicleType, typeInfo }: VehicleCardProps) {
+// Memoized VehicleCard component
+const VehicleCard = memo(function VehicleCard({ vehicle, pricing, showSeasonPricing, vehicleType, typeInfo }: VehicleCardProps) {
   const isAvailable = vehicle.status === 'available';
   const currentPrice = showSeasonPricing ? pricing?.seasonPrice : pricing?.offSeasonPrice;
 
   return (
     <Card className="overflow-hidden hover:rotate-1 transition-transform duration-300 group h-full flex flex-col">
-      <CardHeader className={`p-0 relative`}>
+      <CardHeader className="p-0 relative">
         {/* Vehicle Image */}
         <div className="aspect-[4/3] relative bg-gradient-to-br from-sunrise to-lake">
           {vehicle.featured_image_url ? (
-            <img
+            <Image
               src={vehicle.featured_image_url}
               alt={vehicle.name}
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+              className="object-cover"
+              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -554,7 +571,7 @@ function VehicleCard({ vehicle, pricing, showSeasonPricing, vehicleType, typeInf
         {currentPrice && (
           <div className="bg-gradient-to-r from-sunrise/50 to-lake/50 rounded-lg p-3 mb-4">
             <p className="text-xs text-ink/60 mb-1">Starting from</p>
-            <p className="text-2xl font-bold text-teal">₹{currentPrice}</p>
+            <p className="text-2xl font-bold text-teal">₹{currentPrice.toLocaleString()}</p>
             <p className="text-xs text-ink/50">per trip</p>
           </div>
         )}
@@ -586,4 +603,4 @@ function VehicleCard({ vehicle, pricing, showSeasonPricing, vehicleType, typeInf
       </CardFooter>
     </Card>
   );
-}
+});

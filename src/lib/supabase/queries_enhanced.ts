@@ -64,7 +64,7 @@ export async function isBookingAllowed(date: string): Promise<{
   message?: string;
 }> {
   try {
-    // Query blackout table directly
+    // Query blackout table directly - handle if table doesn't exist
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase.from as any)('booking_blackout')
       .select('show_message')
@@ -72,10 +72,17 @@ export async function isBookingAllowed(date: string): Promise<{
       .lte('start_date', date)
       .gte('end_date', date)
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
-      // No blackout found or error - allow booking
+    // If table doesn't exist or any error, just allow booking
+    if (error) {
+      // Table might not exist or RLS issue - allow booking
+      console.log('Blackout check skipped:', error.message);
+      return { allowed: true };
+    }
+
+    if (!data) {
+      // No blackout found - allow booking
       return { allowed: true };
     }
 
@@ -110,13 +117,13 @@ export async function getPrice(
   // Check if booking is allowed
   const bookingStatus = await isBookingAllowed(date);
 
-  // Get price from pricing table using season_id
+  // Get price from pricing table using season_name
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: pricing, error } = await (supabase.from as any)('pricing')
     .select('price, notes')
     .eq('package_id', packageId)
     .eq('vehicle_type', vehicleType)
-    .eq('season_id', season.id)
+    .eq('season_name', season.name)
     .eq('is_active', true)
     .single() as { data: { price: number; notes: string | null } | null; error: unknown };
 
@@ -149,15 +156,14 @@ export async function getPackagePrices(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from as any)('pricing')
-    .select('vehicle_type, price, season_id, seasons(name)')
+    .select('vehicle_type, price, season_name')
     .eq('package_id', packageId)
-    .eq('season_id', season.id)
+    .eq('season_name', season.name)
     .eq('is_active', true) as {
       data: Array<{
         vehicle_type: VehicleType;
         price: number;
-        season_id: string;
-        seasons: { name: string } | null;
+        season_name: string;
       }> | null;
       error: unknown
     };
@@ -169,11 +175,10 @@ export async function getPackagePrices(
 
   if (!data) return [];
 
-  // Transform the data to include season_name from the joined seasons table
   return data.map(item => ({
     vehicle_type: item.vehicle_type,
     price: item.price,
-    season_name: item.seasons?.name || 'Off-Season'
+    season_name: item.season_name
   }));
 }
 
@@ -675,15 +680,14 @@ export async function getAllPricingForPackage(packageId: string): Promise<Array<
 }>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from as any)('pricing')
-    .select('vehicle_type, price, season_id, seasons(name)')
+    .select('vehicle_type, price, season_name')
     .eq('package_id', packageId)
     .eq('is_active', true)
     .order('vehicle_type') as {
       data: Array<{
         vehicle_type: VehicleType;
         price: number;
-        season_id: string;
-        seasons: { name: 'Season' | 'Off-Season' } | null;
+        season_name: 'Season' | 'Off-Season';
       }> | null;
       error: unknown
     };
@@ -695,10 +699,9 @@ export async function getAllPricingForPackage(packageId: string): Promise<Array<
 
   if (!data) return [];
 
-  // Transform the data to include season_name
   return data.map(item => ({
     vehicle_type: item.vehicle_type,
-    season_name: item.seasons?.name || 'Off-Season',
+    season_name: item.season_name,
     price: item.price
   }));
 }

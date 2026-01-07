@@ -5,6 +5,14 @@ export type BookingType = 'tour' | 'transfer';
 export type VehicleType = 'sedan' | 'suv_normal' | 'suv_deluxe' | 'suv_luxury';
 export type BookingStep = 1 | 2 | 3 | 4;
 
+// Route context for booking from destination pages
+export interface RouteContext {
+  destinationSlug: string;
+  destinationName: string;
+  prefilledPickup: string;
+  prefilledDropoff: string;
+}
+
 export interface BookingState {
   // Current step in the booking flow
   currentStep: BookingStep;
@@ -37,6 +45,16 @@ export interface BookingState {
   availabilityStatus: 'available' | 'limited' | 'sold_out' | 'blocked' | null;
   carsAvailable: number | null;
 
+  // Route Context (from destination pages)
+  routeContext: RouteContext | null;
+
+  // Submission State
+  bookingId: string | null;
+  advanceAmount: number | null;
+  isSubmitting: boolean;
+  submitError: string | null;
+  isBookingComplete: boolean;
+
   // Actions
   setCurrentStep: (step: BookingStep) => void;
   nextStep: () => void;
@@ -66,6 +84,16 @@ export interface BookingState {
   // Availability actions
   setAvailability: (status: 'available' | 'limited' | 'sold_out' | 'blocked', carsAvailable: number) => void;
 
+  // Route context actions
+  setRouteContext: (context: RouteContext) => void;
+  clearRouteContext: () => void;
+
+  // Submission actions
+  setBookingResult: (bookingId: string, advanceAmount: number) => void;
+  setSubmitting: (isSubmitting: boolean) => void;
+  setSubmitError: (error: string | null) => void;
+  setBookingComplete: (complete: boolean) => void;
+
   // Reset
   resetBooking: () => void;
 }
@@ -90,6 +118,12 @@ const initialState = {
   seasonName: null,
   availabilityStatus: null,
   carsAvailable: null,
+  routeContext: null,
+  bookingId: null,
+  advanceAmount: null,
+  isSubmitting: false,
+  submitError: null,
+  isBookingComplete: false,
 };
 
 export const useBookingStore = create<BookingState>()(
@@ -137,6 +171,29 @@ export const useBookingStore = create<BookingState>()(
         carsAvailable
       }),
 
+      // Route context actions
+      setRouteContext: (context) => set({
+        routeContext: context,
+        pickupLocation: context.prefilledPickup,
+        dropoffLocation: context.prefilledDropoff,
+      }),
+      clearRouteContext: () => set({ routeContext: null }),
+
+      // Submission actions
+      setBookingResult: (bookingId, advanceAmount) => set({
+        bookingId,
+        advanceAmount,
+        isBookingComplete: true,
+        isSubmitting: false,
+        submitError: null,
+      }),
+      setSubmitting: (isSubmitting) => set({ isSubmitting }),
+      setSubmitError: (error) => set({
+        submitError: error,
+        isSubmitting: false,
+      }),
+      setBookingComplete: (complete) => set({ isBookingComplete: complete }),
+
       // Reset
       resetBooking: () => set(initialState),
     }),
@@ -158,6 +215,12 @@ export const useBookingStore = create<BookingState>()(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         customerEmail: state.customerEmail,
+        // Route context for destination-based booking
+        routeContext: state.routeContext,
+        // Booking result (persisted until reset)
+        bookingId: state.bookingId,
+        advanceAmount: state.advanceAmount,
+        isBookingComplete: state.isBookingComplete,
       }),
     }
   )

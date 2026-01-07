@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS: AdminSettings = {
   min_booking_hours: 4,
 };
 
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -101,12 +103,18 @@ export default function SettingsPage() {
         description: getSettingDescription(key),
       }));
 
-      for (const setting of settingsArray) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase.from("admin_settings") as any)
-          .upsert(setting, { onConflict: "key" });
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({ settings: settingsArray }),
+      });
 
-        if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save settings");
       }
 
       setSaved(true);

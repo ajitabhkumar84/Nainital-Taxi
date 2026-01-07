@@ -4,8 +4,9 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Input, Select, Label } from "@/components/ui";
 import { Calendar, MapPin, Users, Car, Loader2 } from "lucide-react";
-import { getPackages, getPrice, checkAvailability, isBookingAllowed } from "@/lib/supabase";
+import { getPackages, getPrice } from "@/lib/supabase";
 import type { Package } from "@/lib/supabase";
+import type { Route, RoutePricing } from "@/lib/supabase/types";
 import { useBookingStore } from "@/store/bookingStore";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
@@ -22,6 +23,7 @@ export default function BookingWidget() {
   const bookingStore = useBookingStore();
   const [activeTab, setActiveTab] = useState<"tours" | "transfers">("tours");
   const [packages, setPackages] = useState<Package[]>([]);
+  const [routes, setRoutes] = useState<(Route & { pricing?: RoutePricing[] })[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingPrice, setCheckingPrice] = useState(false);
 
@@ -36,6 +38,7 @@ export default function BookingWidget() {
   const [transferTo, setTransferTo] = useState("");
   const [transferVehicle, setTransferVehicle] = useState<VehicleType>("sedan");
   const [transferDate, setTransferDate] = useState("");
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
   // Price display
   const [priceInfo, setPriceInfo] = useState<{
@@ -45,24 +48,137 @@ export default function BookingWidget() {
     message?: string;
   } | null>(null);
 
-  // Load packages from database
+  // Load packages and routes from database
   useEffect(() => {
-    async function loadPackages() {
+    async function loadData() {
       try {
-        const allPackages = await getPackages();
+        const [allPackages, routesResponse] = await Promise.all([
+          getPackages(),
+          fetch("/api/routes?withPricing=true").then((r) => r.json()),
+        ]);
         setPackages(allPackages);
+        if (routesResponse.success) {
+          setRoutes(routesResponse.data || []);
+        }
       } catch (error) {
-        console.error("Failed to load packages:", error);
+        console.error("Failed to load data:", error);
       }
     }
-    loadPackages();
+    loadData();
   }, []);
 
   // Filter packages by type
   const tourPackages = packages.filter((p) => p.type === "tour");
-  const transferPackages = packages.filter((p) => p.type === "transfer");
 
-  // Check price when form changes
+  // Get unique pickup locations from routes
+  const pickupLocations = Array.from(
+    new Set(
+      routes.flatMap((r) => [
+        r.pickup_location,
+        r.drop_location, // For bidirectional
+      ])
+    )
+  ).sort();
+
+  // Get drop locations based on selected pickup
+  const getDropLocations = () => {
+    if (!transferFrom) return [];
+
+    const validDrops = new Set<string>();
+
+    routes.forEach((route) => {
+      // Forward route
+      if (route.pickup_location === transferFrom) {
+        validDrops.add(route.drop_location);
+      }
+      // Bidirectional route
+      if (route.drop_location === transferFrom) {
+        validDrops.add(route.pickup_location);
+      }
+    });
+
+    return Array.from(validDrops).sort();
+  };
+
+  // Get available vehicle types for a route based on pricing
+  const getAvailableVehiclesForRoute = (route: Route & { pricing?: RoutePricing[] }) => {
+    if (!route.pricing || route.pricing.length === 0) {
+      return VEHICLE_OPTIONS; // If no pricing data, show all options
+    }
+
+    // Get unique vehicle types that have pricing > 0
+    const availableVehicleTypes = new Set<VehicleType>();
+    route.pricing.forEach((p) => {
+      if (p.price > 0) {
+        availableVehicleTypes.add(p.vehicle_type);
+      }
+    });
+
+    // Filter VEHICLE_OPTIONS to only include available types
+    return VEHICLE_OPTIONS.filter((v) => availableVehicleTypes.has(v.value));
+  };
+
+  // Find matching route
+  useEffect(() => {
+    if (!transferFrom || !transferTo) {
+      setSelectedRoute(null);
+      return;
+    }
+
+    const route =
+      routes.find(
+        (r) =>
+          (r.pickup_location === transferFrom && r.drop_location === transferTo) ||
+          (r.pickup_location === transferTo && r.drop_location === transferFrom)
+      ) || null;
+
+    setSelectedRoute(route);
+
+    // Auto-select first available vehicle if current selection doesn't have pricing
+    if (route && route.pricing) {
+      const availableVehicles = getAvailableVehiclesForRoute(route);
+      if (availableVehicles.length > 0 && !availableVehicles.find(v => v.value === transferVehicle)) {
+        setTransferVehicle(availableVehicles[0].value);
+      }
+    }
+
+    // Calculate transfer price if route found
+    if (route && route.pricing && transferDate) {
+      calculateTransferPrice(route);
+    } else {
+      setPriceInfo(null);
+    }
+  }, [transferFrom, transferTo, transferVehicle, transferDate, routes]);
+
+  // Calculate transfer price
+  const calculateTransferPrice = (route: Route & { pricing?: RoutePricing[] }) => {
+    if (!route.pricing || !transferDate) return;
+
+    // Determine season based on date (simple check)
+    const month = new Date(transferDate).getMonth() + 1;
+    const isSeason = month >= 3 && month <= 6; // March to June is peak season
+    const seasonName = isSeason ? "Season" : "Off-Season";
+
+    const pricing = route.pricing.find(
+      (p) => p.vehicle_type === transferVehicle && p.season_name === seasonName
+    );
+
+    if (pricing) {
+      setPriceInfo({
+        price: pricing.price,
+        season: seasonName,
+        bookingAllowed: route.enable_online_booking,
+        message: !route.enable_online_booking
+          ? "Online booking is currently disabled. Please contact us directly."
+          : undefined,
+      });
+    } else {
+      // No pricing available for this vehicle type and season
+      setPriceInfo(null);
+    }
+  };
+
+  // Check price when form changes (for tours)
   useEffect(() => {
     async function checkPrice() {
       if (!tourPackage || !tourDate) {
@@ -91,6 +207,12 @@ export default function BookingWidget() {
     return () => clearTimeout(debounce);
   }, [tourPackage, tourVehicle, tourDate]);
 
+  // Handle pickup location change
+  const handlePickupChange = (value: string) => {
+    setTransferFrom(value);
+    setTransferTo(""); // Reset drop location
+  };
+
   // Handle tour booking
   const handleTourBooking = async () => {
     if (!tourPackage || !tourDate) {
@@ -102,21 +224,18 @@ export default function BookingWidget() {
     try {
       const selectedPkg = packages.find((p) => p.id === tourPackage);
 
-      // Set booking data in store
-      bookingStore.resetBooking(); // Start fresh
-      bookingStore.setBookingType('tour');
-      bookingStore.setPackage(tourPackage, selectedPkg?.title || 'Tour Package');
+      bookingStore.resetBooking();
+      bookingStore.setBookingType("tour");
+      bookingStore.setPackage(tourPackage, selectedPkg?.title || "Tour Package");
       bookingStore.setVehicleType(tourVehicle);
       bookingStore.setTripDate(tourDate);
       bookingStore.setPassengerCount(parseInt(tourPassengers));
 
-      // Set pricing if available
       if (priceInfo) {
-        bookingStore.setCalculatedPrice(priceInfo.price, '', priceInfo.season);
+        bookingStore.setCalculatedPrice(priceInfo.price, "", priceInfo.season);
       }
 
-      // Navigate to booking page
-      router.push('/booking');
+      router.push("/booking");
     } catch (error) {
       console.error("Booking error:", error);
       alert("Something went wrong. Please try again or contact us directly.");
@@ -127,35 +246,39 @@ export default function BookingWidget() {
 
   // Handle transfer booking
   const handleTransferBooking = async () => {
-    if (!transferFrom || !transferDate) {
-      alert("Please select pickup location and date");
+    if (!transferFrom || !transferTo || !transferDate) {
+      alert("Please select pickup location, drop location, and date");
+      return;
+    }
+
+    if (!selectedRoute) {
+      alert("No route found for this transfer. Please contact us directly.");
+      return;
+    }
+
+    if (!selectedRoute.enable_online_booking) {
+      alert("Online booking is disabled for this route. Please contact us directly.");
       return;
     }
 
     setLoading(true);
     try {
-      // Find matching transfer package
-      const transferPkg = transferPackages.find(
-        (p) => p.slug?.includes(transferFrom.toLowerCase())
+      bookingStore.resetBooking();
+      bookingStore.setBookingType("transfer");
+      bookingStore.setPackage(
+        selectedRoute.id,
+        `Transfer: ${transferFrom} to ${transferTo}`
       );
-
-      // Set booking data in store
-      bookingStore.resetBooking(); // Start fresh
-      bookingStore.setBookingType('transfer');
-
-      if (transferPkg) {
-        bookingStore.setPackage(transferPkg.id, transferPkg.title);
-      } else {
-        bookingStore.setPackage('', `Transfer: ${transferFrom} to ${transferTo || 'Nainital'}`);
-      }
-
       bookingStore.setVehicleType(transferVehicle);
       bookingStore.setTripDate(transferDate);
       bookingStore.setPickupLocation(transferFrom);
-      bookingStore.setDropoffLocation(transferTo || 'Nainital');
+      bookingStore.setDropoffLocation(transferTo);
 
-      // Navigate to booking page
-      router.push('/booking');
+      if (priceInfo) {
+        bookingStore.setCalculatedPrice(priceInfo.price, "", priceInfo.season);
+      }
+
+      router.push("/booking");
     } catch (error) {
       console.error("Transfer booking error:", error);
       alert("Something went wrong. Please try again or contact us directly.");
@@ -165,6 +288,7 @@ export default function BookingWidget() {
   };
 
   const today = new Date().toISOString().split("T")[0];
+  const dropLocations = getDropLocations();
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -322,13 +446,14 @@ export default function BookingWidget() {
               <Select
                 id="transfer-from"
                 value={transferFrom}
-                onChange={(e) => setTransferFrom(e.target.value)}
+                onChange={(e) => handlePickupChange(e.target.value)}
               >
                 <option value="">Choose pick-up point</option>
-                <option value="Pantnagar Airport">Pantnagar Airport</option>
-                <option value="Kathgodam Railway Station">Kathgodam Railway Station</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Haldwani">Haldwani</option>
+                {pickupLocations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
               </Select>
             </div>
 
@@ -341,12 +466,20 @@ export default function BookingWidget() {
                 id="transfer-to"
                 value={transferTo}
                 onChange={(e) => setTransferTo(e.target.value)}
+                disabled={!transferFrom || dropLocations.length === 0}
               >
-                <option value="">Choose drop point</option>
-                <option value="Nainital">Nainital</option>
-                <option value="Bhimtal">Bhimtal</option>
-                <option value="Ranikhet">Ranikhet</option>
-                <option value="Mukteshwar">Mukteshwar</option>
+                <option value="">
+                  {!transferFrom
+                    ? "Select pickup first"
+                    : dropLocations.length === 0
+                    ? "No routes available"
+                    : "Choose drop point"}
+                </option>
+                {dropLocations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
               </Select>
             </div>
 
@@ -373,22 +506,76 @@ export default function BookingWidget() {
                 id="transfer-vehicle"
                 value={transferVehicle}
                 onChange={(e) => setTransferVehicle(e.target.value as VehicleType)}
+                disabled={!selectedRoute}
               >
-                {VEHICLE_OPTIONS.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.label} ({v.capacity})
-                  </option>
-                ))}
+                {selectedRoute ? (
+                  getAvailableVehiclesForRoute(selectedRoute).map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label} ({v.capacity})
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Select route first</option>
+                )}
               </Select>
+              {selectedRoute && getAvailableVehiclesForRoute(selectedRoute).length === 0 && (
+                <p className="text-xs text-coral mt-1">
+                  No vehicles available for this route. Please contact us directly.
+                </p>
+              )}
             </div>
           </div>
+
+          {/* Route Info */}
+          {selectedRoute && (
+            <div className="bg-teal/10 border-2 border-teal/30 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-display text-lg text-ink">
+                    {selectedRoute.pickup_location} → {selectedRoute.drop_location}
+                  </div>
+                  {(selectedRoute.distance || selectedRoute.duration) && (
+                    <div className="text-sm text-ink/60 mt-1">
+                      {selectedRoute.distance && `${selectedRoute.distance} km`}
+                      {selectedRoute.distance && selectedRoute.duration && " • "}
+                      {selectedRoute.duration}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Price Display */}
+          {priceInfo && selectedRoute && (
+            <div className="bg-sunshine/30 border-2 border-ink rounded-xl p-4 text-center">
+              <div className="text-3xl font-display font-bold text-ink">
+                ₹{priceInfo.price.toLocaleString()}
+              </div>
+              <div className="text-sm text-ink/70">
+                {priceInfo.season === "Season" ? "Peak Season Price" : "Off-Season Price"}
+              </div>
+              {!priceInfo.bookingAllowed && priceInfo.message && (
+                <div className="mt-2 text-sm text-coral font-medium">
+                  {priceInfo.message}
+                </div>
+              )}
+            </div>
+          )}
 
           <Button
             variant="primary"
             size="lg"
             className="w-full"
             onClick={handleTransferBooking}
-            disabled={loading || !transferFrom || !transferDate}
+            disabled={
+              loading ||
+              !transferFrom ||
+              !transferTo ||
+              !transferDate ||
+              !selectedRoute ||
+              !selectedRoute.enable_online_booking
+            }
           >
             {loading ? (
               <>
@@ -399,10 +586,17 @@ export default function BookingWidget() {
               "Continue to Booking"
             )}
           </Button>
+
+          {routes.length === 0 && (
+            <div className="text-center py-6 text-ink/60 font-body">
+              <p>No transfer routes available at the moment.</p>
+              <p className="text-sm mt-2">Please contact us directly for transfers.</p>
+            </div>
+          )}
         </div>
       )}
 
-      <p className="text-center text-sm text-ink/60 mt-4">
+      <p className="text-sm text-center text-ink/60 font-body mt-6">
         Instant booking for available dates - WhatsApp support for sold-out dates
       </p>
     </Card>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useBookingStore, VehicleType, BookingType } from '@/store/bookingStore';
 import { Button, Badge } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, Users, MapPin, Clock, Car } from 'lucide-react';
+import { ArrowRight, Users, MapPin, Clock, Car, ExternalLink } from 'lucide-react';
 import { getVehicleTypeName, getVehicleCapacity } from '@/lib/pricing';
 
 interface Package {
@@ -144,110 +144,130 @@ export default function Step1PackageSelection() {
           ) : (
             <div className="grid gap-4">
               {packages.map((pkg) => (
-                <button
+                <div
                   key={pkg.id}
-                  onClick={() => handlePackageSelect(pkg)}
                   className={`
-                    text-left p-6 rounded-2xl border-4 transition-all duration-200
+                    relative p-6 rounded-2xl border-4 transition-all duration-200
                     ${
                       packageId === pkg.id
-                        ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
+                        ? 'border-[#FFD93D] bg-gradient-to-br from-[#FFF8E7] to-[#FFF0D4] shadow-[6px_6px_0px_#FFD93D] ring-4 ring-[#FFD93D]/30'
                         : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
                     }
                   `}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-[#2D3436] mb-1">
-                        {pkg.title}
-                      </h3>
-                      <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
-                        {pkg.duration && (
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{pkg.duration}</span>
-                          </div>
-                        )}
-                        {pkg.distance && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            <span>{pkg.distance}</span>
-                          </div>
-                        )}
+                  <button
+                    onClick={() => handlePackageSelect(pkg)}
+                    className="text-left w-full"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className={`font-bold text-lg mb-1 ${packageId === pkg.id ? 'text-[#2D3436]' : 'text-[#2D3436]'}`}>
+                          {pkg.title}
+                        </h3>
+                        <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
+                          {pkg.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{pkg.duration}</span>
+                            </div>
+                          )}
+                          {pkg.distance && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{pkg.distance}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      {pkg.is_popular && (
+                        <Badge variant="accent">Popular</Badge>
+                      )}
                     </div>
-                    {pkg.is_popular && (
-                      <Badge variant="accent">Popular</Badge>
-                    )}
-                  </div>
 
-                  {pkg.places_covered && pkg.places_covered.length > 0 && (
-                    <div className="text-sm text-gray-600">
-                      <span className="font-semibold">Covers:</span>{' '}
-                      {pkg.places_covered.slice(0, 3).join(', ')}
-                      {pkg.places_covered.length > 3 && ` +${pkg.places_covered.length - 3} more`}
-                    </div>
-                  )}
-                </button>
+                    {pkg.places_covered && pkg.places_covered.length > 0 && (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-semibold">Covers:</span>{' '}
+                        {pkg.places_covered.slice(0, 3).join(', ')}
+                        {pkg.places_covered.length > 3 && ` +${pkg.places_covered.length - 3} more`}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* View Details Button */}
+                  <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                    <a
+                      href={`/tour/${pkg.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View Full Details
+                    </a>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Vehicle Type Selection */}
+      {/* Vehicle Type Selection - appears after package selection */}
       {packageId && (
-        <div>
-          <label className="block text-sm font-bold text-[#2D3436] mb-3">
-            Choose Your Vehicle
-          </label>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {vehicleTypes.map((vehicle) => (
-              <button
-                key={vehicle.type}
-                onClick={() => setVehicleType(vehicle.type)}
-                className={`
-                  p-6 rounded-2xl border-4 transition-all duration-200 text-left
-                  ${
-                    vehicleType === vehicle.type
-                      ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
-                      : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                  }
-                `}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="text-3xl">{vehicle.emoji}</div>
-                  {vehicle.badge && (
-                    <Badge variant="secondary" size="sm">
-                      {vehicle.badge}
-                    </Badge>
-                  )}
-                </div>
-                <div className="font-bold text-[#2D3436] mb-1">
-                  {getVehicleTypeName(vehicle.type)}
-                </div>
-                <div className="flex items-center gap-1 text-sm text-gray-600">
-                  <Users className="w-4 h-4" />
-                  <span>Up to {getVehicleCapacity(vehicle.type)} passengers</span>
-                </div>
-              </button>
-            ))}
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-bold text-[#2D3436] mb-3">
+              Choose Your Vehicle
+            </label>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {vehicleTypes.map((vehicle) => (
+                <button
+                  key={vehicle.type}
+                  onClick={() => setVehicleType(vehicle.type)}
+                  className={`
+                    p-6 rounded-2xl border-4 transition-all duration-200 text-left
+                    ${
+                      vehicleType === vehicle.type
+                        ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
+                        : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="text-3xl">{vehicle.emoji}</div>
+                    {vehicle.badge && (
+                      <Badge variant="secondary" size="sm">
+                        {vehicle.badge}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="font-bold text-[#2D3436] mb-1">
+                    {getVehicleTypeName(vehicle.type)}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <Users className="w-4 h-4" />
+                    <span>Up to {getVehicleCapacity(vehicle.type)} passengers</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Next Button - appears right after vehicle selection */}
+          <div className="flex justify-end pt-6 border-t-2 border-gray-200">
+            <Button
+              onClick={handleNext}
+              disabled={!packageId || !vehicleType}
+              size="lg"
+              className="group"
+            >
+              Continue to Trip Details
+              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
           </div>
         </div>
       )}
-
-      {/* Next Button */}
-      <div className="flex justify-end pt-6 border-t-2 border-gray-200">
-        <Button
-          onClick={handleNext}
-          disabled={!packageId || !vehicleType}
-          size="lg"
-          className="group"
-        >
-          Continue to Trip Details
-          <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-        </Button>
-      </div>
     </div>
   );
 }

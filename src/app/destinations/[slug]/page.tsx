@@ -1,8 +1,12 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Header, Button, Card, CardContent } from "@/components/ui";
-import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar } from "lucide-react";
+import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar, Shield, UserCheck, Heart, Sparkles } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import DestinationPricingCard from "@/components/destinations/DestinationPricingCard";
+import DetailedAttractions from "@/components/packages/DetailedAttractions";
+import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
+import BookingInstructions from "@/components/packages/BookingInstructions";
 import {
   getDestinationBySlug,
   getPackages,
@@ -10,6 +14,7 @@ import {
   getSeasonDateRanges,
   Package,
 } from "@/lib/supabase";
+import { TransferContent } from "@/lib/supabase/types";
 
 interface DestinationPageProps {
   params: {
@@ -249,52 +254,19 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
                 const offSeasonPrice = prices["Off-Season"] || 0;
 
                 return (
-                  <Card key={vehicleType} className="overflow-hidden">
-                    <div className="bg-gradient-to-br from-teal/10 to-teal/5 p-6">
-                      <Car className="w-12 h-12 text-teal mb-3" />
-                      <h3 className="font-display text-2xl text-ink mb-1">
-                        {vehicle?.name || vehicleType}
-                      </h3>
-                      <p className="text-sm text-ink/60 mb-2">{vehicle?.capacity}</p>
-                      <p className="text-xs text-ink/50">{vehicle?.model}</p>
-                    </div>
-
-                    <CardContent className="pt-6 space-y-4">
-                      {/* Off-Season Price */}
-                      <div className="border-2 border-ink/20 rounded-lg p-3 bg-white">
-                        <div className="text-xs font-body text-ink/60 mb-1">Off-Season</div>
-                        <div className="text-2xl font-display text-teal">₹{offSeasonPrice.toLocaleString()}</div>
-                        <div className="text-xs text-ink/50 mt-1">
-                          {offSeasonDates.length > 0 ? offSeasonDates[0] : "Regular pricing"}
-                        </div>
-                      </div>
-
-                      {/* Season Price */}
-                      <div className="border-2 border-sunshine rounded-lg p-3 bg-sunshine/10">
-                        <div className="text-xs font-body text-ink/60 mb-1">Peak Season</div>
-                        <div className="text-2xl font-display text-ink">₹{seasonPrice.toLocaleString()}</div>
-                        <div className="text-xs text-ink/50 mt-1">
-                          {seasonDates.length > 0 ? seasonDates.join(", ") : "Peak pricing"}
-                        </div>
-                      </div>
-
-                      {/* Features */}
-                      <div className="space-y-2 pt-2 border-t border-ink/10">
-                        <div className="flex items-center text-sm text-ink/70">
-                          <CheckCircle2 className="w-4 h-4 text-teal mr-2 flex-shrink-0" />
-                          <span className="font-body">Experienced driver</span>
-                        </div>
-                        <div className="flex items-center text-sm text-ink/70">
-                          <CheckCircle2 className="w-4 h-4 text-teal mr-2 flex-shrink-0" />
-                          <span className="font-body">Fuel & tolls included</span>
-                        </div>
-                        <div className="flex items-center text-sm text-ink/70">
-                          <CheckCircle2 className="w-4 h-4 text-teal mr-2 flex-shrink-0" />
-                          <span className="font-body">AC & music system</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <DestinationPricingCard
+                    key={vehicleType}
+                    vehicleType={vehicleType}
+                    vehicle={vehicle || { name: vehicleType, capacity: "", model: "" }}
+                    seasonPrice={seasonPrice}
+                    offSeasonPrice={offSeasonPrice}
+                    seasonDates={seasonDates}
+                    offSeasonDates={offSeasonDates}
+                    destinationSlug={params.slug}
+                    destinationName={destination.name}
+                    packageId={transferPackage?.id || ""}
+                    packageTitle={transferPackage?.title || `Nainital to ${destination.name}`}
+                  />
                 );
               })}
             </div>
@@ -340,44 +312,105 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
             <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
               Why Book {destination.name} Taxi With Us?
             </h2>
-            <p className="text-lg font-body text-ink/70">Your comfort and safety are our top priorities</p>
+            <p className="text-lg font-body text-ink/70">Your safety is our top priority - not the lowest price</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">💰</div>
-                <h3 className="font-display text-xl mb-2">Fixed Pricing</h3>
-                <p className="font-body text-ink/70">Transparent rates with no hidden charges</p>
+                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-7 h-7 text-teal" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Zero Alcohol Policy</h3>
+                <p className="font-body text-ink/70 text-sm">Strict sobriety standards with no exceptions for your safety</p>
               </CardContent>
             </Card>
 
             <Card className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">✅</div>
-                <h3 className="font-display text-xl mb-2">Safe & Verified</h3>
-                <p className="font-body text-ink/70">Background-checked, licensed drivers</p>
+                <div className="w-14 h-14 bg-coral/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <UserCheck className="w-7 h-7 text-coral" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Verified Drivers</h3>
+                <p className="font-body text-ink/70 text-sm">Background-checked, professionally trained drivers</p>
               </CardContent>
             </Card>
 
             <Card className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">🚗</div>
-                <h3 className="font-display text-xl mb-2">Clean Cars</h3>
-                <p className="font-body text-ink/70">Well-maintained, sanitized vehicles</p>
+                <div className="w-14 h-14 bg-sunshine/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Heart className="w-7 h-7 text-ink" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Family-First Care</h3>
+                <p className="font-body text-ink/70 text-sm">Drivers who treat passengers like their own family</p>
               </CardContent>
             </Card>
 
             <Card className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">📞</div>
-                <h3 className="font-display text-xl mb-2">24/7 Support</h3>
-                <p className="font-body text-ink/70">Round-the-clock customer assistance</p>
+                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-7 h-7 text-teal" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Spotless Vehicles</h3>
+                <p className="font-body text-ink/70 text-sm">Daily sanitized, well-maintained comfortable cars</p>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
+
+      {/* Destination Information Paragraphs - Admin Managed */}
+      {transferPackage?.itinerary && (() => {
+        const content = transferPackage.itinerary as TransferContent;
+        if (!content.paragraphs || content.paragraphs.length === 0) return null;
+
+        return (
+          <section className="py-16 px-4">
+            <div className="container mx-auto max-w-4xl space-y-8">
+              {content.paragraphs.map((para, idx) => (
+                para.title && para.content ? (
+                  <Card key={idx} className="overflow-hidden">
+                    <CardContent className="pt-6">
+                      <h2 className="text-2xl md:text-3xl font-display text-ink mb-4">
+                        {para.title}
+                      </h2>
+                      <p className="font-body text-ink/80 leading-relaxed whitespace-pre-line">
+                        {para.content}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : null
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* Detailed Attractions */}
+      {transferPackage?.itinerary && (() => {
+        const content = transferPackage.itinerary as TransferContent;
+        if (!content.detailed_attractions || content.detailed_attractions.length === 0) return null;
+
+        return (
+          <DetailedAttractions
+            attractions={content.detailed_attractions}
+            flexibilityNote={content.itinerary_flexibility_note}
+          />
+        );
+      })()}
+
+      {/* Detailed Inclusions / Exclusions */}
+      {transferPackage?.itinerary && (() => {
+        const content = transferPackage.itinerary as TransferContent;
+        if (!content.detailed_includes && !content.detailed_excludes) return null;
+
+        return (
+          <DetailedInclusionsExclusions
+            includes={content.detailed_includes}
+            excludes={content.detailed_excludes}
+          />
+        );
+      })()}
 
       {/* FAQ Section */}
       <section className="py-20 px-4">
@@ -441,11 +474,23 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         </div>
       </section>
 
+      {/* Booking Instructions */}
+      {transferPackage?.itinerary && (() => {
+        const content = transferPackage.itinerary as TransferContent;
+        if (!content.booking_instructions) return null;
+
+        return <BookingInstructions instructions={content.booking_instructions} />;
+      })()}
+
       {/* Footer */}
       <footer className="py-12 px-4 border-t-3 border-ink">
         <div className="container mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Shield className="w-5 h-5 text-teal" />
+            <p className="font-display text-ink">Your Safety. Our Promise.</p>
+          </div>
           <p className="font-body text-ink/70 mb-4">
-            © 2024 Nainital Taxi. Making your mountain memories special.
+            © 2024 Nainital Taxi. Trusted by families across India.
           </p>
           <div className="flex justify-center gap-4 flex-wrap">
             <Button variant="whatsapp" size="sm">

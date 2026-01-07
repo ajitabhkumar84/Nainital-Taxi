@@ -31,6 +31,8 @@ const STATUS_OPTIONS: { value: BookingStatus | "all"; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,12 +70,22 @@ export default function BookingsPage() {
   const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus) => {
     setUpdatingStatus(bookingId);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("bookings") as any)
-        .update({ status: newStatus })
-        .eq("id", bookingId);
+      const response = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
+          bookingId,
+          updates: { status: newStatus },
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update status");
+      }
 
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
@@ -98,12 +110,19 @@ export default function BookingsPage() {
         updates.status = "confirmed";
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("bookings") as any)
-        .update(updates)
-        .eq("id", bookingId);
+      const response = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({ bookingId, updates }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update payment status");
+      }
 
       setBookings((prev) =>
         prev.map((b) =>
@@ -127,9 +146,51 @@ export default function BookingsPage() {
       booking.customer_name.toLowerCase().includes(query) ||
       booking.customer_phone.includes(query) ||
       booking.package_name.toLowerCase().includes(query) ||
-      booking.booking_date.includes(query)
+      booking.booking_date.includes(query) ||
+      (booking.booking_id && booking.booking_id.toLowerCase().includes(query))
     );
   });
+
+  const updateAdvanceStatus = async (bookingId: string, received: boolean) => {
+    setUpdatingStatus(bookingId);
+    try {
+      const updates: Record<string, unknown> = {
+        advance_received: received,
+      };
+
+      if (received) {
+        updates.advance_received_at = new Date().toISOString();
+        updates.payment_status = "received";
+      }
+
+      const response = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({ bookingId, updates }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update advance status");
+      }
+
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? { ...b, advance_received: received, payment_status: received ? "received" : b.payment_status }
+            : b
+        )
+      );
+    } catch (error) {
+      console.error("Error updating advance status:", error);
+      alert("Failed to update advance status. Please try again.");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
 
   const getStatusColor = (status: BookingStatus) => {
     switch (status) {
@@ -259,9 +320,16 @@ export default function BookingsPage() {
                       🚕
                     </div>
                     <div>
-                      <h3 className="font-display text-lg text-ink">
-                        {booking.customer_name}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-display text-lg text-ink">
+                          {booking.customer_name}
+                        </h3>
+                        {booking.booking_id && (
+                          <span className="px-2 py-0.5 bg-teal/20 text-teal text-xs font-mono rounded-md">
+                            {booking.booking_id}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-ink/60 font-body text-sm">
                         {booking.package_name}
                       </p>
@@ -394,6 +462,41 @@ export default function BookingsPage() {
 
                   {/* Payment & Status Actions */}
                   <div className="mt-6 pt-4 border-t-2 border-ink/10">
+                    {/* Advance Payment Info */}
+                    {booking.advance_amount && booking.advance_amount > 0 && (
+                      <div className="mb-4 p-3 bg-teal/10 rounded-xl border-2 border-teal/30">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="text-sm font-body text-ink/60">Advance (25%)</span>
+                            <div className="font-display text-lg text-teal">
+                              {formatPrice(booking.advance_amount)}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-sm font-body text-ink/60">Remaining</span>
+                            <div className="font-display text-lg text-ink">
+                              {formatPrice(booking.final_price - booking.advance_amount)}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {booking.advance_received ? (
+                              <span className="px-3 py-1 bg-whatsapp/20 text-whatsapp border-2 border-whatsapp rounded-lg text-sm font-body font-semibold">
+                                ✅ Advance Received
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => updateAdvanceStatus(booking.id, true)}
+                                disabled={updatingStatus === booking.id}
+                                className="px-3 py-1 bg-sunshine border-2 border-ink rounded-lg text-sm font-body hover:bg-sunshine/80 transition-colors disabled:opacity-50"
+                              >
+                                Mark Advance Received
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-col md:flex-row gap-4">
                       {/* Payment Status */}
                       <div className="flex-1">
@@ -481,7 +584,7 @@ export default function BookingsPage() {
 
                   {/* Booking Meta */}
                   <div className="mt-4 pt-4 border-t-2 border-ink/10 flex flex-wrap gap-4 text-xs font-body text-ink/40">
-                    <span>ID: {booking.id.slice(0, 8)}...</span>
+                    <span>ID: {booking.booking_id || booking.id.slice(0, 8)}</span>
                     <span>Source: {booking.booking_source}</span>
                     <span>Created: {new Date(booking.created_at).toLocaleString("en-IN")}</span>
                   </div>

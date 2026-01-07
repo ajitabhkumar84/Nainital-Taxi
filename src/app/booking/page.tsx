@@ -1,6 +1,8 @@
 'use client';
 
-import { useBookingStore } from '@/store/bookingStore';
+import { useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useBookingStore, BookingType } from '@/store/bookingStore';
 import { CheckCircle2 } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
@@ -14,8 +16,28 @@ const steps = [
   { number: 4, title: 'Payment', description: 'Complete booking' },
 ];
 
-export default function BookingPage() {
+// Wrapper component to handle URL params
+function BookingPageContent() {
+  const searchParams = useSearchParams();
   const currentStep = useBookingStore((state) => state.currentStep);
+  const setPackage = useBookingStore((state) => state.setPackage);
+  const setBookingType = useBookingStore((state) => state.setBookingType);
+  const packageId = useBookingStore((state) => state.packageId);
+
+  // Pre-populate from URL parameters
+  useEffect(() => {
+    const urlPackageId = searchParams.get('packageId');
+    const urlPackageTitle = searchParams.get('packageTitle');
+    const urlPackageType = searchParams.get('packageType') as BookingType | null;
+
+    // Only pre-populate if we have URL params AND no package is already selected
+    if (urlPackageId && urlPackageTitle && !packageId) {
+      setPackage(urlPackageId, decodeURIComponent(urlPackageTitle));
+      if (urlPackageType) {
+        setBookingType(urlPackageType);
+      }
+    }
+  }, [searchParams, packageId, setPackage, setBookingType]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">
@@ -143,5 +165,41 @@ export default function BookingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback for Suspense
+function BookingLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
+            Book Your Ride
+          </h1>
+          <p className="text-lg text-[#636E72]">Loading booking form...</p>
+        </div>
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl shadow-2xl border-4 border-[#2D3436] p-8 md:p-12 animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-2/3 mb-8"></div>
+            <div className="space-y-4">
+              <div className="h-12 bg-gray-200 rounded"></div>
+              <div className="h-12 bg-gray-200 rounded"></div>
+              <div className="h-12 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Export default with Suspense wrapper
+export default function BookingPage() {
+  return (
+    <Suspense fallback={<BookingLoading />}>
+      <BookingPageContent />
+    </Suspense>
   );
 }

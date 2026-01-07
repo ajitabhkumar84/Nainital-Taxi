@@ -2,13 +2,30 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Phone, Menu, X } from "lucide-react";
+import { Phone, Menu, X, MessageCircle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Button from "./Button";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { HeaderConfig, DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 
-export default function Header() {
+interface HeaderProps {
+  config?: HeaderConfig;
+}
+
+const ctaIcons = {
+  phone: Phone,
+  whatsapp: MessageCircle,
+  arrow: ArrowRight,
+  none: null,
+};
+
+export default function Header({ config: propConfig }: HeaderProps) {
+  const { config: siteConfig, isLoading } = useSiteConfig();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Use prop config if provided, otherwise use fetched config, fallback to default
+  const headerConfig = propConfig || siteConfig?.header || DEFAULT_SITE_CONFIG.header;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,14 +36,18 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/destinations", label: "Destinations" },
-    { href: "/packages", label: "Packages" },
-    { href: "/transfers", label: "Transfers" },
-    { href: "/fleet", label: "Fleet" },
-    { href: "/about", label: "About" },
-  ];
+  // Filter and sort active nav links
+  const activeNavLinks = headerConfig.navLinks
+    .filter(link => link.isActive)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+
+  // Get CTA button icons
+  const PrimaryIcon = headerConfig.ctaPrimary.icon
+    ? ctaIcons[headerConfig.ctaPrimary.icon]
+    : null;
+  const SecondaryIcon = headerConfig.ctaSecondary.icon
+    ? ctaIcons[headerConfig.ctaSecondary.icon]
+    : null;
 
   return (
     <header
@@ -42,17 +63,21 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <div className="text-3xl font-display text-ink">
-              🚕 <span className="text-sunshine">Nainital</span> Taxi
+              {headerConfig.logoEmoji}{" "}
+              <span className="text-sunshine">{headerConfig.logoText.split(" ")[0]}</span>{" "}
+              {headerConfig.logoText.split(" ").slice(1).join(" ")}
             </div>
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
-            {navLinks.map((link) => (
+            {activeNavLinks.map((link) => (
               <Link
-                key={link.href}
+                key={link.id}
                 href={link.href}
                 className="text-ink font-body font-semibold hover:text-teal transition-colors"
+                target={link.openInNewTab ? "_blank" : undefined}
+                rel={link.openInNewTab ? "noopener noreferrer" : undefined}
               >
                 {link.label}
               </Link>
@@ -61,17 +86,25 @@ export default function Header() {
 
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center space-x-4">
-            <a href="tel:+918445206116">
-              <Button variant="outline" size="sm">
-                <Phone className="w-4 h-4 mr-2" />
-                Call Now
-              </Button>
-            </a>
-            <Link href="/booking">
-              <Button variant="primary" size="sm">
-                Book Now
-              </Button>
-            </Link>
+            {/* Secondary CTA (usually Call/Phone) */}
+            {headerConfig.ctaSecondary.isActive && (
+              <a href={headerConfig.ctaSecondary.href}>
+                <Button variant={headerConfig.ctaSecondary.variant} size="sm">
+                  {SecondaryIcon && <SecondaryIcon className="w-4 h-4 mr-2" />}
+                  {headerConfig.ctaSecondary.text}
+                </Button>
+              </a>
+            )}
+
+            {/* Primary CTA (usually Book Now) */}
+            {headerConfig.ctaPrimary.isActive && (
+              <Link href={headerConfig.ctaPrimary.href}>
+                <Button variant={headerConfig.ctaPrimary.variant} size="sm">
+                  {PrimaryIcon && <PrimaryIcon className="w-4 h-4 mr-2" />}
+                  {headerConfig.ctaPrimary.text}
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -92,28 +125,35 @@ export default function Header() {
         {isMobileMenuOpen && (
           <div className="lg:hidden mt-4 pb-4 border-t-3 border-ink pt-4">
             <nav className="flex flex-col space-y-4">
-              {navLinks.map((link) => (
+              {activeNavLinks.map((link) => (
                 <Link
-                  key={link.href}
+                  key={link.id}
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="text-ink font-body font-semibold hover:text-teal transition-colors"
+                  target={link.openInNewTab ? "_blank" : undefined}
+                  rel={link.openInNewTab ? "noopener noreferrer" : undefined}
                 >
                   {link.label}
                 </Link>
               ))}
               <div className="flex flex-col space-y-2 pt-4">
-                <a href="tel:+918445206116">
-                  <Button variant="outline" size="md" className="w-full">
-                    <Phone className="w-4 h-4 mr-2" />
-                    Call Now
-                  </Button>
-                </a>
-                <Link href="/booking">
-                  <Button variant="primary" size="md" className="w-full">
-                    Book Now
-                  </Button>
-                </Link>
+                {headerConfig.ctaSecondary.isActive && (
+                  <a href={headerConfig.ctaSecondary.href}>
+                    <Button variant={headerConfig.ctaSecondary.variant} size="md" className="w-full">
+                      {SecondaryIcon && <SecondaryIcon className="w-4 h-4 mr-2" />}
+                      {headerConfig.ctaSecondary.text}
+                    </Button>
+                  </a>
+                )}
+                {headerConfig.ctaPrimary.isActive && (
+                  <Link href={headerConfig.ctaPrimary.href}>
+                    <Button variant={headerConfig.ctaPrimary.variant} size="md" className="w-full">
+                      {PrimaryIcon && <PrimaryIcon className="w-4 h-4 mr-2" />}
+                      {headerConfig.ctaPrimary.text}
+                    </Button>
+                  </Link>
+                )}
               </div>
             </nav>
           </div>

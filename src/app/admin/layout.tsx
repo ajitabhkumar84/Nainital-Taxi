@@ -14,10 +14,13 @@ import {
   Menu,
   X,
   RefreshCw,
+  Package,
+  MapPin,
+  Globe,
+  Car,
+  Route as RouteIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
 
 interface NavItem {
   href: string;
@@ -27,10 +30,15 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+  { href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
+  { href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
+  { href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
+  { href: "/admin/fleet", label: "Fleet", icon: <Car className="w-5 h-5" /> },
   { href: "/admin/availability", label: "Availability", icon: <Calendar className="w-5 h-5" /> },
   { href: "/admin/bookings", label: "Bookings", icon: <BookOpen className="w-5 h-5" /> },
   { href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },
   { href: "/admin/seasons", label: "Seasons", icon: <Sun className="w-5 h-5" /> },
+  { href: "/admin/site-config", label: "Site Config", icon: <Globe className="w-5 h-5" /> },
   { href: "/admin/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
@@ -39,22 +47,34 @@ function PasswordGate({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
-    // Simple password check
-    setTimeout(() => {
-      if (password === ADMIN_PASSWORD) {
-        localStorage.setItem("admin_authenticated", "true");
-        localStorage.setItem("admin_auth_time", Date.now().toString());
+    try {
+      // Call server-side authentication API
+      const response = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         onAuthenticated();
       } else {
-        setError("Incorrect password. Please try again.");
+        setError(data.error || 'Incorrect password. Please try again.');
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Authentication failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -114,10 +134,16 @@ function AdminSidebar({
 }) {
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    localStorage.removeItem("admin_authenticated");
-    localStorage.removeItem("admin_auth_time");
-    window.location.reload();
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', {
+        method: 'POST',
+      });
+      window.location.href = '/admin';
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/admin';
+    }
   };
 
   return (
@@ -202,23 +228,19 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Check authentication status
-    const authenticated = localStorage.getItem("admin_authenticated");
-    const authTime = localStorage.getItem("admin_auth_time");
-
-    // Session expires after 24 hours
-    if (authenticated && authTime) {
-      const elapsed = Date.now() - parseInt(authTime);
-      if (elapsed < 24 * 60 * 60 * 1000) {
-        setIsAuthenticated(true);
-      } else {
-        localStorage.removeItem("admin_authenticated");
-        localStorage.removeItem("admin_auth_time");
+    // Check authentication status with server
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/verify');
+        const data = await response.json();
+        setIsAuthenticated(data.authenticated);
+      } catch (error) {
+        console.error('Auth verification error:', error);
         setIsAuthenticated(false);
       }
-    } else {
-      setIsAuthenticated(false);
-    }
+    };
+
+    checkAuth();
   }, []);
 
   // Loading state

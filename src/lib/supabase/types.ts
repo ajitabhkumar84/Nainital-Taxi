@@ -20,6 +20,126 @@ export type BookingStatus =
 
 export type PackageType = 'tour' | 'transfer' | 'custom';
 
+// ============================================================================
+// ITINERARY & PACKAGE CONTENT TYPES
+// ============================================================================
+
+/**
+ * Day-wise itinerary for tour packages
+ */
+export interface DayPlan {
+  day_number: number;
+  title: string;
+  description: string;
+  time_start?: string; // e.g., "06:00 AM"
+  time_end?: string; // e.g., "10:00 AM"
+  highlights: string[];
+  meals_included?: string[];
+  overnight_stay?: string;
+}
+
+/**
+ * Hotel pricing tiers for tour packages
+ */
+export interface HotelOption {
+  id: string;
+  name: string;           // "Budget", "Standard", "Deluxe"
+  description: string;
+  hotels_included: string[];
+  price_modifier: Record<VehicleType, number>; // Additional price per vehicle type
+}
+
+/**
+ * FAQ item for packages
+ */
+export interface PackageFAQ {
+  question: string;
+  answer: string;
+}
+
+/**
+ * Detailed attraction/stop for tour packages
+ */
+export interface DetailedAttraction {
+  id: string;
+  order: number;
+  name: string;
+  description: string;
+  image_url?: string;
+  route_info?: string; // e.g., "Kathgodam → Jeolikote → Getia"
+  time_estimate?: string; // e.g., "1 Hour from Kathgodam"
+  is_highlighted?: boolean; // For special badges like "MOST POPULAR"
+  badge_text?: string; // e.g., "MOST POPULAR", "BEST VALUE"
+}
+
+/**
+ * Detailed inclusion/exclusion item with description
+ */
+export interface DetailedInclusionExclusion {
+  item: string;
+  description?: string; // Additional details
+  icon?: string; // Icon name or emoji
+  category?: string; // e.g., "Transportation", "Accommodation"
+}
+
+/**
+ * Booking instructions for package
+ */
+export interface BookingInstructions {
+  steps: Array<{
+    step_number: number;
+    title: string;
+    description: string;
+  }>;
+  contact_phone?: string;
+  whatsapp_number?: string;
+  whatsapp_message?: string; // Pre-filled message
+  additional_notes?: string;
+}
+
+/**
+ * Complete tour itinerary stored in Package.itinerary JSONB
+ */
+export interface TourItinerary {
+  days: DayPlan[];
+  hotel_options: HotelOption[];
+  faqs: PackageFAQ[];
+  detailed_attractions?: DetailedAttraction[]; // NEW
+  itinerary_flexibility_note?: string; // NEW
+  detailed_includes?: DetailedInclusionExclusion[]; // NEW
+  detailed_excludes?: DetailedInclusionExclusion[]; // NEW
+  booking_instructions?: BookingInstructions; // NEW
+}
+
+/**
+ * Transfer destination paragraph
+ */
+export interface TransferParagraph {
+  title: string;
+  content: string;
+}
+
+/**
+ * Transfer content stored in Package.itinerary JSONB for transfer type
+ */
+export interface TransferContent {
+  paragraphs: TransferParagraph[];
+  faqs: PackageFAQ[];
+  detailed_attractions?: DetailedAttraction[]; // NEW
+  itinerary_flexibility_note?: string; // NEW
+  detailed_includes?: DetailedInclusionExclusion[]; // NEW
+  detailed_excludes?: DetailedInclusionExclusion[]; // NEW
+  booking_instructions?: BookingInstructions; // NEW
+}
+
+/**
+ * Gallery image with name and URL
+ */
+export interface GalleryImage {
+  url: string;
+  name: string;
+}
+
 export type VehicleType = 'sedan' | 'suv_normal' | 'suv_deluxe' | 'suv_luxury';
 
 export type VehicleStatus = 'available' | 'booked' | 'maintenance' | 'retired';
@@ -158,7 +278,8 @@ export interface Package {
 
   // Media
   image_url?: string | null;
-  gallery_urls?: string[] | null;
+  gallery_urls?: string[] | null; // Legacy format
+  gallery_images?: GalleryImage[] | null; // New format with names
 
   // Badges & Status
   is_popular: boolean;
@@ -222,6 +343,62 @@ export interface Pricing {
   updated_at: string;
 }
 
+export interface Route {
+  id: string; // UUID
+
+  // Route Information
+  slug: string;
+  pickup_location: string;
+  drop_location: string;
+
+  // Details
+  distance?: number | null; // in kilometers
+  duration?: string | null; // e.g., "2 hours", "3.5 hours"
+  description?: string | null;
+
+  // Optional Features
+  featured_package_id?: string | null;
+  has_hotel_option: boolean;
+
+  // Destination Page Display
+  show_on_destination_page: boolean;
+
+  // Status
+  is_active: boolean;
+  enable_online_booking: boolean;
+
+  // SEO
+  meta_title?: string | null;
+  meta_description?: string | null;
+
+  // Metadata
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoutePricing {
+  id: string; // UUID
+
+  // Route and vehicle combination
+  route_id: string;
+  vehicle_type: VehicleType;
+
+  // Season name for pricing (Off-Season or Season)
+  season_name: 'Off-Season' | 'Season';
+
+  // The actual price
+  price: number;
+
+  // Notes
+  notes?: string | null;
+
+  // Metadata
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Availability {
   id: string; // UUID
   date: string; // YYYY-MM-DD
@@ -251,6 +428,7 @@ export interface Availability {
 
 export interface Booking {
   id: string; // UUID
+  booking_id?: string; // Human-readable ID: NT-YYYYMMDD-XXXX
 
   // Customer
   user_id?: string | null;
@@ -289,6 +467,11 @@ export interface Booking {
   upi_transaction_id?: string | null;
   payment_received_at?: string | null;
   payment_verified_at?: string | null;
+
+  // Advance Payment (25% or min Rs 500)
+  advance_amount?: number;
+  advance_received?: boolean;
+  advance_received_at?: string | null;
 
   // Status Management
   status: BookingStatus;
@@ -588,7 +771,8 @@ export interface Database {
 export type CreateBookingInput = Omit<
   Booking,
   'id' | 'created_at' | 'updated_at' | 'status' | 'payment_status' |
-  'whatsapp_message_sent' | 'confirmation_sent' | 'reminder_sent' | 'booking_source'
+  'whatsapp_message_sent' | 'confirmation_sent' | 'reminder_sent' | 'booking_source' |
+  'advance_received' | 'advance_received_at'
 > & {
   booking_source?: BookingSource;
 };
@@ -631,4 +815,204 @@ export interface AvailabilityCheckResult {
   status: AvailabilityStatus;
   cars_available: number;
   message?: string;
+}
+
+// ============================================================================
+// SITE CONFIGURATION TYPES
+// ============================================================================
+
+/**
+ * Navigation link for header/footer
+ */
+export interface NavLink {
+  id: string;
+  href: string;
+  label: string;
+  isActive: boolean;
+  displayOrder: number;
+  openInNewTab?: boolean;
+}
+
+/**
+ * Social media link
+ */
+export interface SocialLink {
+  id: string;
+  platform: 'whatsapp' | 'instagram' | 'facebook' | 'twitter' | 'youtube' | 'linkedin';
+  url: string;
+  isActive: boolean;
+  displayOrder: number;
+}
+
+/**
+ * Call-to-action button configuration
+ */
+export interface CTAButton {
+  id: string;
+  text: string;
+  href: string;
+  variant: 'primary' | 'secondary' | 'outline' | 'whatsapp';
+  icon?: 'phone' | 'whatsapp' | 'arrow' | 'none';
+  isActive: boolean;
+}
+
+/**
+ * Header configuration
+ */
+export interface HeaderConfig {
+  logoText: string;
+  logoEmoji: string;
+  navLinks: NavLink[];
+  ctaPrimary: CTAButton;
+  ctaSecondary: CTAButton;
+  showPhone: boolean;
+  phoneNumber: string;
+}
+
+/**
+ * Footer link section (e.g., Quick Links, Services)
+ */
+export interface FooterLinkSection {
+  id: string;
+  title: string;
+  links: NavLink[];
+  displayOrder: number;
+  isActive: boolean;
+}
+
+/**
+ * Footer configuration
+ */
+export interface FooterConfig {
+  tagline: string;
+  taglineIcon: string;
+  copyright: string;
+  description: string;
+  linkSections: FooterLinkSection[];
+  socialLinks: SocialLink[];
+  ctaButtons: CTAButton[];
+  showNewsletter: boolean;
+}
+
+/**
+ * Contact information
+ */
+export interface ContactConfig {
+  phone: string;
+  whatsapp: string;
+  email: string;
+  address: string;
+}
+
+/**
+ * Tracking and analytics configuration
+ */
+export interface TrackingConfig {
+  googleTagManagerId?: string;
+  googleAnalyticsId?: string;
+  facebookPixelId?: string;
+  customHeadScripts?: string; // Custom scripts to inject in <head>
+  customBodyScripts?: string; // Custom scripts to inject in <body>
+  isEnabled: boolean;
+}
+
+/**
+ * Complete site configuration
+ */
+export interface SiteConfig {
+  header: HeaderConfig;
+  footer: FooterConfig;
+  contact: ContactConfig;
+  tracking: TrackingConfig;
+  updatedAt?: string;
+}
+
+/**
+ * Default site configuration
+ */
+export const DEFAULT_SITE_CONFIG: SiteConfig = {
+  header: {
+    logoText: 'Nainital Taxi',
+    logoEmoji: '🚕',
+    navLinks: [
+      { id: '1', href: '/', label: 'Home', isActive: true, displayOrder: 0 },
+      { id: '2', href: '/destinations', label: 'Destinations', isActive: true, displayOrder: 1 },
+      { id: '3', href: '/tour', label: 'Tour Packages', isActive: true, displayOrder: 2 },
+      { id: '4', href: '/fleet', label: 'Fleet', isActive: true, displayOrder: 3 },
+      { id: '5', href: '/about', label: 'About', isActive: true, displayOrder: 4 },
+    ],
+    ctaPrimary: {
+      id: 'cta-primary',
+      text: 'Book Now',
+      href: '/booking',
+      variant: 'primary',
+      icon: 'none',
+      isActive: true,
+    },
+    ctaSecondary: {
+      id: 'cta-secondary',
+      text: 'Call Now',
+      href: 'tel:+918445206116',
+      variant: 'outline',
+      icon: 'phone',
+      isActive: true,
+    },
+    showPhone: true,
+    phoneNumber: '+918445206116',
+  },
+  footer: {
+    tagline: 'Your Safety. Our Promise.',
+    taglineIcon: 'shield',
+    copyright: '© 2024 Nainital Taxi. Trusted by families across India.',
+    description: 'Premium taxi services in Nainital and Uttarakhand. Safe, reliable, and family-friendly travel.',
+    linkSections: [
+      {
+        id: 'quick-links',
+        title: 'Quick Links',
+        links: [
+          { id: 'ql-1', href: '/', label: 'Home', isActive: true, displayOrder: 0 },
+          { id: 'ql-2', href: '/destinations', label: 'Destinations', isActive: true, displayOrder: 1 },
+          { id: 'ql-3', href: '/tour', label: 'Tour Packages', isActive: true, displayOrder: 2 },
+          { id: 'ql-4', href: '/fleet', label: 'Our Fleet', isActive: true, displayOrder: 3 },
+        ],
+        displayOrder: 0,
+        isActive: true,
+      },
+      {
+        id: 'support',
+        title: 'Support',
+        links: [
+          { id: 'sp-1', href: '/about', label: 'About Us', isActive: true, displayOrder: 0 },
+          { id: 'sp-2', href: '/contact', label: 'Contact', isActive: true, displayOrder: 1 },
+          { id: 'sp-3', href: '/faq', label: 'FAQ', isActive: true, displayOrder: 2 },
+        ],
+        displayOrder: 1,
+        isActive: true,
+      },
+    ],
+    socialLinks: [
+      { id: 'social-wa', platform: 'whatsapp', url: 'https://wa.me/918445206116', isActive: true, displayOrder: 0 },
+      { id: 'social-ig', platform: 'instagram', url: 'https://instagram.com/nanitaltaxi', isActive: true, displayOrder: 1 },
+      { id: 'social-fb', platform: 'facebook', url: 'https://facebook.com/nanitaltaxi', isActive: true, displayOrder: 2 },
+    ],
+    ctaButtons: [
+      { id: 'footer-cta-1', text: 'WhatsApp Us', href: 'https://wa.me/918445206116', variant: 'whatsapp', icon: 'whatsapp', isActive: true },
+      { id: 'footer-cta-2', text: 'Call Now', href: 'tel:+918445206116', variant: 'outline', icon: 'phone', isActive: true },
+    ],
+    showNewsletter: false,
+  },
+  contact: {
+    phone: '+918445206116',
+    whatsapp: '+918445206116',
+    email: 'info@nanitaltaxi.com',
+    address: 'Nainital, Uttarakhand, India',
+  },
+  tracking: {
+    googleTagManagerId: '',
+    googleAnalyticsId: '',
+    facebookPixelId: '',
+    customHeadScripts: '',
+    customBodyScripts: '',
+    isEnabled: false,
+  },
 }

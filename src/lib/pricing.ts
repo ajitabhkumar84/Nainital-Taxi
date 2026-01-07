@@ -10,8 +10,8 @@ export interface PriceResult {
 }
 
 interface SeasonResult {
-  season_id: string;
-  season_name: string;
+  id: string;
+  name: string;
 }
 
 interface PricingRow {
@@ -29,25 +29,40 @@ export async function getPackagePrice(
   date: string // ISO date string
 ): Promise<PriceResult | null> {
   try {
-    // 1. Get the season for the given date using the existing query function
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: seasonData, error: seasonError } = await (supabase.rpc as any)('get_season_for_date', {
-      check_date: date
-    });
+    // 1. Get the season for the given date by querying seasons table directly
+    const { data: seasonData, error: seasonError } = await supabase
+      .from('seasons')
+      .select('id, name')
+      .eq('is_active', true)
+      .lte('start_date', date)
+      .gte('end_date', date)
+      .order('name', { ascending: false }) // 'Season' comes before 'Off-Season'
+      .limit(1)
+      .single();
 
-    if (seasonError) {
-      console.error('Error fetching season:', seasonError);
-      return null;
+    let season: SeasonResult;
+
+    if (seasonError || !seasonData) {
+      // Default to Off-Season if no season found for date
+      const { data: offSeasonData } = await supabase
+        .from('seasons')
+        .select('id, name')
+        .eq('is_active', true)
+        .eq('name', 'Off-Season')
+        .limit(1)
+        .single();
+
+      if (offSeasonData) {
+        season = offSeasonData as SeasonResult;
+      } else {
+        // Fallback - use 'Off-Season' as default name
+        season = { id: '', name: 'Off-Season' };
+      }
+    } else {
+      season = seasonData as SeasonResult;
     }
 
-    if (!seasonData || (Array.isArray(seasonData) && seasonData.length === 0)) {
-      console.error('No season found for date:', date);
-      return null;
-    }
-
-    const season: SeasonResult = Array.isArray(seasonData) ? seasonData[0] : seasonData;
-
-    // 2. Get the price for the package, vehicle type, and season
+    // 2. Get the price for the package, vehicle type, and season_name
     const { data, error: pricingError } = await supabase
       .from('pricing')
       .select(`
@@ -58,7 +73,7 @@ export async function getPackagePrice(
       `)
       .eq('package_id', packageId)
       .eq('vehicle_type', vehicleType)
-      .eq('season_id', season.season_id)
+      .eq('season_name', season.name)
       .single();
 
     if (pricingError) {
@@ -67,7 +82,7 @@ export async function getPackagePrice(
     }
 
     if (!data) {
-      console.error('No pricing found for:', { packageId, vehicleType, seasonId: season.season_id });
+      console.error('No pricing found for:', { packageId, vehicleType, seasonName: season.name });
       return null;
     }
 
@@ -75,8 +90,8 @@ export async function getPackagePrice(
 
     return {
       price: pricing.price,
-      seasonId: season.season_id,
-      seasonName: season.season_name,
+      seasonId: season.id,
+      seasonName: season.name,
       vehicleType,
       packageTitle: pricing.packages?.title || 'Package'
     };

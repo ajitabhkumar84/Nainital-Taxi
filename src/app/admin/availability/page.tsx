@@ -29,6 +29,8 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
+
 export default function AvailabilityPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availability, setAvailability] = useState<Record<string, DayAvailability>>({});
@@ -124,18 +126,27 @@ export default function AvailabilityPage() {
       const newCarsBooked = Math.max(0, Math.min(fleetSize, (current?.cars_booked || 0) + change));
       const newCarsAvailable = fleetSize - newCarsBooked;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("availability") as any)
-        .upsert({
+      const response = await fetch("/api/availability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
           date: dateStr,
           total_fleet_size: fleetSize,
           cars_booked: newCarsBooked,
-          // cars_available and status are computed by database
           is_blocked: current?.is_blocked || false,
           internal_notes: current?.internal_notes || null,
-        }, { onConflict: "date" });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update availability");
+      }
+
+      const { data } = await response.json();
 
       setAvailability((prev) => ({
         ...prev,
@@ -144,7 +155,7 @@ export default function AvailabilityPage() {
           total_fleet_size: fleetSize,
           cars_booked: newCarsBooked,
           cars_available: newCarsAvailable,
-          status,
+          status: data?.status || (newCarsAvailable === 0 ? "sold_out" : newCarsAvailable <= 2 ? "limited" : "available"),
           is_blocked: current?.is_blocked || false,
           internal_notes: current?.internal_notes || null,
         },
@@ -163,18 +174,25 @@ export default function AvailabilityPage() {
       const current = availability[dateStr];
       const newBlocked = !current?.is_blocked;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("availability") as any)
-        .upsert({
+      const response = await fetch("/api/availability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
           date: dateStr,
           total_fleet_size: fleetSize,
           cars_booked: current?.cars_booked || 0,
-          // cars_available is computed by database, don't insert it
           is_blocked: newBlocked,
           internal_notes: current?.internal_notes || null,
-        }, { onConflict: "date" });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to toggle block");
+      }
 
       setAvailability((prev) => ({
         ...prev,
@@ -203,18 +221,25 @@ export default function AvailabilityPage() {
     try {
       const current = availability[selectedDate];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("availability") as any)
-        .upsert({
+      const response = await fetch("/api/availability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
           date: selectedDate,
           total_fleet_size: fleetSize,
           cars_booked: current?.cars_booked || 0,
-          // cars_available is computed by database, don't insert it
           is_blocked: current?.is_blocked || false,
           internal_notes: notes || null,
-        }, { onConflict: "date" });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save notes");
+      }
 
       setAvailability((prev) => ({
         ...prev,

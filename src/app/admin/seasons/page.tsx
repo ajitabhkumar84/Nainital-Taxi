@@ -23,6 +23,8 @@ interface Season {
   is_recurring: boolean;
 }
 
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
+
 export default function SeasonsPage() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,19 +63,29 @@ export default function SeasonsPage() {
   const saveSeason = async (season: Season) => {
     setSaving(season.id);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("seasons") as any)
-        .update({
-          name: season.name,
-          description: season.description,
-          start_date: season.start_date,
-          end_date: season.end_date,
-          is_active: season.is_active,
-          is_recurring: season.is_recurring,
-        })
-        .eq("id", season.id);
+      const response = await fetch("/api/admin/seasons", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
+          id: season.id,
+          updates: {
+            name: season.name,
+            description: season.description,
+            start_date: season.start_date,
+            end_date: season.end_date,
+            is_active: season.is_active,
+            is_recurring: season.is_recurring,
+          },
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save season");
+      }
 
       setSeasons((prev) =>
         prev.map((s) => (s.id === season.id ? season : s))
@@ -95,20 +107,27 @@ export default function SeasonsPage() {
 
     setSaving("new");
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from("seasons") as any)
-        .insert({
+      const response = await fetch("/api/admin/seasons", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
           name: newSeason.name,
           description: newSeason.description || null,
           start_date: newSeason.start_date,
           end_date: newSeason.end_date,
-          is_active: true,
           is_recurring: newSeason.is_recurring,
-        })
-        .select()
-        .single();
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to add season");
+      }
+
+      const { data } = await response.json();
 
       if (data) {
         setSeasons((prev) => [...prev, data as Season]);
@@ -132,12 +151,22 @@ export default function SeasonsPage() {
   const toggleSeasonActive = async (season: Season) => {
     setSaving(season.id);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("seasons") as any)
-        .update({ is_active: !season.is_active })
-        .eq("id", season.id);
+      const response = await fetch("/api/admin/seasons", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+        body: JSON.stringify({
+          id: season.id,
+          updates: { is_active: !season.is_active },
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to toggle season");
+      }
 
       setSeasons((prev) =>
         prev.map((s) =>
@@ -158,12 +187,17 @@ export default function SeasonsPage() {
 
     setSaving(seasonId);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("seasons") as any)
-        .delete()
-        .eq("id", seasonId);
+      const response = await fetch(`/api/admin/seasons?id=${seasonId}`, {
+        method: "DELETE",
+        headers: {
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete season");
+      }
 
       setSeasons((prev) => prev.filter((s) => s.id !== seasonId));
     } catch (error) {

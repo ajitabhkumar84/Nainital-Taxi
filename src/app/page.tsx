@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Header, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from "@/components/ui";
-import { Car, MapPin, Clock, Star, Plane, Train, ArrowRight } from "lucide-react";
+import { Header, Footer, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from "@/components/ui";
+import { Car, MapPin, Clock, Star, Plane, Train, ArrowRight, Shield, UserCheck, Phone, Sparkles, Heart, Award } from "lucide-react";
 import BookingWidget from "@/components/BookingWidget";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 
@@ -50,6 +50,26 @@ export default function Home() {
               <Button variant="secondary" size="lg">
                 Explore Packages
               </Button>
+            </div>
+
+            {/* Trust Badge Bar */}
+            <div className="mt-8 pt-6 border-t border-white/20">
+              <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-white/90 text-sm md:text-base">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-sunshine" />
+                  <span className="font-body">Verified Drivers</span>
+                </div>
+                <div className="hidden sm:block w-1 h-1 bg-white/40 rounded-full"></div>
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-sunshine" />
+                  <span className="font-body">Zero Alcohol Policy</span>
+                </div>
+                <div className="hidden sm:block w-1 h-1 bg-white/40 rounded-full"></div>
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-sunshine" />
+                  <span className="font-body">10,000+ Safe Trips</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -229,118 +249,124 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Package Card 1 */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between mb-2">
-                  <CardTitle>Nainital Darshan</CardTitle>
-                  <Badge variant="popular">Popular</Badge>
-                </div>
-                <CardDescription>
-                  Complete city tour covering all major attractions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-ink/70">
-                    <Clock className="w-5 h-5 mr-2" />
-                    <span className="font-body">8-10 hours</span>
+            <Link href="/tour/nainital-darshan" className="group">
+              <Card className="h-full transition-transform group-hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-start justify-between mb-2">
+                    <CardTitle>Nainital Darshan</CardTitle>
+                    <Badge variant="popular">Popular</Badge>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    <span className="font-body">Naini Lake, Snow View, Mall Road</span>
+                  <CardDescription>
+                    Complete city tour covering all major attractions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-ink/70">
+                      <Clock className="w-5 h-5 mr-2" />
+                      <span className="font-body">8-10 hours</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <MapPin className="w-5 h-5 mr-2" />
+                      <span className="font-body">Naini Lake, Snow View, Mall Road</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <Car className="w-5 h-5 mr-2" />
+                      <span className="font-body">Sedan / SUV / Tempo</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <Car className="w-5 h-5 mr-2" />
-                    <span className="font-body">Sedan / SUV / Tempo</span>
+                  <div className="flex items-baseline justify-between mb-4">
+                    <div>
+                      <span className="text-3xl font-display text-teal">₹2,000</span>
+                      <span className="text-sm text-ink/60 font-body ml-1">starting</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-baseline justify-between mb-4">
-                  <div>
-                    <span className="text-3xl font-display text-teal">₹2,000</span>
-                    <span className="text-sm text-ink/60 font-body ml-1">starting</span>
-                  </div>
-                </div>
-                <Button variant="primary" className="w-full">
-                  Book Now
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button variant="primary" className="w-full">
+                    View Details & Book
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
 
             {/* Package Card 2 */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between mb-2">
-                  <CardTitle>Bhimtal Lake Tour</CardTitle>
-                  <Badge variant="limited">Limited</Badge>
-                </div>
-                <CardDescription>
-                  Scenic lake tour with island temple visit
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-ink/70">
-                    <Clock className="w-5 h-5 mr-2" />
-                    <span className="font-body">5-6 hours</span>
+            <Link href="/tour/bhimtal-lake-tour" className="group">
+              <Card className="h-full transition-transform group-hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-start justify-between mb-2">
+                    <CardTitle>Bhimtal Lake Tour</CardTitle>
+                    <Badge variant="limited">Limited</Badge>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    <span className="font-body">Bhimtal, Island Temple, Boating</span>
+                  <CardDescription>
+                    Scenic lake tour with island temple visit
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-ink/70">
+                      <Clock className="w-5 h-5 mr-2" />
+                      <span className="font-body">5-6 hours</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <MapPin className="w-5 h-5 mr-2" />
+                      <span className="font-body">Bhimtal, Island Temple, Boating</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <Car className="w-5 h-5 mr-2" />
+                      <span className="font-body">Sedan / SUV / Tempo</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <Car className="w-5 h-5 mr-2" />
-                    <span className="font-body">Sedan / SUV / Tempo</span>
+                  <div className="flex items-baseline justify-between mb-4">
+                    <div>
+                      <span className="text-3xl font-display text-teal">₹1,800</span>
+                      <span className="text-sm text-ink/60 font-body ml-1">starting</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-baseline justify-between mb-4">
-                  <div>
-                    <span className="text-3xl font-display text-teal">₹1,800</span>
-                    <span className="text-sm text-ink/60 font-body ml-1">starting</span>
-                  </div>
-                </div>
-                <Button variant="primary" className="w-full">
-                  Book Now
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button variant="primary" className="w-full">
+                    View Details & Book
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
 
             {/* Package Card 3 */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between mb-2">
-                  <CardTitle>Kainchi Dham</CardTitle>
-                  <Badge variant="available">Available</Badge>
-                </div>
-                <CardDescription>
-                  Spiritual journey to the famous Neem Karoli Baba Ashram
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-ink/70">
-                    <Clock className="w-5 h-5 mr-2" />
-                    <span className="font-body">4-5 hours</span>
+            <Link href="/tour/kainchi-dham" className="group">
+              <Card className="h-full transition-transform group-hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-start justify-between mb-2">
+                    <CardTitle>Kainchi Dham</CardTitle>
+                    <Badge variant="available">Available</Badge>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    <span className="font-body">Kainchi Dham, Temple, Ashram</span>
+                  <CardDescription>
+                    Spiritual journey to the famous Neem Karoli Baba Ashram
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-ink/70">
+                      <Clock className="w-5 h-5 mr-2" />
+                      <span className="font-body">4-5 hours</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <MapPin className="w-5 h-5 mr-2" />
+                      <span className="font-body">Kainchi Dham, Temple, Ashram</span>
+                    </div>
+                    <div className="flex items-center text-ink/70">
+                      <Car className="w-5 h-5 mr-2" />
+                      <span className="font-body">Sedan / SUV / Tempo</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-ink/70">
-                    <Car className="w-5 h-5 mr-2" />
-                    <span className="font-body">Sedan / SUV / Tempo</span>
+                  <div className="flex items-baseline justify-between mb-4">
+                    <div>
+                      <span className="text-3xl font-display text-teal">₹1,500</span>
+                      <span className="text-sm text-ink/60 font-body ml-1">starting</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-baseline justify-between mb-4">
-                  <div>
-                    <span className="text-3xl font-display text-teal">₹1,500</span>
-                    <span className="text-sm text-ink/60 font-body ml-1">starting</span>
-                  </div>
-                </div>
-                <Button variant="primary" className="w-full">
-                  Book Now
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button variant="primary" className="w-full">
+                    View Details & Book
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       </section>
@@ -482,7 +508,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Testimonial 1 */}
+            {/* Testimonial 1 - Solo Female Traveler */}
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center mb-4">
@@ -493,21 +519,21 @@ export default function Home() {
                   <Star className="w-5 h-5 text-sunshine fill-sunshine" />
                 </div>
                 <p className="font-body text-ink/80 mb-6 italic">
-                  {`"Amazing service! The driver was punctual, the car was spotless, and he took us to all the best spots in Nainital. Highly recommend!"`}
+                  {`"As a solo female traveler, safety was my top concern. The driver was extremely professional, courteous, and I felt completely safe throughout my 3-day trip. Worth every rupee!"`}
                 </p>
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center font-display text-2xl mr-3">
-                    R
+                  <div className="w-12 h-12 bg-coral/20 rounded-full flex items-center justify-center font-display text-2xl mr-3">
+                    S
                   </div>
                   <div>
-                    <p className="font-bold text-ink">Rahul Sharma</p>
+                    <p className="font-bold text-ink">Sneha Kapoor</p>
                     <p className="text-sm text-ink/60">Delhi</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Testimonial 2 */}
+            {/* Testimonial 2 - Family with Elderly */}
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center mb-4">
@@ -518,21 +544,21 @@ export default function Home() {
                   <Star className="w-5 h-5 text-sunshine fill-sunshine" />
                 </div>
                 <p className="font-body text-ink/80 mb-6 italic">
-                  {`"Perfect for our family trip! The SUV was comfortable, and the booking process was super easy. The driver knew all the scenic routes."`}
+                  {`"Traveling with my elderly parents needed someone trustworthy. The driver helped with luggage, drove carefully on mountain roads, and treated us like family. Highly recommend!"`}
                 </p>
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-coral/20 rounded-full flex items-center justify-center font-display text-2xl mr-3">
-                    P
+                  <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center font-display text-2xl mr-3">
+                    V
                   </div>
                   <div>
-                    <p className="font-bold text-ink">Priya Mehta</p>
+                    <p className="font-bold text-ink">Vikram Sharma</p>
                     <p className="text-sm text-ink/60">Mumbai</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Testimonial 3 */}
+            {/* Testimonial 3 - Safety Comparison */}
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center mb-4">
@@ -543,14 +569,14 @@ export default function Home() {
                   <Star className="w-5 h-5 text-sunshine fill-sunshine" />
                 </div>
                 <p className="font-body text-ink/80 mb-6 italic">
-                  {`"Best taxi service in Nainital! Very professional, transparent pricing, and excellent local knowledge. Will definitely use again."`}
+                  {`"I've used cheaper services before, but after one bad experience with an unprofessional driver, I only trust Nainital Taxi now. Their verified drivers and zero-alcohol policy give me peace of mind."`}
                 </p>
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-sunshine/30 rounded-full flex items-center justify-center font-display text-2xl mr-3">
                     A
                   </div>
                   <div>
-                    <p className="font-bold text-ink">Amit Patel</p>
+                    <p className="font-bold text-ink">Anjali Mishra</p>
                     <p className="text-sm text-ink/60">Bangalore</p>
                   </div>
                 </div>
@@ -560,45 +586,179 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Our Safety Promise Section */}
+      <section className="py-20 px-4 bg-gradient-to-br from-ink to-ink/95 text-white relative overflow-hidden">
+        {/* Decorative Elements */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-teal/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-sunshine/10 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="container mx-auto relative z-10">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-6">
+              <Shield className="w-5 h-5 text-sunshine" />
+              <span className="font-body text-sm text-white/90">Your Safety, Our Priority</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-display text-white mb-4">
+              The Nainital Taxi Safety Promise
+            </h2>
+            <p className="text-lg font-body text-white/70 max-w-2xl mx-auto">
+              We understand you&apos;re not just booking a ride - you&apos;re trusting us with your family&apos;s safety. That&apos;s why we maintain the highest standards.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {/* Promise 1 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-teal/20 rounded-xl flex items-center justify-center mb-4">
+                <UserCheck className="w-6 h-6 text-teal" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">Verified Drivers</h3>
+              <p className="font-body text-white/70 text-sm">
+                Every driver undergoes thorough background verification, license validation, and character reference checks before joining our team.
+              </p>
+            </div>
+
+            {/* Promise 2 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-coral/20 rounded-xl flex items-center justify-center mb-4">
+                <Shield className="w-6 h-6 text-coral" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">Zero Alcohol Policy</h3>
+              <p className="font-body text-white/70 text-sm">
+                Our drivers pledge complete sobriety. No exceptions. Random checks ensure strict compliance with this non-negotiable policy.
+              </p>
+            </div>
+
+            {/* Promise 3 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-sunshine/20 rounded-xl flex items-center justify-center mb-4">
+                <Award className="w-6 h-6 text-sunshine" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">Professional Training</h3>
+              <p className="font-body text-white/70 text-sm">
+                Defensive driving techniques, first-aid certification, and customer service training ensure you&apos;re in capable hands.
+              </p>
+            </div>
+
+            {/* Promise 4 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-teal/20 rounded-xl flex items-center justify-center mb-4">
+                <Heart className="w-6 h-6 text-teal" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">Family Values</h3>
+              <p className="font-body text-white/70 text-sm">
+                Our drivers are trained to treat every passenger like their own family - helpful, respectful, and genuinely caring.
+              </p>
+            </div>
+
+            {/* Promise 5 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-coral/20 rounded-xl flex items-center justify-center mb-4">
+                <Car className="w-6 h-6 text-coral" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">Spotless Vehicles</h3>
+              <p className="font-body text-white/70 text-sm">
+                Daily sanitized, regularly serviced, and thoroughly inspected vehicles. Your comfort and hygiene are non-negotiable.
+              </p>
+            </div>
+
+            {/* Promise 6 */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-sunshine/20 rounded-xl flex items-center justify-center mb-4">
+                <Phone className="w-6 h-6 text-sunshine" />
+              </div>
+              <h3 className="font-display text-xl text-white mb-2">24/7 Support</h3>
+              <p className="font-body text-white/70 text-sm">
+                Round-the-clock assistance for any concerns. Our team is always just a call away, treating your worries as our own.
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom Message */}
+          <div className="text-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 max-w-3xl mx-auto">
+            <h3 className="font-display text-2xl text-sunshine mb-3">Why We&apos;re Not the Cheapest</h3>
+            <p className="font-body text-white/80 mb-4">
+              Quality drivers deserve fair wages. Well-maintained vehicles cost more to upkeep. Rigorous safety standards require investment. Your safety is worth this - and we won&apos;t compromise on it.
+            </p>
+            <p className="font-display text-lg text-white/90 italic">
+              &ldquo;Cheap fares can cost you dearly. Choose safety.&rdquo;
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Why Choose Us */}
       <section className="py-20 px-4 bg-white/30">
         <div className="container mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
-              Why Choose Nainital Taxi? ⭐
+              Why Families Trust Us
             </h2>
+            <p className="text-lg font-body text-ink/70 max-w-2xl mx-auto">
+              Premium service with uncompromised safety standards
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card hover={false} className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">🚗</div>
-                <h3 className="font-display text-xl mb-2">Modern Fleet</h3>
-                <p className="font-body text-ink/70">Well-maintained vehicles for your comfort</p>
+                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-7 h-7 text-teal" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Verified & Sober Drivers</h3>
+                <p className="font-body text-ink/70 text-sm">Background-checked professionals with strict zero-alcohol policy</p>
               </CardContent>
             </Card>
 
             <Card hover={false} className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">👨‍✈️</div>
-                <h3 className="font-display text-xl mb-2">Expert Drivers</h3>
-                <p className="font-body text-ink/70">Local guides who know every corner</p>
+                <div className="w-14 h-14 bg-coral/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Heart className="w-7 h-7 text-coral" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Family-First Service</h3>
+                <p className="font-body text-ink/70 text-sm">Courteous drivers who treat your loved ones like their own</p>
               </CardContent>
             </Card>
 
             <Card hover={false} className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">💰</div>
-                <h3 className="font-display text-xl mb-2">Best Prices</h3>
-                <p className="font-body text-ink/70">Transparent pricing with no hidden fees</p>
+                <div className="w-14 h-14 bg-sunshine/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Award className="w-7 h-7 text-ink" />
+                </div>
+                <h3 className="font-display text-xl mb-2">10,000+ Safe Journeys</h3>
+                <p className="font-body text-ink/70 text-sm">Trusted by thousands of families across India</p>
               </CardContent>
             </Card>
 
             <Card hover={false} className="text-center">
               <CardContent className="pt-6">
-                <div className="text-4xl mb-4">📱</div>
-                <h3 className="font-display text-xl mb-2">Easy Booking</h3>
-                <p className="font-body text-ink/70">Book online or call us directly</p>
+                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-7 h-7 text-teal" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Spotless Vehicles</h3>
+                <p className="font-body text-ink/70 text-sm">Daily sanitized, well-maintained fleet for your comfort</p>
+              </CardContent>
+            </Card>
+
+            <Card hover={false} className="text-center">
+              <CardContent className="pt-6">
+                <div className="w-14 h-14 bg-coral/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-7 h-7 text-coral" />
+                </div>
+                <h3 className="font-display text-xl mb-2">Local Expertise</h3>
+                <p className="font-body text-ink/70 text-sm">Drivers who know every scenic route and hidden gem</p>
+              </CardContent>
+            </Card>
+
+            <Card hover={false} className="text-center">
+              <CardContent className="pt-6">
+                <div className="w-14 h-14 bg-sunshine/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Phone className="w-7 h-7 text-ink" />
+                </div>
+                <h3 className="font-display text-xl mb-2">24/7 Support</h3>
+                <p className="font-body text-ink/70 text-sm">Round-the-clock assistance whenever you need us</p>
               </CardContent>
             </Card>
           </div>
@@ -606,21 +766,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t-3 border-ink">
-        <div className="container mx-auto text-center">
-          <p className="font-body text-ink/70 mb-4">
-            © 2024 Nainital Taxi. Making your mountain memories special.
-          </p>
-          <div className="flex justify-center gap-4">
-            <Button variant="whatsapp" size="sm">
-              WhatsApp Us
-            </Button>
-            <Button variant="outline" size="sm">
-              Call Now
-            </Button>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

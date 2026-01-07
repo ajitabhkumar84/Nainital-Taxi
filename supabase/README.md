@@ -30,35 +30,35 @@ This directory contains the complete data layer architecture for the Nainital Ta
 
 1. Open the Supabase Dashboard
 2. Navigate to **SQL Editor**
-3. Copy the contents of `schema.sql`
+3. Copy the contents of `schema_enhanced.sql`
 4. Paste and execute the SQL
-5. Wait for confirmation (should create ~10 tables, views, and functions)
+5. Wait for confirmation (should create 13 tables + views)
 
-### Step 3: Run the Seed Data
+### Step 3: Run Database Functions
 
 1. In the same SQL Editor
-2. Copy the contents of `seed.sql`
+2. Copy the contents of `functions.sql`
+3. Paste and execute the SQL
+
+### Step 4: Enable Row Level Security
+
+1. Copy the contents of `enable_rls_with_policies.sql`
+2. Paste and execute the SQL
+
+### Step 5: Run the Seed Data
+
+1. In the same SQL Editor
+2. Copy the contents of `seed_enhanced.sql`
 3. Paste and execute the SQL
 4. Verify data insertion:
    ```sql
-   SELECT COUNT(*) FROM vehicles;  -- Should return 9
-   SELECT COUNT(*) FROM packages;   -- Should return 14
+   SELECT COUNT(*) FROM vehicles;     -- Should return 10
+   SELECT COUNT(*) FROM packages;     -- Should return 7
    SELECT COUNT(*) FROM destinations; -- Should return 6
+   SELECT COUNT(*) FROM pricing;      -- Should return 28
    ```
 
-### Step 4: Get API Credentials
-
-1. Go to **Project Settings > API**
-2. Copy the following values:
-   - **Project URL**: `https://xxxxx.supabase.co`
-   - **anon/public key**: `eyJhbGc...`
-3. Create `.env.local` in your project root:
-   ```bash
-   cp .env.local.example .env.local
-   ```
-4. Paste your credentials into `.env.local`
-
-### Step 5: Verify Connection
+### Step 6: Verify Connection
 
 Run the development server and check console:
 ```bash
@@ -394,7 +394,7 @@ CREATE POLICY "Users can view own bookings"
 
 For issues or questions:
 - Check the master plan: `master-plan.md`
-- Review SQL comments in `schema.sql`
+- Review SQL comments in `schema_enhanced.sql`
 - Contact: Database Architect
 
 ---

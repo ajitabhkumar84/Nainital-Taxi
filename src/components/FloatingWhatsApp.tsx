@@ -46,7 +46,7 @@ export default function FloatingWhatsApp() {
       {showTooltip && (
         <div className="hidden md:block bg-white border-3 border-ink rounded-lg shadow-retro px-4 py-3 animate-bounce">
           <div className="flex items-center gap-2">
-            <p className="font-body font-bold text-ink">Need help? Chat with us!</p>
+            <p className="font-body font-bold text-ink">Talk to our safety-first team!</p>
             <button
               onClick={() => setShowTooltip(false)}
               className="text-ink/60 hover:text-ink"
@@ -54,6 +54,7 @@ export default function FloatingWhatsApp() {
               <X className="w-4 h-4" />
             </button>
           </div>
+          <p className="text-xs text-ink/60 mt-1">Verified drivers, zero alcohol policy</p>
         </div>
       )}
 
