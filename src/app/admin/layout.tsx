@@ -19,6 +19,9 @@ import {
   Globe,
   Car,
   Route as RouteIcon,
+  CalendarDays,
+  Church,
+  FolderTree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +36,11 @@ const navItems: NavItem[] = [
   { href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
   { href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
   { href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
+  { href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
+  { href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },
+  { href: "/admin/temple-categories", label: "Temple Categories", icon: <FolderTree className="w-5 h-5" /> },
   { href: "/admin/fleet", label: "Fleet", icon: <Car className="w-5 h-5" /> },
+  { href: "/admin/multi-day-rental", label: "Multi-Day Rental", icon: <CalendarDays className="w-5 h-5" /> },
   { href: "/admin/availability", label: "Availability", icon: <Calendar className="w-5 h-5" /> },
   { href: "/admin/bookings", label: "Bookings", icon: <BookOpen className="w-5 h-5" /> },
   { href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },

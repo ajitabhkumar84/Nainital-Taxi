@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Save,
   MapPin,
@@ -11,8 +11,11 @@ import {
   Hotel,
   Eye,
   Package,
+  FolderTree,
 } from "lucide-react";
-import { Route, RoutePricing, VehicleType } from "@/lib/supabase/types";
+import { Route, RoutePricing, VehicleType, RouteCategory } from "@/lib/supabase/types";
+
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
 
 interface RouteFormProps {
   initialData?: (Route & { pricing?: RoutePricing[] }) | null;
@@ -33,6 +36,10 @@ function generateSlug(pickup: string, drop: string): string {
 }
 
 export default function RouteForm({ initialData, onSubmit, isSubmitting }: RouteFormProps) {
+  // Categories
+  const [categories, setCategories] = useState<RouteCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
   // Basic Info
   const [pickupLocation, setPickupLocation] = useState(initialData?.pickup_location || "");
   const [dropLocation, setDropLocation] = useState(initialData?.drop_location || "");
@@ -40,6 +47,8 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const [distance, setDistance] = useState(initialData?.distance?.toString() || "");
   const [duration, setDuration] = useState(initialData?.duration || "");
   const [description, setDescription] = useState(initialData?.description || "");
+  const [categoryId, setCategoryId] = useState(initialData?.category_id || "");
+  const [displayOrder, setDisplayOrder] = useState(initialData?.display_order?.toString() || "0");
 
   // Optional Features
   const [featuredPackageId, setFeaturedPackageId] = useState(initialData?.featured_package_id || "");
@@ -83,6 +92,29 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
 
   const [pricing, setPricing] = useState<Partial<RoutePricing>[]>(initializePricing());
 
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/admin/route-categories", {
+        headers: {
+          "x-admin-auth": ADMIN_PASSWORD,
+        },
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch categories");
+
+      const { data } = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
   const handlePickupChange = (value: string) => {
     setPickupLocation(value);
     if (!initialData && value && dropLocation) {
@@ -122,6 +154,8 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
       distance: distance ? Number(distance) : null,
       duration: duration || null,
       description: description || null,
+      category_id: categoryId || null,
+      display_order: Number(displayOrder) || 0,
       featured_package_id: featuredPackageId || null,
       has_hotel_option: hasHotelOption,
       show_on_destination_page: showOnDestinationPage,
@@ -225,6 +259,47 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
             placeholder="Brief description of this route..."
             className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine resize-none"
           />
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="block font-body text-sm text-ink/60 mb-2 flex items-center gap-2">
+              <FolderTree className="w-4 h-4" />
+              Category
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
+              disabled={loadingCategories}
+            >
+              <option value="">No Category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.category_name}
+                </option>
+              ))}
+            </select>
+            {loadingCategories && (
+              <p className="text-xs text-ink/50 mt-1">Loading categories...</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block font-body text-sm text-ink/60 mb-2">
+              Display Order
+            </label>
+            <input
+              type="number"
+              value={displayOrder}
+              onChange={(e) => setDisplayOrder(e.target.value)}
+              placeholder="0"
+              className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
+            />
+            <p className="text-xs text-ink/50 mt-1">
+              Lower numbers appear first (e.g., 1, 2, 3...)
+            </p>
+          </div>
         </div>
       </div>
 

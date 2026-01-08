@@ -820,3 +820,163 @@ export async function getAllAdminSettings() {
 
   return data || [];
 }
+
+// ============================================================================
+// TEMPLE QUERIES
+// ============================================================================
+
+/**
+ * Get all active temples
+ */
+export async function getTemples() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('temples')
+    .select('*')
+    .eq('is_active', true)
+    .order('display_order')
+    .order('popularity', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching temples:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Get all temple categories with their temples
+ */
+export async function getTempleCategoriesWithTemples() {
+  // First get all active categories
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: categories, error: categoriesError } = await (supabase.from as any)('temple_categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('display_order');
+
+  if (categoriesError) {
+    console.error('Error fetching temple categories:', error);
+    return [];
+  }
+
+  if (!categories || categories.length === 0) {
+    return [];
+  }
+
+  // Get all temples for each category
+  const categoriesWithTemples = await Promise.all(
+    categories.map(async (category: { id: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: temples } = await (supabase.from as any)('temples')
+        .select('*')
+        .eq('category_id', category.id)
+        .eq('is_active', true)
+        .order('display_order')
+        .order('popularity', { ascending: false });
+
+      return {
+        ...category,
+        temples: temples || []
+      };
+    })
+  );
+
+  // Filter out categories with no temples
+  return categoriesWithTemples.filter(cat => cat.temples.length > 0);
+}
+
+/**
+ * Get a single temple by slug
+ */
+export async function getTempleBySlug(slug: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: temple, error } = await (supabase.from as any)('temples')
+    .select('*')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    console.error('Error fetching temple:', error);
+    return null;
+  }
+
+  return temple;
+}
+
+/**
+ * Get temple pricing (taxi services from Nainital)
+ */
+export async function getTemplePricing(templeId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('temple_pricing')
+    .select('*')
+    .eq('temple_id', templeId)
+    .order('vehicle_type')
+    .order('season_name');
+
+  if (error) {
+    console.error('Error fetching temple pricing:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Get temple FAQs
+ */
+export async function getTempleFaqs(templeId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('temple_faqs')
+    .select('*')
+    .eq('temple_id', templeId)
+    .eq('is_active', true)
+    .order('display_order');
+
+  if (error) {
+    console.error('Error fetching temple FAQs:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Get featured temples
+ */
+export async function getFeaturedTemples(limit: number = 6) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('temples')
+    .select('*')
+    .eq('is_active', true)
+    .eq('is_featured', true)
+    .order('popularity', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching featured temples:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Get temples page configuration
+ */
+export async function getTemplesPageConfig() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('temples_page_config')
+    .select('*')
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    console.error('Error fetching temples page config:', error);
+    return null;
+  }
+
+  return data;
+}
