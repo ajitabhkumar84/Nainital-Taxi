@@ -587,102 +587,102 @@ export default function Home() {
       </section>
 
       {/* Our Safety Promise Section */}
-      <section className="py-20 px-4 bg-gradient-to-br from-ink to-ink/95 text-white relative overflow-hidden">
+      <section className="py-20 px-4 bg-gradient-to-br from-[#D4F1E0] to-[#C5E8D5] text-ink relative overflow-hidden">
         {/* Decorative Elements */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 left-10 w-32 h-32 bg-teal/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-40 h-40 bg-sunshine/10 rounded-full blur-3xl"></div>
+          <div className="absolute top-20 left-10 w-32 h-32 bg-teal/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-sunshine/5 rounded-full blur-3xl"></div>
         </div>
 
         <div className="container mx-auto relative z-10">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full mb-6">
               <Shield className="w-5 h-5 text-sunshine" />
-              <span className="font-body text-sm text-white/90">Your Safety, Our Priority</span>
+              <span className="font-body text-sm text-ink/90">Your Safety, Our Priority</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-display text-white mb-4">
+            <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
               The Nainital Taxi Safety Promise
             </h2>
-            <p className="text-lg font-body text-white/70 max-w-2xl mx-auto">
+            <p className="text-lg font-body text-ink/70 max-w-2xl mx-auto">
               We understand you&apos;re not just booking a ride - you&apos;re trusting us with your family&apos;s safety. That&apos;s why we maintain the highest standards.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {/* Promise 1 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-teal/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-teal/15 rounded-xl flex items-center justify-center mb-4">
                 <UserCheck className="w-6 h-6 text-teal" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">Verified Drivers</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">Verified Drivers</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Every driver undergoes thorough background verification, license validation, and character reference checks before joining our team.
               </p>
             </div>
 
             {/* Promise 2 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-coral/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-coral/15 rounded-xl flex items-center justify-center mb-4">
                 <Shield className="w-6 h-6 text-coral" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">Zero Alcohol Policy</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">Zero Alcohol Policy</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Our drivers pledge complete sobriety. No exceptions. Random checks ensure strict compliance with this non-negotiable policy.
               </p>
             </div>
 
             {/* Promise 3 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-sunshine/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-sunshine/15 rounded-xl flex items-center justify-center mb-4">
                 <Award className="w-6 h-6 text-sunshine" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">Professional Training</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">Professional Training</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Defensive driving techniques, first-aid certification, and customer service training ensure you&apos;re in capable hands.
               </p>
             </div>
 
             {/* Promise 4 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-teal/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-teal/15 rounded-xl flex items-center justify-center mb-4">
                 <Heart className="w-6 h-6 text-teal" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">Family Values</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">Family Values</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Our drivers are trained to treat every passenger like their own family - helpful, respectful, and genuinely caring.
               </p>
             </div>
 
             {/* Promise 5 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-coral/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-coral/15 rounded-xl flex items-center justify-center mb-4">
                 <Car className="w-6 h-6 text-coral" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">Spotless Vehicles</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">Spotless Vehicles</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Daily sanitized, regularly serviced, and thoroughly inspected vehicles. Your comfort and hygiene are non-negotiable.
               </p>
             </div>
 
             {/* Promise 6 */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-sunshine/20 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-white/60 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-6 hover:bg-white/80 transition-colors">
+              <div className="w-12 h-12 bg-sunshine/15 rounded-xl flex items-center justify-center mb-4">
                 <Phone className="w-6 h-6 text-sunshine" />
               </div>
-              <h3 className="font-display text-xl text-white mb-2">24/7 Support</h3>
-              <p className="font-body text-white/70 text-sm">
+              <h3 className="font-display text-xl text-ink mb-2">24/7 Support</h3>
+              <p className="font-body text-ink/70 text-sm">
                 Round-the-clock assistance for any concerns. Our team is always just a call away, treating your worries as our own.
               </p>
             </div>
           </div>
 
           {/* Bottom Message */}
-          <div className="text-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 max-w-3xl mx-auto">
+          <div className="text-center bg-white/70 backdrop-blur-sm border-2 border-teal/30 rounded-2xl p-8 max-w-3xl mx-auto">
             <h3 className="font-display text-2xl text-sunshine mb-3">Why We&apos;re Not the Cheapest</h3>
-            <p className="font-body text-white/80 mb-4">
+            <p className="font-body text-ink/80 mb-4">
               Quality drivers deserve fair wages. Well-maintained vehicles cost more to upkeep. Rigorous safety standards require investment. Your safety is worth this - and we won&apos;t compromise on it.
             </p>
-            <p className="font-display text-lg text-white/90 italic">
+            <p className="font-display text-lg text-ink/90 italic">
               &ldquo;Cheap fares can cost you dearly. Choose safety.&rdquo;
             </p>
           </div>
