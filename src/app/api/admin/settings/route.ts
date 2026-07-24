@@ -19,6 +19,37 @@ function isAuthorized(request: NextRequest): boolean {
   return authHeader === adminPassword;
 }
 
+// GET: Fetch a setting by key
+export async function GET(request: NextRequest) {
+  try {
+    const key = request.nextUrl.searchParams.get('key');
+
+    if (!key) {
+      return NextResponse.json({ error: 'key parameter is required' }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('*')
+      .eq('key', key)
+      .single();
+
+    if (error) {
+      // Not found is OK, just return null
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ key, value: null });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error in settings GET:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // POST: Upsert settings
 export async function POST(request: NextRequest) {
   try {

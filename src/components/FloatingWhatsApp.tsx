@@ -3,7 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { MessageCircle, X } from "lucide-react";
 
-export default function FloatingWhatsApp() {
+interface FloatingWhatsAppProps {
+  /** Contextual message based on current page */
+  contextMessage?: string;
+  /** Route name for pre-filled message (e.g., "Kathgodam to Nainital") */
+  routeName?: string;
+  /** Package/tour name for pre-filled message */
+  packageName?: string;
+  /** Destination name for pre-filled message */
+  destinationName?: string;
+}
+
+export default function FloatingWhatsApp({
+  contextMessage,
+  routeName,
+  packageName,
+  destinationName,
+}: FloatingWhatsAppProps = {}) {
   const [isVisible, setIsVisible] = useState(false);
   const [showTooltip, setShowTooltip] = useState(true);
 
@@ -32,16 +48,29 @@ export default function FloatingWhatsApp() {
 
   const handleWhatsAppClick = () => {
     const phoneNumber = "918445206116";
-    const message = encodeURIComponent(
-      "Hi! I'm interested in booking a taxi in Nainital. Can you help me?"
-    );
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+
+    // Generate contextual message
+    let message = "Hi! ";
+
+    if (contextMessage) {
+      message += contextMessage;
+    } else if (routeName) {
+      message += `I want to book a taxi from ${routeName}. Can you provide details?`;
+    } else if (packageName) {
+      message += `I'm interested in the ${packageName} tour package. Can you help me?`;
+    } else if (destinationName) {
+      message += `I want to visit ${destinationName}. Can you help me plan my trip?`;
+    } else {
+      message += "I'm interested in booking a taxi in Nainital. Can you help me?";
+    }
+
+    window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };
 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+    <div className="hidden md:flex fixed bottom-6 right-6 z-50 items-center gap-3">
       {/* Tooltip */}
       {showTooltip && (
         <div className="hidden md:block bg-white border-3 border-ink rounded-lg shadow-retro px-4 py-3 animate-bounce">

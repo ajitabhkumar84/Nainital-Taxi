@@ -11,6 +11,7 @@ import {
   sendBookingConfirmation,
   sendAdminNotification,
 } from '@/lib/notifications';
+import { SelectedAddon } from '@/lib/supabase/types';
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -38,6 +39,8 @@ interface CreateBookingRequest {
   dropoffLocation?: string;
   passengers: number;
   totalAmount: number;
+  addonsTotal?: number;
+  selectedAddons?: SelectedAddon[];
   seasonName?: string;
   specialRequests?: string;
 }
@@ -112,7 +115,8 @@ export async function POST(request: NextRequest) {
       pickup_location: body.pickupLocation.trim(),
       dropoff_location: body.dropoffLocation?.trim() || null,
       passengers: body.passengers || 2,
-      final_price: body.totalAmount,
+      final_price: body.totalAmount, // Base package price
+      addons_total: body.addonsTotal || 0,
       season_name: body.seasonName || 'Off-Season',
       currency: 'INR',
       special_requests: body.specialRequests?.trim() || null,
@@ -137,6 +141,27 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create booking. Please try again.' },
         { status: 500 }
       );
+    }
+
+    // Insert addon records if any
+    if (booking && body.selectedAddons && body.selectedAddons.length > 0) {
+      const addonRecords = body.selectedAddons.map(addon => ({
+        booking_id: booking.id,
+        addon_id: addon.id,
+        addon_name: addon.name,
+        addon_price: addon.price,
+        season_name: addon.season_name,
+        selected_at_stage: 'before_booking'
+      }));
+
+      const { error: addonError } = await supabase
+        .from('booking_addons')
+        .insert(addonRecords);
+
+      if (addonError) {
+        console.error('Error inserting booking addons:', addonError);
+        // Continue even if addon insert fails - booking is already created
+      }
     }
 
     // Generate a readable booking reference from UUID

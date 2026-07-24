@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { IndianRupee, Users, Hotel, Car } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { VehicleType, HotelOption, Pricing } from "@/lib/supabase/types";
+import React from 'react';
+import { IndianRupee, Users, Car } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { useBookingStore } from '@/store/bookingStore';
 
 interface VehicleCategoryImages {
   sedan?: string;
@@ -12,78 +13,80 @@ interface VehicleCategoryImages {
   suv_luxury?: string;
 }
 
-interface PricingGridWithHotelProps {
-  pricing: Pricing[];
-  hotelOptions?: HotelOption[];
-  showHotelPricing?: boolean;
+interface PricingGridForDestinationProps {
+  pricingByVehicle: Record<string, Record<string, number>>;
+  seasonDates: string[];
+  offSeasonDates: string[];
   vehicleCategoryImages?: VehicleCategoryImages;
+  packageId: string;
+  packageTitle: string;
+  destinationSlug: string;
+  destinationName: string;
 }
+
+type VehicleType = 'sedan' | 'suv_normal' | 'suv_deluxe' | 'suv_luxury';
 
 const VEHICLE_DISPLAY: Record<VehicleType, { name: string; capacity: string; models: string }> = {
   sedan: {
-    name: "Sedan",
-    capacity: "4 passengers",
-    models: "Dzire, Amaze, Xcent",
+    name: 'Sedan',
+    capacity: '4 passengers',
+    models: 'Dzire, Amaze, Xcent',
   },
   suv_normal: {
-    name: "SUV Normal",
-    capacity: "6 passengers",
-    models: "Ertiga, Triber, Xylo",
+    name: 'SUV Normal',
+    capacity: '6 passengers',
+    models: 'Ertiga, Triber, Xylo',
   },
   suv_deluxe: {
-    name: "SUV Deluxe",
-    capacity: "6 passengers",
-    models: "Innova, Marazzo",
+    name: 'SUV Deluxe',
+    capacity: '6 passengers',
+    models: 'Innova, Marazzo',
   },
   suv_luxury: {
-    name: "SUV Luxury",
-    capacity: "6 passengers",
-    models: "Innova Crysta",
+    name: 'SUV Luxury',
+    capacity: '6 passengers',
+    models: 'Innova Crysta',
   },
 };
 
-const VEHICLE_ORDER: VehicleType[] = ["sedan", "suv_normal", "suv_deluxe", "suv_luxury"];
+const VEHICLE_ORDER: VehicleType[] = ['sedan', 'suv_normal', 'suv_deluxe', 'suv_luxury'];
 
 const VEHICLE_CARD_COLORS: Record<VehicleType, string> = {
-  sedan: "from-teal/10 to-lake border-l-teal",
-  suv_normal: "from-coral/10 to-sunrise border-l-coral",
-  suv_deluxe: "from-sunshine/15 to-sunrise border-l-sunshine-500",
-  suv_luxury: "from-teal/5 to-lake border-l-teal-500",
+  sedan: 'from-teal/10 to-lake border-l-teal',
+  suv_normal: 'from-coral/10 to-sunrise border-l-coral',
+  suv_deluxe: 'from-sunshine/15 to-sunrise border-l-sunshine-500',
+  suv_luxury: 'from-teal/5 to-lake border-l-teal-500',
 };
 
-export default function PricingGridWithHotel({
-  pricing,
-  hotelOptions = [],
-  showHotelPricing = false,
+export default function PricingGridForDestination({
+  pricingByVehicle,
+  seasonDates,
+  offSeasonDates,
   vehicleCategoryImages,
-}: PricingGridWithHotelProps) {
-  const [selectedHotelOption, setSelectedHotelOption] = useState<string | null>(
-    hotelOptions.length > 0 ? hotelOptions[0].id : null
-  );
+  packageId,
+  packageTitle,
+  destinationSlug,
+  destinationName,
+}: PricingGridForDestinationProps) {
+  const router = useRouter();
+  const setBookingContext = useBookingStore((state) => state.setBookingContext);
 
-  // Get unique seasons from pricing
-  const seasons = Array.from(new Set(pricing.map((p) => p.season_name))).sort((a) =>
-    a === "Off-Season" ? -1 : 1
-  );
+  const seasons = ['Off-Season', 'Season'];
 
-  // Group pricing by vehicle type
-  const pricingByVehicle: Record<VehicleType, Record<string, number>> = {} as Record<
-    VehicleType,
-    Record<string, number>
-  >;
+  const handleBookNow = (vehicleType: VehicleType, seasonPrice: number, offSeasonPrice: number) => {
+    // Set booking context with route information
+    setBookingContext({
+      packageId,
+      packageTitle,
+      packageType: 'transfer',
+      vehicleType,
+      basePrice: offSeasonPrice, // Use off-season as base
+      seasonPrice,
+      destination: destinationName,
+    });
 
-  pricing.forEach((p) => {
-    if (!pricingByVehicle[p.vehicle_type]) {
-      pricingByVehicle[p.vehicle_type] = {};
-    }
-    pricingByVehicle[p.vehicle_type][p.season_name] = p.price;
-  });
-
-  const selectedHotel = hotelOptions.find((h) => h.id === selectedHotelOption);
-
-  const getHotelAdjustedPrice = (basePrice: number, vehicleType: VehicleType) => {
-    if (!showHotelPricing || !selectedHotel) return basePrice;
-    return basePrice + (selectedHotel.price_modifier?.[vehicleType] || 0);
+    // Navigate to booking page
+    router.push('/booking');
   };
 
   return (
@@ -99,39 +102,20 @@ export default function PricingGridWithHotel({
           </p>
         </div>
 
-        {/* Hotel Option Selector */}
-        {showHotelPricing && hotelOptions.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <Hotel className="w-5 h-5 text-coral" />
-              <span className="font-body font-semibold text-ink">Select Hotel Option:</span>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                onClick={() => setSelectedHotelOption(null)}
-                className={cn(
-                  "px-4 py-2 rounded-xl font-body text-sm border-2 transition-all",
-                  selectedHotelOption === null
-                    ? "bg-ink text-white border-ink"
-                    : "bg-white border-ink/30 hover:border-ink"
-                )}
-              >
-                Without Hotel
-              </button>
-              {hotelOptions.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setSelectedHotelOption(option.id)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl font-body text-sm border-2 transition-all",
-                    selectedHotelOption === option.id
-                      ? "bg-coral text-white border-coral"
-                      : "bg-white border-ink/30 hover:border-coral"
-                  )}
-                >
-                  {option.name}
-                </button>
-              ))}
+        {/* Season Date Ranges Info */}
+        {(seasonDates.length > 0 || offSeasonDates.length > 0) && (
+          <div className="mb-6 text-center">
+            <div className="inline-flex flex-col gap-2 bg-white/70 rounded-xl p-4 border-2 border-ink/10">
+              {offSeasonDates.length > 0 && (
+                <p className="text-sm font-body text-ink/70">
+                  <span className="font-bold">Off-Season:</span> {offSeasonDates.join(', ')}
+                </p>
+              )}
+              {seasonDates.length > 0 && (
+                <p className="text-sm font-body text-ink/70">
+                  <span className="font-bold">Peak Season:</span> {seasonDates.join(', ')}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -142,6 +126,8 @@ export default function PricingGridWithHotel({
             const vehicle = VEHICLE_DISPLAY[vehicleType];
             const vehiclePricing = pricingByVehicle[vehicleType];
             const categoryImage = vehicleCategoryImages?.[vehicleType];
+            const seasonPrice = vehiclePricing['Season'] || 0;
+            const offSeasonPrice = vehiclePricing['Off-Season'] || 0;
 
             return (
               <div
@@ -172,13 +158,9 @@ export default function PricingGridWithHotel({
                   </div>
 
                   {/* Season Prices */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     {seasons.map((season) => {
-                      const basePrice = vehiclePricing[season] || 0;
-                      const displayPrice =
-                        selectedHotelOption !== null
-                          ? getHotelAdjustedPrice(basePrice, vehicleType)
-                          : basePrice;
+                      const price = vehiclePricing[season] || 0;
 
                       return (
                         <div key={season} className="bg-white/70 rounded-xl p-3 text-center border border-ink/10">
@@ -186,17 +168,20 @@ export default function PricingGridWithHotel({
                             {season}
                           </div>
                           <div className="font-display text-xl text-ink">
-                            ₹{displayPrice.toLocaleString()}
+                            ₹{price.toLocaleString()}
                           </div>
-                          {selectedHotelOption !== null && selectedHotel && (
-                            <div className="text-[10px] text-coral font-body mt-0.5">
-                              +₹{(selectedHotel.price_modifier?.[vehicleType] || 0).toLocaleString()} hotel
-                            </div>
-                          )}
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Book Now Button */}
+                  <button
+                    onClick={() => handleBookNow(vehicleType, seasonPrice, offSeasonPrice)}
+                    className="w-full bg-teal hover:bg-teal/90 text-white px-4 py-3 rounded-xl font-bold font-body border-3 border-ink shadow-retro hover:shadow-retro-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                  >
+                    Book Now
+                  </button>
                 </div>
               </div>
             );
@@ -206,7 +191,7 @@ export default function PricingGridWithHotel({
         {/* Desktop: Table with Vehicle Thumbnails */}
         <div className="hidden md:block bg-white rounded-2xl border-3 border-ink overflow-hidden shadow-retro">
           {/* Table Header */}
-          <div className={`grid ${vehicleCategoryImages ? "grid-cols-[80px,2fr,1fr,1fr]" : "grid-cols-[2fr,1fr,1fr]"} border-b-3 border-ink bg-gradient-to-r from-sunshine/30 to-coral/10`}>
+          <div className={`grid ${vehicleCategoryImages ? 'grid-cols-[80px,2fr,1fr,1fr,140px]' : 'grid-cols-[2fr,1fr,1fr,140px]'} border-b-3 border-ink bg-gradient-to-r from-sunshine/30 to-coral/10`}>
             {vehicleCategoryImages && (
               <div className="p-4 font-display text-ink text-sm"></div>
             )}
@@ -219,6 +204,9 @@ export default function PricingGridWithHotel({
                 {season}
               </div>
             ))}
+            <div className="p-4 font-display text-ink text-center border-l-2 border-ink/20">
+              Action
+            </div>
           </div>
 
           {/* Table Body */}
@@ -227,11 +215,13 @@ export default function PricingGridWithHotel({
               const vehicle = VEHICLE_DISPLAY[vehicleType];
               const vehiclePricing = pricingByVehicle[vehicleType];
               const categoryImage = vehicleCategoryImages?.[vehicleType];
+              const seasonPrice = vehiclePricing['Season'] || 0;
+              const offSeasonPrice = vehiclePricing['Off-Season'] || 0;
 
               return (
                 <div
                   key={vehicleType}
-                  className={`grid ${vehicleCategoryImages ? "grid-cols-[80px,2fr,1fr,1fr]" : "grid-cols-[2fr,1fr,1fr]"} hover:bg-sunrise/10 transition-colors`}
+                  className={`grid ${vehicleCategoryImages ? 'grid-cols-[80px,2fr,1fr,1fr,140px]' : 'grid-cols-[2fr,1fr,1fr,140px]'} hover:bg-sunrise/10 transition-colors`}
                 >
                   {/* Vehicle Thumbnail */}
                   {vehicleCategoryImages && (
@@ -249,7 +239,7 @@ export default function PricingGridWithHotel({
                   )}
 
                   {/* Vehicle Info */}
-                  <div className="p-4 border-b md:border-b-0">
+                  <div className="p-4">
                     <div className="font-display text-lg text-ink">{vehicle.name}</div>
                     <div className="flex items-center gap-2 text-sm text-ink/60 font-body mt-1">
                       <Users className="w-4 h-4" />
@@ -262,28 +252,29 @@ export default function PricingGridWithHotel({
 
                   {/* Prices */}
                   {seasons.map((season) => {
-                    const basePrice = vehiclePricing[season] || 0;
-                    const displayPrice =
-                      selectedHotelOption !== null
-                        ? getHotelAdjustedPrice(basePrice, vehicleType)
-                        : basePrice;
+                    const price = vehiclePricing[season] || 0;
 
                     return (
                       <div
                         key={season}
-                        className="p-4 md:border-l-2 md:border-ink/20 flex flex-col items-center justify-center"
+                        className="p-4 border-l-2 border-ink/20 flex flex-col items-center justify-center"
                       >
                         <div className="font-display text-2xl text-ink">
-                          ₹{displayPrice.toLocaleString()}
+                          ₹{price.toLocaleString()}
                         </div>
-                        {selectedHotelOption !== null && selectedHotel && (
-                          <div className="text-xs text-coral font-body mt-1">
-                            +₹{(selectedHotel.price_modifier?.[vehicleType] || 0).toLocaleString()} hotel
-                          </div>
-                        )}
                       </div>
                     );
                   })}
+
+                  {/* Book Now Button */}
+                  <div className="p-4 border-l-2 border-ink/20 flex items-center justify-center">
+                    <button
+                      onClick={() => handleBookNow(vehicleType, seasonPrice, offSeasonPrice)}
+                      className="bg-teal hover:bg-teal/90 text-white px-4 py-2 rounded-lg font-bold font-body border-2 border-ink shadow-retro-sm hover:shadow-retro-pressed hover:translate-x-[1px] hover:translate-y-[1px] transition-all text-sm"
+                    >
+                      Book Now
+                    </button>
+                  </div>
                 </div>
               );
             })}

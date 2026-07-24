@@ -3,7 +3,7 @@
 import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useBookingStore, BookingType } from '@/store/bookingStore';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Shield, Star, Users, Award } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
 import Step3ContactInfo from '@/components/booking/Step3ContactInfo';
@@ -47,9 +47,49 @@ function BookingPageContent() {
           <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
             Book Your Ride
           </h1>
-          <p className="text-lg text-[#636E72]">
+          <p className="text-lg text-[#636E72] mb-6">
             Complete your booking in 4 easy steps
           </p>
+
+          {/* Trust Signals */}
+          <div className="flex flex-wrap justify-center gap-6 mt-8">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+              <div className="w-10 h-10 bg-teal/20 rounded-full flex items-center justify-center">
+                <Star className="w-5 h-5 text-teal fill-teal" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold">4.8/5 Rating</div>
+                <div className="text-xs text-gray-500">Google Reviews</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+              <div className="w-10 h-10 bg-whatsapp/20 rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-whatsapp" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold">500+ Happy</div>
+                <div className="text-xs text-gray-500">Customers</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+              <div className="w-10 h-10 bg-coral/20 rounded-full flex items-center justify-center">
+                <Shield className="w-5 h-5 text-coral" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold">100% Safe</div>
+                <div className="text-xs text-gray-500">Verified Drivers</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+              <div className="w-10 h-10 bg-sunshine/30 rounded-full flex items-center justify-center">
+                <Award className="w-5 h-5 text-ink" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold">15+ Years</div>
+                <div className="text-xs text-gray-500">Experience</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Step Indicator */}

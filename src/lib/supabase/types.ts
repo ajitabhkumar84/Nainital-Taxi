@@ -486,6 +486,7 @@ export interface Booking {
 
   // Pricing (UPDATED - Manual pricing only)
   final_price: number;
+  addons_total?: number; // Total cost of selected addons
   season_id?: string | null;
   currency: string;
 
@@ -951,6 +952,84 @@ export const DEFAULT_TEMPLES_PAGE_CONFIG: Partial<TemplesPageConfig> = {
 };
 
 // ============================================================================
+// ADDON TYPES (Revenue-Generating Addons)
+// ============================================================================
+
+/**
+ * Main addon entity
+ */
+export interface Addon {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  short_description?: string | null;
+  image_url?: string | null;
+  icon_emoji?: string | null;
+  show_before_booking: boolean;
+  show_after_booking: boolean;
+  off_season_price: number;
+  season_price: number;
+  display_order: number;
+  is_featured: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Addon-Package relationship
+ */
+export interface AddonPackage {
+  id: string;
+  addon_id: string;
+  package_id: string;
+  created_at: string;
+}
+
+/**
+ * Addon-Destination relationship
+ */
+export interface AddonDestination {
+  id: string;
+  addon_id: string;
+  destination_id: string;
+  created_at: string;
+}
+
+/**
+ * Booking addon junction (historical snapshot)
+ */
+export interface BookingAddon {
+  id: string;
+  booking_id: string;
+  addon_id: string;
+  addon_name: string;
+  addon_price: number;
+  season_name: 'Off-Season' | 'Season';
+  selected_at_stage: 'before_booking' | 'after_booking';
+  created_at: string;
+}
+
+/**
+ * Selected addon in booking store (runtime state)
+ */
+export interface SelectedAddon {
+  id: string;
+  name: string;
+  price: number;
+  season_name: 'Off-Season' | 'Season';
+  icon_emoji?: string | null;
+}
+
+/**
+ * Addon with computed price (for display)
+ */
+export interface AddonWithPrice extends Addon {
+  price: number; // Season-selected price (either season_price or off_season_price)
+}
+
+// ============================================================================
 // DATABASE TYPE (For Supabase Client)
 // ============================================================================
 
@@ -1322,6 +1401,164 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     isEnabled: false,
   },
 }
+
+// ============================================================================
+// B2B PAGE CONFIGURATION TYPES
+// ============================================================================
+
+export interface B2BPricingTier {
+  name: string;           // e.g., "Bronze", "Silver", "Gold"
+  monthly_volume: string; // e.g., "5-15 trips", "15-40 trips"
+  discount: string;       // e.g., "8% off retail", "12% off retail"
+  payment_terms: string;  // e.g., "Advance per trip", "Weekly settlement"
+  is_featured: boolean;   // Highlight this tier
+  order: number;         // Display order
+}
+
+export interface B2BBenefit {
+  title: string;
+  description: string;
+  icon: string;  // emoji or icon name
+  order: number;
+}
+
+export interface B2BTestimonial {
+  company_name: string;
+  person_name: string;
+  designation: string;
+  testimonial: string;
+  rating: number;
+  order: number;
+}
+
+export interface B2BFleetShowcase {
+  vehicle_name: string;
+  capacity: string;
+  model_year: string;
+  ac_status: string;
+  image_url?: string;
+  order: number;
+}
+
+export interface B2BPageConfig {
+  // Hero Section
+  hero_title: string;
+  hero_subtitle: string;
+  hero_description: string;
+  hero_cta_text: string;
+  hero_cta_secondary_text: string;
+
+  // Company Info
+  gst_number: string;
+  company_address: string;
+  service_area_description: string;
+
+  // Fleet Showcase
+  total_vehicles: number;
+  fleet_items: B2BFleetShowcase[];
+
+  // Pricing Tiers
+  pricing_section_title: string;
+  pricing_section_description: string;
+  pricing_tiers: B2BPricingTier[];
+
+  // Benefits
+  benefits_section_title: string;
+  benefits: B2BBenefit[];
+
+  // Testimonials
+  testimonials_section_title: string;
+  testimonials: B2BTestimonial[];
+
+  // Rate Card
+  rate_card_pdf_url?: string;
+  rate_card_download_text: string;
+
+  // Partnership Form
+  form_title: string;
+  form_description: string;
+
+  // Trust Indicators
+  years_experience: string;
+  satisfied_operators: string;
+  monthly_trips: string;
+
+  // Contact
+  contact_person_name: string;
+  contact_person_designation: string;
+  contact_email: string;
+  contact_phone: string;
+  contact_whatsapp: string;
+
+  // SEO
+  meta_title?: string;
+  meta_description?: string;
+
+  // Status
+  is_active: boolean;
+  updated_at?: string;
+}
+
+export const DEFAULT_B2B_CONFIG: B2BPageConfig = {
+  hero_title: "Partner with Nainital's Most Reliable Local Taxi Service",
+  hero_subtitle: "B2B Partnership Program for Tour Operators",
+  hero_description: "Join hands with us for reliable, professional taxi services for your clients. Competitive rates, verified drivers, and 24/7 support.",
+  hero_cta_text: "Request Partnership",
+  hero_cta_secondary_text: "Download Rate Card",
+
+  gst_number: "07XXXXX1234X1ZX",
+  company_address: "Nainital, Uttarakhand 263001",
+  service_area_description: "Complete Uttarakhand coverage including Nainital, Kathgodam, Haldwani, Bhimtal, Mukteshwar, and surrounding areas.",
+
+  total_vehicles: 7,
+  fleet_items: [
+    { vehicle_name: "Sedan", capacity: "4 Seater", model_year: "2020-2023", ac_status: "AC", order: 1 },
+    { vehicle_name: "SUV Standard", capacity: "6-7 Seater", model_year: "2019-2023", ac_status: "AC", order: 2 },
+    { vehicle_name: "SUV Deluxe", capacity: "7 Seater", model_year: "2020-2024", ac_status: "AC", order: 3 },
+  ],
+
+  pricing_section_title: "Flexible Pricing Tiers",
+  pricing_section_description: "Choose the plan that matches your business volume",
+  pricing_tiers: [
+    { name: "Bronze", monthly_volume: "5-15 trips", discount: "8% off retail", payment_terms: "Advance per trip", is_featured: false, order: 1 },
+    { name: "Silver", monthly_volume: "15-40 trips", discount: "12% off retail", payment_terms: "Weekly settlement", is_featured: true, order: 2 },
+    { name: "Gold", monthly_volume: "40+ trips", discount: "15-18% off retail", payment_terms: "Monthly, 15-day credit", is_featured: false, order: 3 },
+  ],
+
+  benefits_section_title: "Why Tour Operators Choose Us",
+  benefits: [
+    { title: "100% Reliability", description: "Cars show up every time, even during peak season", icon: "✓", order: 1 },
+    { title: "Fleet Capacity", description: "Handle 5+ simultaneous bookings with ease", icon: "🚗", order: 2 },
+    { title: "Transparent Pricing", description: "Fixed base rates with clear margin structure", icon: "💰", order: 3 },
+    { title: "GST Invoices", description: "Proper documentation and monthly statements", icon: "📄", order: 4 },
+    { title: "Dedicated Support", description: "Single WhatsApp contact, fast response", icon: "💬", order: 5 },
+    { title: "Local Expertise", description: "15+ years in Nainital tourism", icon: "🏔️", order: 6 },
+  ],
+
+  testimonials_section_title: "What Our Partners Say",
+  testimonials: [],
+
+  rate_card_pdf_url: "",
+  rate_card_download_text: "Download Complete Rate Card (PDF)",
+
+  form_title: "Request Partnership",
+  form_description: "Fill in your details and we'll get back to you within 24 hours",
+
+  years_experience: "15+",
+  satisfied_operators: "50+",
+  monthly_trips: "200+",
+
+  contact_person_name: "Partnership Manager",
+  contact_person_designation: "B2B Relations",
+  contact_email: "b2b@nainialtaxi.com",
+  contact_phone: "+918445206116",
+  contact_whatsapp: "+918445206116",
+
+  meta_title: "B2B Partnership | Tour Operator Taxi Services | Nainital Taxi",
+  meta_description: "Partner with Nainital's most reliable taxi service. Competitive rates, verified drivers, GST invoices, 24/7 support for tour operators.",
+
+  is_active: true,
+};
 
 // ============================================================================
 // MULTI-DAY RENTAL PAGE TYPES

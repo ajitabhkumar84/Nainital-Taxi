@@ -5,6 +5,7 @@ import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input } from '@/components/ui';
 import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle } from 'lucide-react';
 import { getPackagePrice, getAvailabilityForDate, formatPrice } from '@/lib/pricing';
+import AddonSelector from './AddonSelector';
 
 const timeSlots = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
@@ -31,6 +32,8 @@ export default function Step2TripDetails() {
     carsAvailable,
     calculatedPrice,
     seasonName,
+    routeContext,
+    addonsTotal,
     nextStep,
     prevStep,
   } = useBookingStore();
@@ -196,14 +199,32 @@ export default function Step2TripDetails() {
       {tripDate && calculatedPrice !== null && (
         <div className="p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Estimated Price</div>
+            <div className="flex-1">
+              <div className="text-sm text-gray-600 mb-1">
+                {addonsTotal > 0 ? 'Base Package Price' : 'Estimated Price'}
+              </div>
               <div className="text-3xl font-bold text-[#2D3436]">
                 {formatPrice(calculatedPrice)}
               </div>
               {seasonName && (
                 <div className="text-sm text-gray-600 mt-1">
                   {seasonName} pricing
+                </div>
+              )}
+
+              {/* Addons Breakdown */}
+              {addonsTotal > 0 && (
+                <div className="mt-4 pt-4 border-t-2 border-yellow-300">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-600">Selected Addons</span>
+                    <span className="text-sm font-bold text-gray-900">+{formatPrice(addonsTotal)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-yellow-300">
+                    <span className="font-bold text-gray-900">Total Amount</span>
+                    <span className="text-2xl font-bold text-[#2D3436]">
+                      {formatPrice(calculatedPrice + addonsTotal)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -292,6 +313,18 @@ export default function Step2TripDetails() {
           />
         </div>
       </div>
+
+      {/* Addons Section */}
+      {tripDate && calculatedPrice !== null && seasonName && (
+        <div className="p-6 rounded-2xl border-4 border-[#4D96FF] bg-[#E8F4F8]">
+          <AddonSelector
+            packageId={packageId || undefined}
+            destinationId={routeContext?.destinationSlug || undefined}
+            seasonName={seasonName as 'Off-Season' | 'Season'}
+            stage="before_booking"
+          />
+        </div>
+      )}
 
       {/* Navigation Buttons */}
       <div className="flex justify-between pt-6 border-t-2 border-gray-200">

@@ -16,7 +16,14 @@
       "Bash(xargs cat:*)",
       "Bash(npm run dev:*)",
       "Bash(npm outdated:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npx next build:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(node apply-addon-schema.js:*)",
+      "Bash(node verify-schema.js:*)",
+      "Bash(curl *)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { SelectedAddon } from '@/lib/supabase/types';
 
 export type BookingType = 'tour' | 'transfer';
 export type VehicleType = 'sedan' | 'suv_normal' | 'suv_deluxe' | 'suv_luxury';
@@ -41,6 +42,10 @@ export interface BookingState {
   seasonId: string | null;
   seasonName: string | null;
 
+  // Addons
+  selectedAddons: SelectedAddon[];
+  addonsTotal: number;
+
   // Availability
   availabilityStatus: 'available' | 'limited' | 'sold_out' | 'blocked' | null;
   carsAvailable: number | null;
@@ -81,12 +86,28 @@ export interface BookingState {
   // Pricing actions
   setCalculatedPrice: (price: number, seasonId: string, seasonName: string) => void;
 
+  // Addon actions
+  addAddon: (addon: SelectedAddon) => void;
+  removeAddon: (addonId: string) => void;
+  clearAddons: () => void;
+
   // Availability actions
   setAvailability: (status: 'available' | 'limited' | 'sold_out' | 'blocked', carsAvailable: number) => void;
 
   // Route context actions
   setRouteContext: (context: RouteContext) => void;
   clearRouteContext: () => void;
+
+  // Booking context (simpler method for setting multiple fields at once)
+  setBookingContext: (context: {
+    packageId: string;
+    packageTitle: string;
+    packageType: BookingType;
+    vehicleType: VehicleType;
+    basePrice?: number;
+    seasonPrice?: number;
+    destination?: string;
+  }) => void;
 
   // Submission actions
   setBookingResult: (bookingId: string, advanceAmount: number) => void;
@@ -116,6 +137,8 @@ const initialState = {
   calculatedPrice: null,
   seasonId: null,
   seasonName: null,
+  selectedAddons: [],
+  addonsTotal: 0,
   availabilityStatus: null,
   carsAvailable: null,
   routeContext: null,
@@ -165,6 +188,38 @@ export const useBookingStore = create<BookingState>()(
         seasonName
       }),
 
+      // Addon actions
+      addAddon: (addon) => set((state) => {
+        // Check if addon already exists
+        const exists = state.selectedAddons.find(a => a.id === addon.id);
+        if (exists) {
+          return state; // Don't add duplicate
+        }
+
+        const newAddons = [...state.selectedAddons, addon];
+        const newTotal = newAddons.reduce((sum, a) => sum + a.price, 0);
+
+        return {
+          selectedAddons: newAddons,
+          addonsTotal: newTotal
+        };
+      }),
+
+      removeAddon: (addonId) => set((state) => {
+        const newAddons = state.selectedAddons.filter(a => a.id !== addonId);
+        const newTotal = newAddons.reduce((sum, a) => sum + a.price, 0);
+
+        return {
+          selectedAddons: newAddons,
+          addonsTotal: newTotal
+        };
+      }),
+
+      clearAddons: () => set({
+        selectedAddons: [],
+        addonsTotal: 0
+      }),
+
       // Availability actions
       setAvailability: (status, carsAvailable) => set({
         availabilityStatus: status,
@@ -178,6 +233,14 @@ export const useBookingStore = create<BookingState>()(
         dropoffLocation: context.prefilledDropoff,
       }),
       clearRouteContext: () => set({ routeContext: null }),
+
+      // Booking context (simpler method for setting multiple fields at once)
+      setBookingContext: (context) => set({
+        bookingType: context.packageType,
+        packageId: context.packageId,
+        packageTitle: context.packageTitle,
+        vehicleType: context.vehicleType,
+      }),
 
       // Submission actions
       setBookingResult: (bookingId, advanceAmount) => set({
@@ -215,6 +278,9 @@ export const useBookingStore = create<BookingState>()(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         customerEmail: state.customerEmail,
+        // Addons
+        selectedAddons: state.selectedAddons,
+        addonsTotal: state.addonsTotal,
         // Route context for destination-based booking
         routeContext: state.routeContext,
         // Booking result (persisted until reset)

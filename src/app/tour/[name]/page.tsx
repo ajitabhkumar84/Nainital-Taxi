@@ -1,6 +1,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Script from "next/script";
 import { Metadata } from "next";
 import {
   Clock,
@@ -21,6 +22,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Package, Pricing, TourItinerary, GalleryImage } from "@/lib/supabase/types";
 import { Header, Footer } from "@/components/ui";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import { generateTouristTripSchema } from "@/lib/structuredData";
 import ItineraryTimeline from "@/components/packages/ItineraryTimeline";
 import HotelOptionsCard from "@/components/packages/HotelOptionsCard";
 import PricingGridWithHotel from "@/components/packages/PricingGridWithHotel";
@@ -65,6 +67,22 @@ async function getPackagePricing(packageId: string): Promise<Pricing[]> {
   return data as Pricing[];
 }
 
+async function getVehicleCategoryImages(): Promise<Record<string, string> | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("admin_settings")
+    .select("value")
+    .eq("key", "vehicle_category_images")
+    .single();
+
+  if (error || !data?.value) return null;
+  try {
+    return typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -79,9 +97,23 @@ export async function generateMetadata({
     };
   }
 
+  const pricing = await getPackagePricing(pkg.id);
+  const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p) => p.price)) : 0;
+  const url = `https://nainialtaxi.com/tour/${pkg.slug}`;
+
   return {
     title: pkg.meta_title || `${pkg.title} | Nainital Taxi Tour Packages`,
-    description: pkg.meta_description || pkg.description || `Book ${pkg.title} tour package with Nainital Taxi`,
+    description: pkg.meta_description || pkg.description || `Book ${pkg.title} tour package with Nainital Taxi. Starting from ₹${minPrice}. Reliable service with professional drivers.`,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title: pkg.title,
+      description: pkg.description || `Book ${pkg.title} tour package`,
+      url: url,
+      type: 'website',
+      images: pkg.image_url ? [{ url: pkg.image_url, alt: pkg.title }] : [],
+    },
   };
 }
 
@@ -97,16 +129,37 @@ export default async function TourPackagePage({
     notFound();
   }
 
-  const pricing = await getPackagePricing(pkg.id);
+  const [pricing, vehicleCategoryImages] = await Promise.all([
+    getPackagePricing(pkg.id),
+    getVehicleCategoryImages(),
+  ]);
   const itinerary = pkg.itinerary as TourItinerary | undefined;
 
   // Get minimum price for display
   const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p) => p.price)) : 0;
 
+  // Generate TouristTrip structured data
+  const touristTripSchema = generateTouristTripSchema({
+    name: pkg.title,
+    description: pkg.description || `Book ${pkg.title} tour package with Nainital Taxi`,
+    url: `https://nainialtaxi.com/tour/${pkg.slug}`,
+    image: pkg.image_url,
+    itinerary: itinerary?.days?.map(day => ({
+      name: day.title,
+      description: day.description,
+    })),
+    price: minPrice,
+  });
+
   return (
     <>
+      <Script
+        id="tourist-trip-schema"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(touristTripSchema) }}
+      />
       <Header />
-      <FloatingWhatsApp />
+      <FloatingWhatsApp packageName={pkg.title} />
 
       <main className="min-h-screen bg-white">
         {/* Hero Section */}
@@ -253,6 +306,7 @@ export default async function TourPackagePage({
             pricing={pricing}
             hotelOptions={itinerary?.hotel_options}
             showHotelPricing={itinerary?.hotel_options && itinerary.hotel_options.length > 0}
+            vehicleCategoryImages={vehicleCategoryImages || undefined}
           />
         )}
 

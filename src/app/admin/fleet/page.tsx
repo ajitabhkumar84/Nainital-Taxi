@@ -21,9 +21,12 @@ import {
   Baby,
   Users,
   Wrench,
+  Save,
+  Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Vehicle, VehicleType, VehicleStatus } from "@/lib/supabase/types";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   sedan: "Sedan",
@@ -39,6 +42,20 @@ const STATUS_STYLES: Record<VehicleStatus, { bg: string; text: string; label: st
   retired: { bg: "bg-gray-100", text: "text-gray-500", label: "Retired" },
 };
 
+interface VehicleCategoryImages {
+  sedan: string;
+  suv_normal: string;
+  suv_deluxe: string;
+  suv_luxury: string;
+}
+
+const CATEGORY_LABELS: Record<keyof VehicleCategoryImages, string> = {
+  sedan: "Sedan",
+  suv_normal: "SUV Normal",
+  suv_deluxe: "SUV Deluxe",
+  suv_luxury: "SUV Luxury",
+};
+
 export default function FleetAdminPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +63,71 @@ export default function FleetAdminPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  // Vehicle Category Images state
+  const [categoryImages, setCategoryImages] = useState<VehicleCategoryImages>({
+    sedan: "",
+    suv_normal: "",
+    suv_deluxe: "",
+    suv_luxury: "",
+  });
+  const [categoryImagesSaving, setCategoryImagesSaving] = useState(false);
+  const [categoryImagesSaved, setCategoryImagesSaved] = useState(false);
+
+  // Fetch vehicle category images from admin_settings
+  useEffect(() => {
+    const fetchCategoryImages = async () => {
+      try {
+        const response = await fetch("/api/admin/settings?key=vehicle_category_images");
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.value) {
+            const parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+            setCategoryImages((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching category images:", error);
+      }
+    };
+    fetchCategoryImages();
+  }, []);
+
+  const saveCategoryImages = async () => {
+    setCategoryImagesSaving(true);
+    setCategoryImagesSaved(false);
+    const adminPassword =
+      localStorage.getItem("admin_password") ||
+      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
+      "nainital2024";
+
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-auth": adminPassword,
+        },
+        body: JSON.stringify({
+          settings: [
+            {
+              key: "vehicle_category_images",
+              value: JSON.stringify(categoryImages),
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        setCategoryImagesSaved(true);
+        setTimeout(() => setCategoryImagesSaved(false), 3000);
+      }
+    } catch (error) {
+      console.error("Error saving category images:", error);
+    } finally {
+      setCategoryImagesSaving(false);
+    }
+  };
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
@@ -256,6 +338,45 @@ export default function FleetAdminPage() {
           <Plus className="w-5 h-5" />
           Add Vehicle
         </Link>
+      </div>
+
+      {/* Vehicle Category Default Images */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 shadow-retro-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg text-ink flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-teal" />
+            Vehicle Category Default Images
+          </h2>
+          <button
+            onClick={saveCategoryImages}
+            disabled={categoryImagesSaving}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl font-body text-sm font-semibold border-2 transition-all",
+              categoryImagesSaved
+                ? "bg-whatsapp/20 border-whatsapp text-whatsapp"
+                : "bg-sunshine text-ink border-ink hover:shadow-retro-sm"
+            )}
+          >
+            <Save className="w-4 h-4" />
+            {categoryImagesSaving ? "Saving..." : categoryImagesSaved ? "Saved!" : "Save Images"}
+          </button>
+        </div>
+        <p className="text-sm text-ink/50 font-body mb-4">
+          These images appear on the pricing table for all package pages.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(Object.keys(CATEGORY_LABELS) as Array<keyof VehicleCategoryImages>).map((key) => (
+            <ImageUploader
+              key={key}
+              value={categoryImages[key]}
+              onChange={(url) => setCategoryImages((prev) => ({ ...prev, [key]: url }))}
+              folder="vehicles/categories"
+              label={CATEGORY_LABELS[key]}
+              recommendedSize="400 x 300"
+              aspectRatio="4:3"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Stats */}

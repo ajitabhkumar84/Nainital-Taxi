@@ -2,96 +2,50 @@ import Link from "next/link";
 import { Header, Footer, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from "@/components/ui";
 import { Car, MapPin, Clock, Star, Plane, Train, ArrowRight, Shield, UserCheck, Phone, Sparkles, Heart, Award } from "lucide-react";
 import BookingWidget from "@/components/BookingWidget";
-import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import DestinationFlipCard from "@/components/home/DestinationFlipCard";
+import SeasonalHero from "@/components/home/SeasonalHero";
+import SocialProofTicker from "@/components/home/SocialProofTicker";
+import AnimatedCounter from "@/components/home/AnimatedCounter";
+import { getDestinations } from "@/lib/supabase";
 
-export default function Home() {
+// Gradient mapping for destinations (fallback if not in DB)
+const GRADIENT_MAP: Record<string, string> = {
+  kathgodam: "from-teal/30 to-teal/10",
+  pantnagar: "from-sunshine/30 to-sunshine/10",
+  "kainchi-dham": "from-coral/30 to-coral/10",
+  ranikhet: "from-teal/30 to-teal/10",
+  mukteshwar: "from-sunshine/30 to-sunshine/10",
+  "jim-corbett": "from-coral/30 to-coral/10",
+};
+
+export default async function Home() {
+  // Fetch destinations from Supabase
+  const destinations = await getDestinations();
   return (
     <>
       <Header />
-      <FloatingWhatsApp />
 
-      {/* Hero Section with Naini Lake Background */}
-      <section className="relative min-h-screen flex items-center justify-center px-4 pt-24 overflow-hidden">
-        {/* Background Image - Naini Lake */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=80&w=2070&auto=format&fit=crop')",
-          }}
-        >
-          {/* Dark Gradient Overlay for Text Readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/50 to-ink/70"></div>
+      {/* Seasonal Hero Section */}
+      <SeasonalHero />
 
-          {/* Secondary Gradient for Depth */}
-          <div className="absolute inset-0 bg-gradient-to-r from-teal/30 via-transparent to-sunshine/20"></div>
-        </div>
-
-        {/* Decorative Floating Elements with Retro Pop Style */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-32 left-10 w-24 h-24 bg-sunshine/30 rounded-full blur-2xl animate-pulse"></div>
-          <div className="absolute top-48 right-20 w-32 h-32 bg-coral/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-          <div className="absolute bottom-40 left-1/4 w-28 h-28 bg-teal/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '2s'}}></div>
-        </div>
-
-        {/* Hero Content with Glassmorphism */}
-        <div className="container mx-auto text-center relative z-10">
-          <div className="max-w-5xl mx-auto bg-white/10 backdrop-blur-md border-3 border-white/30 rounded-3xl p-8 md:p-12 shadow-retro-lg">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display text-white mb-6 drop-shadow-lg">
-              Your <span className="text-sunshine drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">Vacation</span> Starts Here! 🏔️
-            </h1>
-            <p className="text-lg sm:text-xl md:text-2xl font-body text-white/95 mb-8 md:mb-12 max-w-3xl mx-auto drop-shadow-md leading-relaxed">
-              Explore the breathtaking hills of Nainital with our premium taxi services.
-              Book instantly or customize your perfect mountain getaway.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="primary" size="lg">
-                Book Your Ride Now
-              </Button>
-              <Button variant="secondary" size="lg">
-                Explore Packages
-              </Button>
-            </div>
-
-            {/* Trust Badge Bar */}
-            <div className="mt-8 pt-6 border-t border-white/20">
-              <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-white/90 text-sm md:text-base">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-sunshine" />
-                  <span className="font-body">Verified Drivers</span>
-                </div>
-                <div className="hidden sm:block w-1 h-1 bg-white/40 rounded-full"></div>
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-sunshine" />
-                  <span className="font-body">Zero Alcohol Policy</span>
-                </div>
-                <div className="hidden sm:block w-1 h-1 bg-white/40 rounded-full"></div>
-                <div className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-sunshine" />
-                  <span className="font-body">10,000+ Safe Trips</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Wavy SVG Divider at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 z-20">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" className="w-full h-20 md:h-32">
-            <path
-              fill="#FFF8E7"
-              fillOpacity="1"
-              d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
-            ></path>
-          </svg>
-        </div>
-      </section>
-
-      {/* Booking Widget */}
+      {/* Booking Widget with Urgency Badge */}
       <section className="py-12 px-4 -mt-32 relative z-20">
         <div className="container mx-auto">
+          {/* Urgency Badge */}
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex items-center gap-2 bg-coral/90 text-white px-6 py-3 rounded-full border-3 border-ink shadow-retro animate-pulse">
+              <span className="text-xl">⚡</span>
+              <span className="font-body font-bold text-sm md:text-base">
+                Peak season ahead - book early for best availability!
+              </span>
+            </div>
+          </div>
           <BookingWidget />
         </div>
       </section>
+
+      {/* Social Proof Ticker */}
+      <SocialProofTicker />
 
       {/* Destinations Grid */}
       <section className="py-20 px-4">
@@ -106,131 +60,25 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Destination 1 - Kathgodam */}
-            <Link href="/destinations/kathgodam">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-teal/30 to-teal/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  🚂
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Kathgodam</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    Railway station gateway to Nainital, scenic mountain drive
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">35 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Destination 2 - Pantnagar */}
-            <Link href="/destinations/pantnagar">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-sunshine/30 to-sunshine/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  ✈️
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Pantnagar Airport</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    Nearest airport to Nainital, meet & greet service available
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">65 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Destination 3 - Kainchi Dham */}
-            <Link href="/destinations/kainchi-dham">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-coral/30 to-coral/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  🕉️
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Kainchi Dham</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    Famous ashram of Neem Karoli Baba, spiritual retreat
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">17 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Destination 4 - Ranikhet */}
-            <Link href="/destinations/ranikhet">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-teal/30 to-teal/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  🏔️
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Ranikhet</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    Majestic views of Himalayas, golf course, and pine forests
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">62 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Destination 5 - Mukteshwar */}
-            <Link href="/destinations/mukteshwar">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-sunshine/30 to-sunshine/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  ⛰️
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Mukteshwar</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    Adventure hub with rock climbing and panoramic vistas
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">51 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Destination 6 - Jim Corbett */}
-            <Link href="/destinations/jim-corbett">
-              <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-coral/30 to-coral/10 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform">
-                  🐅
-                </div>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-2xl mb-2">Jim Corbett</h3>
-                  <p className="font-body text-ink/70 mb-4">
-                    India&apos;s oldest national park, famous for Royal Bengal Tigers
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-ink/60">115 km from Nainital</span>
-                    <Button variant="outline" size="sm">
-                      Explore →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            {destinations.length > 0 ? (
+              destinations.slice(0, 6).map((destination) => (
+                <DestinationFlipCard
+                  key={destination.id}
+                  slug={destination.slug}
+                  name={destination.name}
+                  emoji={destination.emoji || "📍"}
+                  hero_image_url={destination.hero_image_url}
+                  description={destination.description || ""}
+                  distance_from_nainital={destination.distance_from_nainital || 0}
+                  gradient={GRADIENT_MAP[destination.slug] || "from-teal/30 to-teal/10"}
+                />
+              ))
+            ) : (
+              /* Fallback if no destinations loaded */
+              <p className="col-span-full text-center text-ink/70 font-body">
+                Loading destinations...
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -727,7 +575,9 @@ export default function Home() {
                 <div className="w-14 h-14 bg-sunshine/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Award className="w-7 h-7 text-ink" />
                 </div>
-                <h3 className="font-display text-xl mb-2">10,000+ Safe Journeys</h3>
+                <h3 className="font-display text-xl mb-2">
+                  <AnimatedCounter end={10000} suffix="+" duration={2000} /> Safe Journeys
+                </h3>
                 <p className="font-body text-ink/70 text-sm">Trusted by thousands of families across India</p>
               </CardContent>
             </Card>

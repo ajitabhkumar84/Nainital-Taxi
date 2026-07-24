@@ -1277,12 +1277,13 @@ export default function PackageForm({ initialData, onSubmit, isSubmitting }: Pac
                       className="w-full px-3 py-2 border-2 border-ink/30 rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-sunshine"
                     />
                   </div>
-                  <input
-                    type="url"
+                  <ImageUploader
                     value={attraction.image_url || ""}
-                    onChange={(e) => updateAttraction(index, { image_url: e.target.value })}
-                    placeholder="Image URL (optional)"
-                    className="w-full px-3 py-2 border-2 border-ink/30 rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-sunshine"
+                    onChange={(url) => updateAttraction(index, { image_url: url })}
+                    folder="packages/attractions"
+                    label={`Attraction Image: ${attraction.name || `Stop ${attraction.order}`}`}
+                    recommendedSize="800 x 600"
+                    aspectRatio="4:3"
                   />
                   <div className="grid md:grid-cols-2 gap-3">
                     <label className="flex items-center gap-2">

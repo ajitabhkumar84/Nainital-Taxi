@@ -61,11 +61,21 @@ const config: Config = {
       },
       animation: {
         "tilt-hover": "tilt 0.3s ease-in-out forwards",
+        "flip-in": "flipIn 0.6s ease-in-out forwards",
+        "flip-out": "flipOut 0.6s ease-in-out forwards",
       },
       keyframes: {
         tilt: {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(-1deg)" },
+        },
+        flipIn: {
+          "0%": { transform: "rotateY(0deg)" },
+          "100%": { transform: "rotateY(180deg)" },
+        },
+        flipOut: {
+          "0%": { transform: "rotateY(180deg)" },
+          "100%": { transform: "rotateY(360deg)" },
         },
       },
       backgroundImage: {

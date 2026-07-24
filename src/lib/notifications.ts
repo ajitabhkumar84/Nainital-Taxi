@@ -495,3 +495,259 @@ export async function sendAdminNotification(booking: BookingData): Promise<boole
     html: generateAdminNewBookingEmail(booking),
   });
 }
+
+/**
+ * Contact Enquiry Email Templates
+ */
+
+interface ContactData {
+  name: string;
+  phone: string;
+  email?: string | null;
+  message?: string;
+  pickup?: string;
+  drop?: string;
+  date?: string;
+  passengers?: string;
+  vehicle?: string;
+}
+
+/**
+ * Generate contact enquiry admin notification email HTML
+ */
+function generateContactEnquiryAdminEmail(data: ContactData): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Contact Enquiry</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+    <!-- Header -->
+    <div style="background-color: #4D96FF; padding: 24px; text-align: center;">
+      <h1 style="margin: 0; color: #fff; font-size: 24px;">New Contact Enquiry!</h1>
+      <p style="margin: 8px 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">
+        ${new Date().toLocaleString('en-IN')}
+      </p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="padding: 16px; background-color: #f8f9fa; text-align: center;">
+      <a href="https://wa.me/91${data.phone}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
+        WhatsApp
+      </a>
+      <a href="tel:+91${data.phone}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+        Call
+      </a>
+    </div>
+
+    <!-- Customer Details -->
+    <div style="padding: 24px;">
+      <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px;">
+        Customer Details
+      </h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 40%;">Name</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.name}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Phone</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.phone}</td>
+        </tr>
+        ${data.email ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Email</td>
+          <td style="padding: 8px 0; color: #2D3436;">${data.email}</td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+
+    ${(data.pickup || data.drop || data.date || data.passengers || data.vehicle) ? `
+    <!-- Trip Details -->
+    <div style="padding: 0 24px 24px;">
+      <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px;">
+        Trip Details
+      </h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        ${data.pickup ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 40%;">Pickup</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.pickup}</td>
+        </tr>
+        ` : ''}
+        ${data.drop ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Drop</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.drop}</td>
+        </tr>
+        ` : ''}
+        ${data.date ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Date</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.date}</td>
+        </tr>
+        ` : ''}
+        ${data.passengers ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Passengers</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.passengers}</td>
+        </tr>
+        ` : ''}
+        ${data.vehicle ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Vehicle</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.vehicle}</td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+    ` : ''}
+
+    ${data.message ? `
+    <!-- Message -->
+    <div style="padding: 24px; background-color: #f8f9fa;">
+      <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 16px;">Message</h2>
+      <p style="margin: 0; padding: 12px; background-color: #fff; border-radius: 6px; color: #2D3436; white-space: pre-wrap;">
+        ${data.message}
+      </p>
+    </div>
+    ` : ''}
+
+    <!-- Footer -->
+    <div style="padding: 16px; background-color: #2D3436; text-align: center;">
+      <p style="margin: 0; color: #aaa; font-size: 12px;">
+        Nainital Taxi Admin | ${new Date().toLocaleString('en-IN')}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+/**
+ * Generate contact enquiry auto-reply email HTML
+ */
+function generateContactAutoReplyEmail(data: ContactData): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>We Received Your Enquiry</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #FFD93D 0%, #FF6B6B 100%); padding: 32px; text-align: center;">
+      <h1 style="margin: 0; color: #2D3436; font-size: 28px;">Thank You!</h1>
+      <p style="margin: 8px 0 0; color: #2D3436; font-size: 16px;">We received your enquiry</p>
+    </div>
+
+    <!-- Confirmation Message -->
+    <div style="padding: 24px; text-align: center;">
+      <div style="width: 64px; height: 64px; background-color: #4D96FF; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 32px; color: white;">✓</span>
+      </div>
+      <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 20px;">Hi ${data.name}!</h2>
+      <p style="margin: 0; color: #666; font-size: 16px;">
+        Thank you for your enquiry. Our team will contact you shortly.
+      </p>
+    </div>
+
+    <!-- Your Details -->
+    <div style="padding: 24px; background-color: #f8f9fa;">
+      <h3 style="margin: 0 0 12px; color: #2D3436; font-size: 16px;">Your Enquiry Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Name</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.name}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Phone</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.phone}</td>
+        </tr>
+        ${data.pickup ? `
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Pickup</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.pickup}</td>
+        </tr>
+        ` : ''}
+        ${data.drop ? `
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Drop</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.drop}</td>
+        </tr>
+        ` : ''}
+        ${data.date ? `
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Date</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.date}</td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+
+    <!-- What's Next -->
+    <div style="padding: 24px;">
+      <h3 style="margin: 0 0 12px; color: #2D3436; font-size: 16px;">What Happens Next?</h3>
+      <ol style="margin: 0; padding-left: 20px; color: #666; line-height: 1.8;">
+        <li>Our team will review your enquiry</li>
+        <li>We'll call or WhatsApp you within 15-30 minutes</li>
+        <li>We'll provide a detailed quote and answer any questions</li>
+        <li>Book your ride when you're ready!</li>
+      </ol>
+    </div>
+
+    <!-- Contact -->
+    <div style="padding: 24px; background-color: #2D3436; color: #fff; text-align: center;">
+      <p style="margin: 0 0 16px; font-size: 14px;">Need immediate assistance?</p>
+      <a href="https://wa.me/${BUSINESS_WHATSAPP}" style="display: inline-block; padding: 12px 24px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 8px;">
+        WhatsApp
+      </a>
+      <a href="tel:+91${BUSINESS_PHONE}" style="display: inline-block; padding: 12px 24px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+        Call Us
+      </a>
+      <p style="margin: 16px 0 0; font-size: 12px; color: #aaa;">
+        ${BUSINESS_NAME} | ${WEBSITE_URL}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+/**
+ * Send contact enquiry emails (admin notification + customer auto-reply)
+ */
+export async function sendContactEnquiry(data: ContactData): Promise<boolean> {
+  try {
+    // Always send admin notification
+    const adminEmailSent = await sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `New Contact Enquiry - ${data.name}`,
+      html: generateContactEnquiryAdminEmail(data),
+    });
+
+    // Send auto-reply only if customer provided email
+    if (data.email && data.email.trim().length > 0) {
+      await sendEmail({
+        to: data.email,
+        subject: `We Received Your Enquiry | ${BUSINESS_NAME}`,
+        html: generateContactAutoReplyEmail(data),
+      });
+    }
+
+    return adminEmailSent;
+  } catch (error) {
+    console.error('Failed to send contact enquiry emails:', error);
+    return false;
+  }
+}

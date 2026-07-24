@@ -25,22 +25,37 @@ export default function ContactForm({
 
     try {
       const formData = new FormData(e.currentTarget);
-      const response = await fetch('https://api.web3forms.com/submit', {
+      const data = {
+        name: formData.get('name'),
+        phone: formData.get('phone'),
+        email: formData.get('email'),
+        pickup: formData.get('pickup'),
+        drop: formData.get('drop'),
+        date: formData.get('date'),
+        passengers: formData.get('passengers'),
+        vehicle: formData.get('vehicle'),
+        message: formData.get('message'),
+      };
+
+      const response = await fetch('/api/contact', {
         method: 'POST',
-        body: formData,
         headers: {
-          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(data),
       });
 
-      if (response.ok) {
+      const result = await response.json();
+
+      if (response.ok && result.success) {
         e.currentTarget.reset();
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 5000);
       } else {
-        throw new Error('Form submission failed');
+        throw new Error(result.error || 'Form submission failed');
       }
     } catch (error) {
+      console.error('Contact form error:', error);
       setShowError(true);
     } finally {
       setIsSubmitting(false);
@@ -93,10 +108,6 @@ export default function ContactForm({
           onSubmit={handleSubmit}
           className="bg-gradient-to-br from-white to-sunshine/5 rounded-3xl shadow-retro-lg p-6 md:p-8 border-3 border-ink"
         >
-          {/* Web3Forms Access Key */}
-          <input type="hidden" name="access_key" value={process.env.NEXT_PUBLIC_WEB3FORMS_KEY || ""} />
-          <input type="hidden" name="subject" value="New Taxi Booking Request from Nainital Taxi Website" />
-          <input type="hidden" name="from_name" value="Nainital Taxi Contact Form" />
 
           {/* Your Information */}
           <div className="mb-6">

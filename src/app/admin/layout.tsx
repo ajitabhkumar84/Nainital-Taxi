@@ -22,6 +22,7 @@ import {
   CalendarDays,
   Church,
   FolderTree,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
   { href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
+  { href: "/admin/addons", label: "Revenue Addons", icon: <Gift className="w-5 h-5" /> },
   { href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
   { href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
   { href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },

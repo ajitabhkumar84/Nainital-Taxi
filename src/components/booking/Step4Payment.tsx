@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { calculateAdvanceAmount, formatPrice } from '@/lib/booking';
+import AddonSelector from './AddonSelector';
 
 const UPI_ID = 'gokumaon@ptyes';
 const WHATSAPP_NUMBER = '8445206116';
@@ -32,8 +33,8 @@ export default function Step4Payment() {
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdAdvanceAmount, setCreatedAdvanceAmount] = useState<number | null>(null);
 
-  // Calculate advance amount
-  const totalAmount = booking.calculatedPrice || 0;
+  // Calculate advance amount (including addons)
+  const totalAmount = (booking.calculatedPrice || 0) + booking.addonsTotal;
   const advanceAmount = calculateAdvanceAmount(totalAmount);
   const remainingAmount = totalAmount - advanceAmount;
 
@@ -81,7 +82,9 @@ export default function Step4Payment() {
           pickupLocation: booking.pickupLocation,
           dropoffLocation: booking.dropoffLocation || undefined,
           passengers: booking.passengerCount,
-          totalAmount: totalAmount,
+          totalAmount: booking.calculatedPrice || 0, // Base price only
+          addonsTotal: booking.addonsTotal,
+          selectedAddons: booking.selectedAddons,
           seasonName: booking.seasonName || 'Off-Season',
           specialRequests: booking.specialRequests || undefined,
         }),
@@ -259,6 +262,62 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
           </div>
         </div>
 
+        {/* After-Booking Upsell */}
+        {createdBookingId && booking.seasonName && (
+          <div className="p-6 rounded-2xl border-4 border-purple-500 bg-purple-50">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">✨</span>
+              <div>
+                <h3 className="font-bold text-lg">Upgrade Your Experience</h3>
+                <p className="text-sm text-gray-600">Add these extras to your booking</p>
+              </div>
+            </div>
+
+            <AddonSelector
+              packageId={booking.packageId || undefined}
+              destinationId={booking.routeContext?.destinationSlug || undefined}
+              seasonName={booking.seasonName as 'Off-Season' | 'Season'}
+              stage="after_booking"
+            />
+
+            {booking.selectedAddons.length > 0 && (
+              <Button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/bookings/add-addons', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        bookingId: createdBookingId,
+                        addons: booking.selectedAddons.map(a => ({
+                          addon_id: a.id,
+                          addon_name: a.name,
+                          addon_price: a.price,
+                          season_name: a.season_name,
+                          selected_at_stage: 'after_booking'
+                        }))
+                      })
+                    });
+
+                    if (response.ok) {
+                      alert('Addons added successfully! Please update your advance payment to include the addon cost.');
+                      booking.clearAddons();
+                    } else {
+                      alert('Failed to add addons. Please try again.');
+                    }
+                  } catch (error) {
+                    console.error('Error adding addons:', error);
+                    alert('Failed to add addons. Please try again.');
+                  }
+                }}
+                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 border-purple-600"
+              >
+                Add to My Booking (+{formatPrice(booking.addonsTotal)})
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Share on WhatsApp */}
         <div className="p-6 rounded-2xl border-4 border-[#25D366] bg-green-50">
           <h3 className="font-bold text-lg text-[#2D3436] mb-4 flex items-center gap-2">
@@ -391,6 +450,21 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
               <span className="font-bold text-[#2D3436]">{booking.seasonName}</span>
             </div>
           )}
+
+          {/* Show selected addons */}
+          {booking.selectedAddons.length > 0 && (
+            <div className="pt-3 border-t-2 border-gray-200 mt-3">
+              <p className="text-xs text-gray-500 mb-2">ADDONS</p>
+              {booking.selectedAddons.map(addon => (
+                <div key={addon.id} className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600">
+                    {addon.icon_emoji} {addon.name}
+                  </span>
+                  <span className="font-medium">{formatPrice(addon.price)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -398,8 +472,21 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
       <div className="p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
         <h3 className="font-bold text-lg text-[#2D3436] mb-4">Payment Breakdown</h3>
         <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-700">Package Price</span>
+              <span className="text-xl font-bold text-gray-900">{formatPrice(booking.calculatedPrice || 0)}</span>
+            </div>
+            {booking.addonsTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-700">Addons</span>
+                <span className="text-xl font-bold text-gray-900">+{formatPrice(booking.addonsTotal)}</span>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-between items-center pb-4 border-b-2 border-yellow-300">
-            <span className="text-gray-700 font-medium">Total Trip Cost</span>
+            <span className="text-gray-700 font-bold">Total Trip Cost</span>
             <span className="text-2xl font-bold text-[#2D3436]">{formatPrice(totalAmount)}</span>
           </div>
 

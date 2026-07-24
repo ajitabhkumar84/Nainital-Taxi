@@ -1,9 +1,10 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { Header, Button, Card, CardContent } from "@/components/ui";
 import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar, Shield, UserCheck, Heart, Sparkles } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
-import DestinationPricingCard from "@/components/destinations/DestinationPricingCard";
+import PricingGridForDestination from "@/components/destinations/PricingGridForDestination";
 import DetailedAttractions from "@/components/packages/DetailedAttractions";
 import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
 import BookingInstructions from "@/components/packages/BookingInstructions";
@@ -15,6 +16,30 @@ import {
   Package,
 } from "@/lib/supabase";
 import { TransferContent } from "@/lib/supabase/types";
+
+// Create Supabase client for server-side
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+async function getVehicleCategoryImages(): Promise<Record<string, string> | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("admin_settings")
+    .select("value")
+    .eq("key", "vehicle_category_images")
+    .single();
+
+  if (error || !data?.value) return null;
+  try {
+    return typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+  } catch {
+    return null;
+  }
+}
 
 interface DestinationPageProps {
   params: {
@@ -75,9 +100,14 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     description: string | null;
   }> = [];
 
+  let vehicleCategoryImages: Record<string, string> | null = null;
+
   if (transferPackage) {
-    pricingData = await getAllPricingForPackage(transferPackage.id);
-    seasonRanges = await getSeasonDateRanges();
+    [pricingData, seasonRanges, vehicleCategoryImages] = await Promise.all([
+      getAllPricingForPackage(transferPackage.id),
+      getSeasonDateRanges(),
+      getVehicleCategoryImages(),
+    ]);
   }
 
   // Group pricing by vehicle type
@@ -113,7 +143,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   return (
     <>
       <Header />
-      <FloatingWhatsApp />
+      <FloatingWhatsApp destinationName={destination.name} />
 
       {/* Hero Section */}
       <section
@@ -236,42 +266,16 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
       {/* Transparent Pricing Section */}
       {transferPackage && Object.keys(pricingByVehicle).length > 0 && (
-        <section className="py-20 px-4 bg-white/30">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
-                Transparent Pricing
-              </h2>
-              <p className="text-lg font-body text-ink/70">
-                Choose your preferred vehicle - Fixed, honest pricing
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {Object.entries(pricingByVehicle).map(([vehicleType, prices]) => {
-                const vehicle = VEHICLE_INFO[vehicleType as keyof typeof VEHICLE_INFO];
-                const seasonPrice = prices["Season"] || 0;
-                const offSeasonPrice = prices["Off-Season"] || 0;
-
-                return (
-                  <DestinationPricingCard
-                    key={vehicleType}
-                    vehicleType={vehicleType}
-                    vehicle={vehicle || { name: vehicleType, capacity: "", model: "" }}
-                    seasonPrice={seasonPrice}
-                    offSeasonPrice={offSeasonPrice}
-                    seasonDates={seasonDates}
-                    offSeasonDates={offSeasonDates}
-                    destinationSlug={params.slug}
-                    destinationName={destination.name}
-                    packageId={transferPackage?.id || ""}
-                    packageTitle={transferPackage?.title || `Nainital to ${destination.name}`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </section>
+        <PricingGridForDestination
+          pricingByVehicle={pricingByVehicle}
+          seasonDates={seasonDates}
+          offSeasonDates={offSeasonDates}
+          vehicleCategoryImages={vehicleCategoryImages || undefined}
+          packageId={transferPackage.id}
+          packageTitle={transferPackage.title || `Nainital to ${destination.name}`}
+          destinationSlug={params.slug}
+          destinationName={destination.name}
+        />
       )}
 
       {/* CTA Section */}
