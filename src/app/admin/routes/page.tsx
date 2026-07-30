@@ -5,8 +5,6 @@ import Link from "next/link";
 import { Plus, Edit, Trash2, MapPin, ArrowRight, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
 import { Route } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 interface RouteWithPricing extends Route {
   pricing?: Array<{
     vehicle_type: string;
@@ -26,11 +24,7 @@ export default function RoutesPage() {
 
   const fetchRoutes = async () => {
     try {
-      const response = await fetch("/api/admin/routes?withPricing=true", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/routes?withPricing=true");
 
       if (!response.ok) throw new Error("Failed to fetch routes");
 
@@ -53,9 +47,6 @@ export default function RoutesPage() {
     try {
       const response = await fetch(`/api/admin/routes?id=${id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
       });
 
       if (!response.ok) throw new Error("Failed to delete route");
@@ -76,7 +67,6 @@ export default function RoutesPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: route.id,

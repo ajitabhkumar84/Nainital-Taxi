@@ -7,8 +7,6 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import RouteForm from "@/components/admin/RouteForm";
 import { Route, RoutePricing } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function EditRoutePage() {
   const router = useRouter();
   const params = useParams();
@@ -20,11 +18,7 @@ export default function EditRoutePage() {
 
   const fetchRoute = useCallback(async () => {
     try {
-      const response = await fetch(`/api/admin/routes?id=${routeId}&withPricing=true`, {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch(`/api/admin/routes?id=${routeId}&withPricing=true`);
       if (!response.ok) throw new Error("Failed to fetch route");
 
       const { data } = await response.json();
@@ -52,7 +46,6 @@ export default function EditRoutePage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: routeId,

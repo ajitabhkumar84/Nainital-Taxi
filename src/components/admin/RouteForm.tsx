@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 import { Route, RoutePricing, VehicleType, RouteCategory } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 interface RouteFormProps {
   initialData?: (Route & { pricing?: RoutePricing[] }) | null;
   onSubmit: (data: Partial<Route & { pricing: Partial<RoutePricing>[] }>) => Promise<void>;
@@ -98,11 +96,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/admin/route-categories", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/route-categories");
 
       if (!response.ok) throw new Error("Failed to fetch categories");
 

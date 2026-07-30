@@ -3,11 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Input, Select, Label } from "@/components/ui";
-import { Calendar, MapPin, Users, Car, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Users, Car, Loader2, MessageCircle } from "lucide-react";
 import { getPackages, getPrice } from "@/lib/supabase";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing } from "@/lib/supabase/types";
 import { useBookingStore } from "@/store/bookingStore";
+import { buildBookingUrl } from "@/lib/bookingLink";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
@@ -21,6 +24,9 @@ const VEHICLE_OPTIONS: { value: VehicleType; label: string; capacity: string }[]
 export default function BookingWidget() {
   const router = useRouter();
   const bookingStore = useBookingStore();
+  const { config: siteConfig } = useSiteConfig();
+  const phoneNumber =
+    siteConfig?.header?.phoneNumber || DEFAULT_SITE_CONFIG.header.phoneNumber;
   const [activeTab, setActiveTab] = useState<"tours" | "transfers">("tours");
   const [packages, setPackages] = useState<Package[]>([]);
   const [routes, setRoutes] = useState<(Route & { pricing?: RoutePricing[] })[]>([]);
@@ -213,38 +219,38 @@ export default function BookingWidget() {
     setTransferTo(""); // Reset drop location
   };
 
-  // Handle tour booking
-  const handleTourBooking = async () => {
+  // Handle tour booking — a pure navigation. Package/vehicle/date/passengers
+  // travel as URL entry-contract params; the store is never pre-seeded here,
+  // so /booking always recomputes price itself rather than trusting this form.
+  const handleTourBooking = () => {
     if (!tourPackage || !tourDate) {
       alert("Please select a package and date");
       return;
     }
 
-    setLoading(true);
-    try {
-      const selectedPkg = packages.find((p) => p.id === tourPackage);
+    const selectedPkg = packages.find((p) => p.id === tourPackage);
 
-      bookingStore.resetBooking();
-      bookingStore.setBookingType("tour");
-      bookingStore.setPackage(tourPackage, selectedPkg?.title || "Tour Package");
-      bookingStore.setVehicleType(tourVehicle);
-      bookingStore.setTripDate(tourDate);
-      bookingStore.setPassengerCount(parseInt(tourPassengers));
-
-      if (priceInfo) {
-        bookingStore.setCalculatedPrice(priceInfo.price, "", priceInfo.season);
-      }
-
-      router.push("/booking");
-    } catch (error) {
-      console.error("Booking error:", error);
-      alert("Something went wrong. Please try again or contact us directly.");
-    } finally {
-      setLoading(false);
-    }
+    router.push(
+      buildBookingUrl({
+        packageId: tourPackage,
+        packageTitle: selectedPkg?.title || "Tour Package",
+        packageType: "tour",
+        vehicle: tourVehicle,
+        date: tourDate,
+        passengers: parseInt(tourPassengers, 10),
+      })
+    );
   };
 
-  // Handle transfer booking
+  // Handle transfer booking — unlike tours, this keeps writing straight to
+  // the store rather than pushing a URL. selectedRoute.id is a `routes` row,
+  // not a `packages` row, so it can't be priced through the same
+  // packageId-based entry contract the tour path uses; /booking's pricing
+  // lookup (and the create API's) only knows how to resolve packages.
+  // Making this a pure URL push would land on Step 2 with no fare and a
+  // permanently disabled Submit. Fixing that needs a distinct routeId
+  // concept end-to-end (Phase 3 follow-up) — until then this handler stays
+  // as the one place that pre-seeds calculatedPrice into the store.
   const handleTransferBooking = async () => {
     if (!transferFrom || !transferTo || !transferDate) {
       alert("Please select pickup location, drop location, and date");
@@ -291,25 +297,27 @@ export default function BookingWidget() {
   const dropLocations = getDropLocations();
 
   return (
-    <Card className="max-w-4xl mx-auto">
+    <Card className="w-full">
       {/* Tabs */}
-      <div className="flex border-b-3 border-ink -mt-6 -mx-6 mb-6">
+      <div className="flex bg-slate-100 rounded-lg p-1 -mt-2 mb-6">
         <button
           onClick={() => setActiveTab("tours")}
-          className={`flex-1 py-4 px-6 font-display text-xl transition-all ${
+          aria-pressed={activeTab === "tours"}
+          className={`flex-1 py-2.5 px-4 rounded-md text-sm transition-all ${
             activeTab === "tours"
-              ? "bg-sunshine border-b-4 border-ink -mb-[3px]"
-              : "bg-white/50 hover:bg-white/80"
+              ? "bg-sunshine text-white font-semibold shadow-sm"
+              : "text-slate-500 font-medium hover:text-ink"
           }`}
         >
-          Tour Packages
+          Tours &amp; packages
         </button>
         <button
           onClick={() => setActiveTab("transfers")}
-          className={`flex-1 py-4 px-6 font-display text-xl transition-all ${
+          aria-pressed={activeTab === "transfers"}
+          className={`flex-1 py-2.5 px-4 rounded-md text-sm transition-all ${
             activeTab === "transfers"
-              ? "bg-teal text-white border-b-4 border-ink -mb-[3px]"
-              : "bg-white/50 hover:bg-white/80"
+              ? "bg-sunshine text-white font-semibold shadow-sm"
+              : "text-slate-500 font-medium hover:text-ink"
           }`}
         >
           Transfers
@@ -400,15 +408,18 @@ export default function BookingWidget() {
           )}
 
           {priceInfo && !checkingPrice && (
-            <div className="bg-sunshine/30 border-2 border-ink rounded-xl p-4 text-center">
-              <div className="text-3xl font-display font-bold text-ink">
-                ₹{priceInfo.price.toLocaleString()}
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-slate-500">Estimated fare</span>
+                <span className="text-2xl font-semibold tabular-nums text-ink">
+                  ₹{priceInfo.price.toLocaleString()}
+                </span>
               </div>
-              <div className="text-sm text-ink/70">
-                {priceInfo.season === "Season" ? "Peak Season Price" : "Off-Season Price"}
+              <div className="text-xs text-slate-500 mt-1">
+                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver, fuel, tolls
               </div>
               {!priceInfo.bookingAllowed && priceInfo.message && (
-                <div className="mt-2 text-sm text-coral font-medium">
+                <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
                   {priceInfo.message}
                 </div>
               )}
@@ -428,7 +439,7 @@ export default function BookingWidget() {
                 Processing...
               </>
             ) : (
-              "Continue to Booking"
+              "Check availability & book"
             )}
           </Button>
         </div>
@@ -519,7 +530,7 @@ export default function BookingWidget() {
                 )}
               </Select>
               {selectedRoute && getAvailableVehiclesForRoute(selectedRoute).length === 0 && (
-                <p className="text-xs text-coral mt-1">
+                <p className="text-xs text-amber-700 mt-1">
                   No vehicles available for this route. Please contact us directly.
                 </p>
               )}
@@ -528,35 +539,34 @@ export default function BookingWidget() {
 
           {/* Route Info */}
           {selectedRoute && (
-            <div className="bg-teal/10 border-2 border-teal/30 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-display text-lg text-ink">
-                    {selectedRoute.pickup_location} → {selectedRoute.drop_location}
-                  </div>
-                  {(selectedRoute.distance || selectedRoute.duration) && (
-                    <div className="text-sm text-ink/60 mt-1">
-                      {selectedRoute.distance && `${selectedRoute.distance} km`}
-                      {selectedRoute.distance && selectedRoute.duration && " • "}
-                      {selectedRoute.duration}
-                    </div>
-                  )}
-                </div>
+            <div className="border border-slate-200 bg-slate-50 rounded-md p-4">
+              <div className="font-medium text-ink">
+                {selectedRoute.pickup_location} → {selectedRoute.drop_location}
               </div>
+              {(selectedRoute.distance || selectedRoute.duration) && (
+                <div className="text-sm text-slate-500 mt-1">
+                  {selectedRoute.distance && `${selectedRoute.distance} km`}
+                  {selectedRoute.distance && selectedRoute.duration && " • "}
+                  {selectedRoute.duration}
+                </div>
+              )}
             </div>
           )}
 
           {/* Price Display */}
           {priceInfo && selectedRoute && (
-            <div className="bg-sunshine/30 border-2 border-ink rounded-xl p-4 text-center">
-              <div className="text-3xl font-display font-bold text-ink">
-                ₹{priceInfo.price.toLocaleString()}
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-slate-500">Estimated fare</span>
+                <span className="text-2xl font-semibold tabular-nums text-ink">
+                  ₹{priceInfo.price.toLocaleString()}
+                </span>
               </div>
-              <div className="text-sm text-ink/70">
-                {priceInfo.season === "Season" ? "Peak Season Price" : "Off-Season Price"}
+              <div className="text-xs text-slate-500 mt-1">
+                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver, fuel, tolls
               </div>
               {!priceInfo.bookingAllowed && priceInfo.message && (
-                <div className="mt-2 text-sm text-coral font-medium">
+                <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
                   {priceInfo.message}
                 </div>
               )}
@@ -583,12 +593,12 @@ export default function BookingWidget() {
                 Processing...
               </>
             ) : (
-              "Continue to Booking"
+              "Check availability & book"
             )}
           </Button>
 
           {routes.length === 0 && (
-            <div className="text-center py-6 text-ink/60 font-body">
+            <div className="text-center py-6 text-slate-500">
               <p>No transfer routes available at the moment.</p>
               <p className="text-sm mt-2">Please contact us directly for transfers.</p>
             </div>
@@ -596,9 +606,15 @@ export default function BookingWidget() {
         </div>
       )}
 
-      <p className="text-sm text-center text-ink/60 font-body mt-6">
-        Instant booking for available dates - WhatsApp support for sold-out dates
-      </p>
+      <a
+        href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-6 flex items-center justify-center gap-1.5 text-sm text-slate-500 hover:text-ink transition-colors"
+      >
+        <MessageCircle className="w-4 h-4 text-whatsapp" />
+        Or WhatsApp us on {phoneNumber}
+      </a>
     </Card>
   );
 }

@@ -96,17 +96,12 @@ export default function FleetAdminPage() {
   const saveCategoryImages = async () => {
     setCategoryImagesSaving(true);
     setCategoryImagesSaved(false);
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
 
     try {
       const response = await fetch("/api/admin/settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           settings: [
@@ -149,17 +144,11 @@ export default function FleetAdminPage() {
   }, [fetchVehicles]);
 
   const handleToggleActive = async (vehicle: Vehicle) => {
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
-
     try {
       const response = await fetch("/api/admin/vehicles", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           id: vehicle.id,
@@ -178,17 +167,11 @@ export default function FleetAdminPage() {
   };
 
   const handleToggleFeatured = async (vehicle: Vehicle) => {
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
-
     try {
       const response = await fetch("/api/admin/vehicles", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           id: vehicle.id,
@@ -207,17 +190,11 @@ export default function FleetAdminPage() {
   };
 
   const handleStatusChange = async (vehicle: Vehicle, newStatus: VehicleStatus) => {
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
-
     try {
       const response = await fetch("/api/admin/vehicles", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           id: vehicle.id,
@@ -238,17 +215,9 @@ export default function FleetAdminPage() {
   const handleDelete = async (vehicle: Vehicle) => {
     if (!confirm(`Are you sure you want to delete "${vehicle.name}"?`)) return;
 
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
-
     try {
       const response = await fetch(`/api/admin/vehicles?id=${vehicle.id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": adminPassword,
-        },
       });
 
       if (response.ok) {
@@ -260,10 +229,6 @@ export default function FleetAdminPage() {
   };
 
   const handleReorder = async (vehicleId: string, direction: "up" | "down") => {
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
     const currentIndex = vehicles.findIndex((v) => v.id === vehicleId);
     if (currentIndex === -1) return;
 
@@ -287,7 +252,6 @@ export default function FleetAdminPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify(update),
       });

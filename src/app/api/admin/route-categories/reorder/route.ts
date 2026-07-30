@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
-function verifyAuth(request: NextRequest) {
-  const authHeader = request.headers.get("x-admin-auth");
-  if (authHeader !== ADMIN_PASSWORD) {
-    return false;
-  }
-  return true;
-}
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 
 // POST - Reorder categories
 export async function POST(request: NextRequest) {
-  if (!verifyAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = await createClient();
+  const supabase = getAdminSupabaseClient();
 
   try {
     const body = await request.json();

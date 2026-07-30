@@ -46,14 +46,11 @@ export default function DestinationsAdminPage() {
   }, [fetchDestinations]);
 
   const handleToggleActive = async (dest: Destination) => {
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     try {
       const response = await fetch("/api/admin/destinations", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           id: dest.id,
@@ -72,14 +69,11 @@ export default function DestinationsAdminPage() {
   };
 
   const handleTogglePopular = async (dest: Destination) => {
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     try {
       const response = await fetch("/api/admin/destinations", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({
           id: dest.id,
@@ -100,14 +94,9 @@ export default function DestinationsAdminPage() {
   const handleDelete = async (dest: Destination) => {
     if (!confirm(`Are you sure you want to delete "${dest.name}"?`)) return;
 
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     try {
       const response = await fetch(`/api/admin/destinations?id=${dest.id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": adminPassword,
-        },
       });
 
       if (response.ok) {
@@ -119,7 +108,6 @@ export default function DestinationsAdminPage() {
   };
 
   const handleReorder = async (destId: string, direction: "up" | "down") => {
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
     const currentIndex = destinations.findIndex((d) => d.id === destId);
     if (currentIndex === -1) return;
 
@@ -143,7 +131,6 @@ export default function DestinationsAdminPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify(update),
       });

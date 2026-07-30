@@ -250,8 +250,8 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
           <div>
             <label className="block text-sm font-body text-ink mb-2">Image</label>
             <ImageUploader
-              currentImageUrl={imageUrl}
-              onImageUploaded={setImageUrl}
+              value={imageUrl}
+              onChange={setImageUrl}
               label="Upload Addon Image"
             />
           </div>
@@ -413,7 +413,7 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
                 className="w-5 h-5 border-3 border-ink rounded accent-teal"
               />
               <span className="font-body text-ink">
-                Featured (Show "POPULAR" badge)
+                Featured (Show &quot;POPULAR&quot; badge)
               </span>
             </label>
 

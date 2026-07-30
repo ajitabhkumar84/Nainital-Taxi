@@ -107,7 +107,7 @@ export default function Footer({
             <div className="space-y-3 mb-6">
               <a
                 href={`tel:${contact.phone}`}
-                className="flex items-center gap-2 text-white/70 hover:text-teal transition-colors text-sm font-body"
+                className="flex items-center gap-2 text-white hover:text-teal transition-colors text-base font-semibold tabular-nums"
               >
                 <Phone className="w-4 h-4" />
                 {contact.phone}
@@ -118,8 +118,8 @@ export default function Footer({
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-white/70 hover:text-teal transition-colors text-sm font-body"
               >
-                <MessageCircle className="w-4 h-4" />
-                WhatsApp
+                <MessageCircle className="w-4 h-4 text-whatsapp" />
+                WhatsApp us
               </a>
               {contact.email && (
                 <a

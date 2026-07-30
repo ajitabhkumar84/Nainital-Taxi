@@ -6,13 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
-function checkAuth(request: NextRequest) {
-  const authHeader = request.headers.get("x-admin-auth");
-  return authHeader === ADMIN_PASSWORD;
-}
-
 /**
  * GET /api/admin/routes
  * Fetch all routes (admin only)
@@ -21,10 +14,6 @@ function checkAuth(request: NextRequest) {
  *   - withPricing: Include pricing data
  */
 export async function GET(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
@@ -82,10 +71,6 @@ export async function GET(request: NextRequest) {
  * Create a new route
  */
 export async function POST(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const body = await request.json();
     const { pricing, ...routeData } = body;
@@ -139,10 +124,6 @@ export async function POST(request: NextRequest) {
  * Update a route
  */
 export async function PATCH(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const body = await request.json();
     const { id, updates, pricing } = body;
@@ -210,10 +191,6 @@ export async function PATCH(request: NextRequest) {
  * Delete a route
  */
 export async function DELETE(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");

@@ -631,6 +631,52 @@ export interface Review {
   updated_at: string;
 }
 
+export interface TickerBooking {
+  id: string; // UUID
+  guest_first_name: string;
+  guest_city: string;
+  service_label: string;
+  service_type?: string | null; // 'transfer' | 'day_tour' | 'multi_day_rental' | 'temple_trip'
+  real_booking_date?: string | null;
+  is_active: boolean;
+  last_shown_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrustPillar {
+  icon_name: string; // e.g. 'user-check' | 'shield' | 'award' | 'heart' | 'car' | 'phone'
+  title: string;
+  description: string;
+  display_order: number;
+  is_active: boolean;
+}
+
+export interface TrustSection {
+  id: string; // UUID, fixed singleton
+  heading: string;
+  description: string;
+  trust_pillars: TrustPillar[];
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DEFAULT_TRUST_SECTION: Omit<TrustSection, "id" | "created_at" | "updated_at"> = {
+  heading: "Why families trust us",
+  description:
+    "Every driver is background-verified, trained, and held to a zero-alcohol policy. Your safety is not an afterthought — it is how we operate.",
+  trust_pillars: [
+    { icon_name: "user-check", title: "Verified drivers", description: "Background verification, license validation and character reference checks before joining our team.", display_order: 1, is_active: true },
+    { icon_name: "shield", title: "Zero alcohol policy", description: "Our drivers pledge complete sobriety. No exceptions, with random checks to enforce it.", display_order: 2, is_active: true },
+    { icon_name: "award", title: "Professional training", description: "Defensive driving, first-aid certification and customer service training.", display_order: 3, is_active: true },
+    { icon_name: "heart", title: "Family values", description: "Drivers trained to treat every passenger like their own family.", display_order: 4, is_active: true },
+    { icon_name: "car", title: "Spotless vehicles", description: "Daily sanitized, regularly serviced and thoroughly inspected.", display_order: 5, is_active: true },
+    { icon_name: "phone", title: "24/7 support", description: "Round-the-clock assistance, a call away whenever you need us.", display_order: 6, is_active: true },
+  ],
+  is_published: true,
+};
+
 export interface AdminSetting {
   key: string;
   value: any; // JSONB - can be any JSON value

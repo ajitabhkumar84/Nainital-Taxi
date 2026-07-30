@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { Chewy, Nunito } from "next/font/google";
+import { headers } from "next/headers";
+import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { generateLocalBusinessSchema } from "@/lib/structuredData";
 import GlobalContactWidgets from "@/components/GlobalContactWidgets";
 
-const chewy = Chewy({
-  weight: "400",
+const interTight = Inter_Tight({
+  weight: ["500", "600", "700"],
   subsets: ["latin"],
   variable: "--font-chewy",
   display: "swap",
 });
 
-const nunito = Nunito({
-  weight: ["400", "600", "700", "800"],
+const nunito = Inter({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
   variable: "--font-nunito",
   display: "swap",
@@ -46,22 +47,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const localBusinessSchema = generateLocalBusinessSchema();
+  const headersList = await headers();
+  const nonce = headersList.get("x-nonce") ?? undefined;
 
   return (
     <html lang="en">
       <head>
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
         />
       </head>
-      <body className={`${chewy.variable} ${nunito.variable}`}>
+      <body className={`${interTight.variable} ${nunito.variable}`}>
         {children}
         <GlobalContactWidgets />
       </body>

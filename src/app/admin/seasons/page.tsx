@@ -23,8 +23,6 @@ interface Season {
   is_recurring: boolean;
 }
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function SeasonsPage() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +65,6 @@ export default function SeasonsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: season.id,
@@ -111,7 +108,6 @@ export default function SeasonsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           name: newSeason.name,
@@ -155,7 +151,6 @@ export default function SeasonsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: season.id,
@@ -189,9 +184,6 @@ export default function SeasonsPage() {
     try {
       const response = await fetch(`/api/admin/seasons?id=${seasonId}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
       });
 
       if (!response.ok) {

@@ -22,8 +22,6 @@ import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Package as PackageType } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 type ViewMode = "grid" | "list";
 type TypeFilter = "all" | "tour" | "transfer";
 
@@ -62,7 +60,6 @@ export default function PackagesPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: pkg.id,
@@ -91,7 +88,6 @@ export default function PackagesPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: pkg.id,
@@ -136,7 +132,6 @@ export default function PackagesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({ orders }),
       });
@@ -158,7 +153,6 @@ export default function PackagesPage() {
     try {
       const response = await fetch(`/api/admin/packages?id=${pkg.id}`, {
         method: "DELETE",
-        headers: { "x-admin-auth": ADMIN_PASSWORD },
       });
 
       if (!response.ok) throw new Error("Failed to delete");

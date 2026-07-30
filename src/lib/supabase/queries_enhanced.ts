@@ -8,7 +8,8 @@
  */
 
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection } from './types';
+import { DEFAULT_TRUST_SECTION } from './types';
 
 // ============================================================================
 // SEASON & PRICING HELPERS
@@ -496,6 +497,31 @@ export async function getFeaturedReviews(limit: number = 6): Promise<Review[]> {
 }
 
 // ============================================================================
+// TRUST & SAFETY SECTION
+// ============================================================================
+
+export async function getTrustSection(): Promise<TrustSection> {
+  const FIXED_ID = '00000000-0000-0000-0000-000000000002';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('trust_section') as any)
+    .select('*')
+    .eq('id', FIXED_ID)
+    .single();
+
+  if (error || !data) {
+    return {
+      ...DEFAULT_TRUST_SECTION,
+      id: FIXED_ID,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return data;
+}
+
+// ============================================================================
 // ADMIN HELPERS (for managing seasons and blackouts)
 // ============================================================================
 
@@ -707,6 +733,116 @@ export async function getAllPricingForPackage(packageId: string): Promise<Array<
 }
 
 /**
+ * Lowest active price for every package, keyed by package id.
+ *
+ * Deliberately one query for all packages rather than a per-package call —
+ * the homepage renders several cards at once and an N+1 here would be a
+ * round trip per card. Callers use this for "From ₹X" display only; the
+ * authoritative, season- and blackout-aware figure still comes from
+ * getPrice() at booking time.
+ */
+export async function getMinPricePerPackage(): Promise<Record<string, number>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from as any)('pricing')
+    .select('package_id, price')
+    .eq('is_active', true) as {
+      data: Array<{ package_id: string; price: number }> | null;
+      error: unknown;
+    };
+
+  if (error) {
+    console.error('Error fetching minimum package prices:', error);
+    return {};
+  }
+
+  const minima: Record<string, number> = {};
+  for (const row of data || []) {
+    if (row.price == null) continue;
+    const current = minima[row.package_id];
+    if (current === undefined || row.price < current) {
+      minima[row.package_id] = row.price;
+    }
+  }
+  return minima;
+}
+
+export interface TransferRoute {
+  id: string;
+  slug: string;
+  pickup_location: string;
+  drop_location: string;
+  distance: number | null;
+  duration: string | null;
+  sedanPrice: number | null;
+  suvPrice: number | null;
+}
+
+/**
+ * Active point-to-point transfer routes for the homepage fare table, with
+ * the lowest active sedan/SUV price per route. Two separate queries (routes,
+ * then route_pricing for those route ids) rather than a join — the schema
+ * has diverged between `routes.category_id` (referenced by
+ * /api/routes-with-categories) and the actual table, so this goes straight
+ * at `routes` + `route_pricing`, the same tables BookingWidget's working
+ * /api/routes endpoint uses.
+ */
+export async function getTransferRoutes(): Promise<TransferRoute[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: routes, error: routesError } = await (supabase.from as any)('routes')
+    .select('id, slug, pickup_location, drop_location, distance, duration')
+    .eq('is_active', true)
+    .order('display_order', { ascending: true }) as {
+      data: Array<{
+        id: string;
+        slug: string;
+        pickup_location: string;
+        drop_location: string;
+        distance: number | null;
+        duration: string | null;
+      }> | null;
+      error: unknown;
+    };
+
+  if (routesError || !routes || routes.length === 0) {
+    if (routesError) console.error('Error fetching transfer routes:', routesError);
+    return [];
+  }
+
+  const routeIds = routes.map((r) => r.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pricing, error: pricingError } = await (supabase.from as any)('route_pricing')
+    .select('route_id, vehicle_type, price')
+    .in('route_id', routeIds)
+    .eq('is_active', true)
+    .in('vehicle_type', ['sedan', 'suv_normal']) as {
+      data: Array<{ route_id: string; vehicle_type: string; price: number }> | null;
+      error: unknown;
+    };
+
+  if (pricingError) {
+    console.error('Error fetching transfer route pricing:', pricingError);
+  }
+
+  return routes.map((route) => {
+    const routePricing = (pricing || []).filter((p) => p.route_id === route.id);
+    const minFor = (vehicleType: string) => {
+      const prices = routePricing.filter((p) => p.vehicle_type === vehicleType).map((p) => p.price);
+      return prices.length > 0 ? Math.min(...prices) : null;
+    };
+    return {
+      id: route.id,
+      slug: route.slug,
+      pickup_location: route.pickup_location,
+      drop_location: route.drop_location,
+      distance: route.distance,
+      duration: route.duration,
+      sedanPrice: minFor('sedan'),
+      suvPrice: minFor('suv_normal'),
+    };
+  });
+}
+
+/**
  * Get season date ranges
  * Returns all active season periods
  */
@@ -856,7 +992,7 @@ export async function getTempleCategoriesWithTemples() {
     .order('display_order');
 
   if (categoriesError) {
-    console.error('Error fetching temple categories:', error);
+    console.error('Error fetching temple categories:', categoriesError);
     return [];
   }
 

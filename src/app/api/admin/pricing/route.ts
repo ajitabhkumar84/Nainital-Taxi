@@ -1,31 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 // PATCH: Update existing pricing entry
 export async function PATCH(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { id, price } = body;
 
@@ -36,7 +14,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('pricing')
       .update({ price })
@@ -59,10 +37,6 @@ export async function PATCH(request: NextRequest) {
 // POST: Create new pricing entry
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { package_id, vehicle_type, season_id, price } = body;
 
@@ -73,7 +47,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('pricing')
       .insert({

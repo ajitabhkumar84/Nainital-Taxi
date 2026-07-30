@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { Phone, Menu, X, MessageCircle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,20 +21,10 @@ const ctaIcons = {
 
 export default function Header({ config: propConfig }: HeaderProps) {
   const { config: siteConfig, isLoading } = useSiteConfig();
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Use prop config if provided, otherwise use fetched config, fallback to default
   const headerConfig = propConfig || siteConfig?.header || DEFAULT_SITE_CONFIG.header;
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   // Filter and sort active nav links
   const activeNavLinks = headerConfig.navLinks
@@ -50,20 +40,12 @@ export default function Header({ config: propConfig }: HeaderProps) {
     : null;
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "bg-white/80 backdrop-blur-lg shadow-retro-sm border-b-3 border-ink"
-          : "bg-transparent"
-      )}
-    >
-      <div className="container mx-auto px-4 py-4">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
+      <div className="container mx-auto px-4 py-3.5">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="text-3xl font-display text-ink">
-              {headerConfig.logoEmoji}{" "}
+          <Link href="/" className="flex items-center">
+            <div className="text-xl font-display font-semibold tracking-tight text-ink">
               <span className="text-sunshine">{headerConfig.logoText.split(" ")[0]}</span>{" "}
               {headerConfig.logoText.split(" ").slice(1).join(" ")}
             </div>
@@ -75,7 +57,7 @@ export default function Header({ config: propConfig }: HeaderProps) {
               <Link
                 key={link.id}
                 href={link.href}
-                className="text-ink font-body font-semibold hover:text-teal transition-colors"
+                className="text-sm font-medium text-slate-600 hover:text-ink transition-colors"
                 target={link.openInNewTab ? "_blank" : undefined}
                 rel={link.openInNewTab ? "noopener noreferrer" : undefined}
               >
@@ -123,14 +105,14 @@ export default function Header({ config: propConfig }: HeaderProps) {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden mt-4 pb-4 border-t-3 border-ink pt-4">
+          <div className="lg:hidden mt-4 pb-4 border-t border-slate-200 pt-4">
             <nav className="flex flex-col space-y-4">
               {activeNavLinks.map((link) => (
                 <Link
                   key={link.id}
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="text-ink font-body font-semibold hover:text-teal transition-colors"
+                  className="text-sm font-medium text-slate-600 hover:text-ink transition-colors"
                   target={link.openInNewTab ? "_blank" : undefined}
                   rel={link.openInNewTab ? "noopener noreferrer" : undefined}
                 >

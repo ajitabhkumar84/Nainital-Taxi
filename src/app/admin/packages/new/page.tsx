@@ -7,8 +7,6 @@ import { ArrowLeft } from "lucide-react";
 import PackageForm from "@/components/admin/PackageForm";
 import { Package } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function NewPackagePage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +18,6 @@ export default function NewPackagePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify(data),
       });

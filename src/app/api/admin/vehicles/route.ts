@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { Vehicle } from '@/lib/supabase/types';
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-
-function isAuthenticated(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === ADMIN_PASSWORD;
-}
 
 // GET - Fetch vehicles
 export async function GET(request: NextRequest) {
@@ -63,11 +57,8 @@ export async function GET(request: NextRequest) {
 
 // POST - Create vehicle
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
 
     // Validate required fields
@@ -79,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get max display order
-    const { data: maxOrderData } = await supabase
+    const { data: maxOrderData } = await adminSupabase
       .from('vehicles')
       .select('display_order')
       .order('display_order', { ascending: false })
@@ -129,7 +120,7 @@ export async function POST(request: NextRequest) {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('vehicles') as any)
+    const { data, error } = await (adminSupabase.from('vehicles') as any)
       .insert(newVehicle)
       .select()
       .single();
@@ -148,11 +139,8 @@ export async function POST(request: NextRequest) {
 
 // PATCH - Update vehicle
 export async function PATCH(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -163,7 +151,7 @@ export async function PATCH(request: NextRequest) {
     updates.updated_at = new Date().toISOString();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('vehicles') as any)
+    const { data, error } = await (adminSupabase.from('vehicles') as any)
       .update(updates)
       .eq('id', id)
       .select()
@@ -183,11 +171,8 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE - Delete vehicle
 export async function DELETE(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const hard = searchParams.get('hard') === 'true';
@@ -199,7 +184,7 @@ export async function DELETE(request: NextRequest) {
     if (hard) {
       // Hard delete
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('vehicles') as any)
+      const { error } = await (adminSupabase.from('vehicles') as any)
         .delete()
         .eq('id', id);
 
@@ -210,7 +195,7 @@ export async function DELETE(request: NextRequest) {
     } else {
       // Soft delete (set is_active to false and status to retired)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('vehicles') as any)
+      const { error } = await (adminSupabase.from('vehicles') as any)
         .update({
           is_active: false,
           status: 'retired',

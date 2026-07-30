@@ -37,8 +37,6 @@ const DEFAULT_SETTINGS: AdminSettings = {
   min_booking_hours: 4,
 };
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -107,7 +105,6 @@ export default function SettingsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({ settings: settingsArray }),
       });
@@ -159,7 +156,7 @@ export default function SettingsPage() {
     // For now, we'll just show a success message
     alert(
       "Password change would be implemented with proper authentication. " +
-        "For now, update NEXT_PUBLIC_ADMIN_PASSWORD in your .env file."
+        "For now, update ADMIN_PASSWORD (server-only) in your environment and redeploy."
     );
     setShowPasswordSection(false);
     setCurrentPassword("");

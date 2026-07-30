@@ -19,7 +19,7 @@ export default function SimplifiedStep2ContactAndPayment() {
     setCustomerWhatsapp,
     setSpecialRequests,
     setRequiresChildSeat,
-    previousStep,
+    prevStep,
   } = useBookingStore();
 
   const [error, setError] = useState("");
@@ -53,7 +53,7 @@ export default function SimplifiedStep2ContactAndPayment() {
         </div>
         <h2 className="text-3xl font-display text-ink mb-4">Booking Request Received!</h2>
         <p className="text-lg text-ink/70 font-body mb-6">
-          We'll call you within 5 minutes to confirm your booking details.
+          We&apos;ll call you within 5 minutes to confirm your booking details.
         </p>
         <div className="bg-lake/10 border-2 border-lake rounded-lg p-6 mb-6">
           <p className="font-body text-ink mb-2">Our team will contact you at:</p>
@@ -185,7 +185,7 @@ export default function SimplifiedStep2ContactAndPayment() {
             <div>
               <h3 className="font-display text-lg text-ink mb-2">Payment Information</h3>
               <p className="text-sm text-ink/70 font-body mb-3">
-                We'll call you to confirm the booking and discuss payment options:
+                We&apos;ll call you to confirm the booking and discuss payment options:
               </p>
               <ul className="text-sm text-ink/70 font-body space-y-1">
                 <li>• Pay advance online (UPI/Card)</li>
@@ -205,7 +205,7 @@ export default function SimplifiedStep2ContactAndPayment() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
-          <Button onClick={previousStep} variant="outline" size="lg" className="sm:w-auto w-full">
+          <Button onClick={prevStep} variant="outline" size="lg" className="sm:w-auto w-full">
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </Button>

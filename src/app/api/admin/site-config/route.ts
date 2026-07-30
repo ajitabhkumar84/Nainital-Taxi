@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { SiteConfig, DEFAULT_SITE_CONFIG } from '@/lib/supabase/types';
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-
-function isAuthenticated(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === ADMIN_PASSWORD;
-}
 
 // GET - Fetch site configuration
 export async function GET() {
@@ -32,6 +26,7 @@ export async function GET() {
       header: (configMap.get('site_config_header') as SiteConfig['header']) || DEFAULT_SITE_CONFIG.header,
       footer: (configMap.get('site_config_footer') as SiteConfig['footer']) || DEFAULT_SITE_CONFIG.footer,
       contact: (configMap.get('site_config_contact') as SiteConfig['contact']) || DEFAULT_SITE_CONFIG.contact,
+      tracking: DEFAULT_SITE_CONFIG.tracking,
     };
 
     return NextResponse.json(siteConfig);
@@ -43,14 +38,8 @@ export async function GET() {
 
 // POST - Update site configuration (requires auth)
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
     const { header, footer, contact } = body as Partial<SiteConfig>;
 
@@ -83,7 +72,7 @@ export async function POST(request: NextRequest) {
     // Upsert each config section
     for (const update of updates) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('admin_settings') as any)
+      const { error } = await (adminSupabase.from('admin_settings') as any)
         .upsert(
           {
             key: update.key,
@@ -105,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch and return updated config
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: settings } = await (supabase.from('admin_settings') as any)
+    const { data: settings } = await (adminSupabase.from('admin_settings') as any)
       .select('key, value')
       .in('key', ['site_config_header', 'site_config_footer', 'site_config_contact']);
 
@@ -116,6 +105,7 @@ export async function POST(request: NextRequest) {
       header: (configMap.get('site_config_header') as SiteConfig['header']) || DEFAULT_SITE_CONFIG.header,
       footer: (configMap.get('site_config_footer') as SiteConfig['footer']) || DEFAULT_SITE_CONFIG.footer,
       contact: (configMap.get('site_config_contact') as SiteConfig['contact']) || DEFAULT_SITE_CONFIG.contact,
+      tracking: DEFAULT_SITE_CONFIG.tracking,
       updatedAt: new Date().toISOString(),
     };
 
@@ -130,17 +120,11 @@ export async function POST(request: NextRequest) {
 }
 
 // Initialize default config if not exists
-export async function PUT(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-
+export async function PUT() {
   try {
+    const adminSupabase = getAdminSupabaseClient();
     // Check if config exists
-    const { data: existing } = await supabase
+    const { data: existing } = await adminSupabase
       .from('admin_settings')
       .select('key')
       .eq('key', 'site_config_header')
@@ -171,7 +155,7 @@ export async function PUT(request: NextRequest) {
 
     for (const config of defaults) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('admin_settings') as any).upsert(config, { onConflict: 'key' });
+      await (adminSupabase.from('admin_settings') as any).upsert(config, { onConflict: 'key' });
     }
 
     return NextResponse.json({

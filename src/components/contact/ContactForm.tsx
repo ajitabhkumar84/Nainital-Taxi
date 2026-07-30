@@ -35,6 +35,7 @@ export default function ContactForm({
         passengers: formData.get('passengers'),
         vehicle: formData.get('vehicle'),
         message: formData.get('message'),
+        company: formData.get('company'), // honeypot — real users never fill this
       };
 
       const response = await fetch('/api/contact', {
@@ -108,6 +109,22 @@ export default function ContactForm({
           onSubmit={handleSubmit}
           className="bg-gradient-to-br from-white to-sunshine/5 rounded-3xl shadow-retro-lg p-6 md:p-8 border-3 border-ink"
         >
+
+          {/* Honeypot — hidden from real users, left open for bots. Positioned
+              off-screen rather than display:none, since unsophisticated bots
+              skip display:none fields. Server silently discards submissions
+              that fill it (see /api/contact/route.ts). */}
+          <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true">
+            <label htmlFor="company">Company</label>
+            <input
+              type="text"
+              id="company"
+              name="company"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
+          </div>
 
           {/* Your Information */}
           <div className="mb-6">

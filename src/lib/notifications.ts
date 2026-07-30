@@ -22,6 +22,21 @@ interface EmailOptions {
   html: string;
 }
 
+/**
+ * Escape a value for safe interpolation into email HTML. Defence in depth:
+ * booking/contact fields ultimately trace back to URL params or form input
+ * (e.g. ?packageTitle=<img onerror=...>), and the server never validates
+ * their content beyond what's needed for pricing/lookup.
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface BookingData {
   id: string;
   booking_id: string;
@@ -121,13 +136,13 @@ function generateBookingConfirmationEmail(booking: BookingData): string {
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Package</td>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #2D3436; font-weight: 600; text-align: right;">
-            ${booking.package_name}
+            ${escapeHtml(booking.package_name)}
           </td>
         </tr>
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Vehicle</td>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #2D3436; font-weight: 600; text-align: right;">
-            ${getVehicleDisplayName(booking.vehicle_type)}
+            ${escapeHtml(getVehicleDisplayName(booking.vehicle_type))}
           </td>
         </tr>
         <tr>
@@ -145,14 +160,14 @@ function generateBookingConfirmationEmail(booking: BookingData): string {
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Pickup Location</td>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #2D3436; font-weight: 600; text-align: right;">
-            ${booking.pickup_location}
+            ${escapeHtml(booking.pickup_location)}
           </td>
         </tr>
         ${booking.dropoff_location ? `
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Drop-off</td>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #2D3436; font-weight: 600; text-align: right;">
-            ${booking.dropoff_location}
+            ${escapeHtml(booking.dropoff_location)}
           </td>
         </tr>
         ` : ''}
@@ -264,7 +279,7 @@ function generatePaymentVerifiedEmail(booking: BookingData): string {
           ${formatDate(booking.booking_date)} at ${formatTime(booking.pickup_time)}
         </p>
         <p style="margin: 0; font-size: 18px; color: #2D3436; font-weight: 600;">
-          ${booking.pickup_location} ${booking.dropoff_location ? `&#8594; ${booking.dropoff_location}` : ''}
+          ${escapeHtml(booking.pickup_location)} ${booking.dropoff_location ? `&#8594; ${escapeHtml(booking.dropoff_location)}` : ''}
         </p>
       </div>
 
@@ -272,13 +287,13 @@ function generatePaymentVerifiedEmail(booking: BookingData): string {
         <tr>
           <td style="padding: 8px 0; color: #666;">Package</td>
           <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">
-            ${booking.package_name}
+            ${escapeHtml(booking.package_name)}
           </td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Vehicle</td>
           <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">
-            ${getVehicleDisplayName(booking.vehicle_type)}
+            ${escapeHtml(getVehicleDisplayName(booking.vehicle_type))}
           </td>
         </tr>
         <tr>
@@ -342,10 +357,10 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
 
     <!-- Quick Actions -->
     <div style="padding: 16px; background-color: #f8f9fa; text-align: center;">
-      <a href="https://wa.me/91${booking.customer_phone}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
+      <a href="https://wa.me/91${escapeHtml(booking.customer_phone)}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
         WhatsApp
       </a>
-      <a href="tel:+91${booking.customer_phone}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+      <a href="tel:+91${escapeHtml(booking.customer_phone)}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
         Call
       </a>
     </div>
@@ -358,16 +373,16 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #666; width: 40%;">Name</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.customer_name}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.customer_name)}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Phone</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.customer_phone}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.customer_phone)}</td>
         </tr>
         ${booking.customer_email ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Email</td>
-          <td style="padding: 8px 0; color: #2D3436;">${booking.customer_email}</td>
+          <td style="padding: 8px 0; color: #2D3436;">${escapeHtml(booking.customer_email)}</td>
         </tr>
         ` : ''}
       </table>
@@ -381,11 +396,11 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #666; width: 40%;">Package</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.package_name}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.package_name)}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Vehicle</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${getVehicleDisplayName(booking.vehicle_type)}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(getVehicleDisplayName(booking.vehicle_type))}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Date</td>
@@ -397,12 +412,12 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Pickup</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.pickup_location}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.pickup_location)}</td>
         </tr>
         ${booking.dropoff_location ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Drop-off</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.dropoff_location}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.dropoff_location)}</td>
         </tr>
         ` : ''}
         <tr>
@@ -436,7 +451,7 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
     <div style="padding: 24px;">
       <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 16px;">Special Requests</h2>
       <p style="margin: 0; padding: 12px; background-color: #fff3cd; border-radius: 6px; color: #856404;">
-        ${booking.special_requests}
+        ${escapeHtml(booking.special_requests)}
       </p>
     </div>
     ` : ''}
@@ -536,10 +551,10 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
 
     <!-- Quick Actions -->
     <div style="padding: 16px; background-color: #f8f9fa; text-align: center;">
-      <a href="https://wa.me/91${data.phone}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
+      <a href="https://wa.me/91${escapeHtml(data.phone)}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
         WhatsApp
       </a>
-      <a href="tel:+91${data.phone}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+      <a href="tel:+91${escapeHtml(data.phone)}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
         Call
       </a>
     </div>
@@ -552,16 +567,16 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 0; color: #666; width: 40%;">Name</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.name}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.name)}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #666;">Phone</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.phone}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.phone)}</td>
         </tr>
         ${data.email ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Email</td>
-          <td style="padding: 8px 0; color: #2D3436;">${data.email}</td>
+          <td style="padding: 8px 0; color: #2D3436;">${escapeHtml(data.email)}</td>
         </tr>
         ` : ''}
       </table>
@@ -577,31 +592,31 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
         ${data.pickup ? `
         <tr>
           <td style="padding: 8px 0; color: #666; width: 40%;">Pickup</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.pickup}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.pickup)}</td>
         </tr>
         ` : ''}
         ${data.drop ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Drop</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.drop}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.drop)}</td>
         </tr>
         ` : ''}
         ${data.date ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Date</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.date}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.date)}</td>
         </tr>
         ` : ''}
         ${data.passengers ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Passengers</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.passengers}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.passengers)}</td>
         </tr>
         ` : ''}
         ${data.vehicle ? `
         <tr>
           <td style="padding: 8px 0; color: #666;">Vehicle</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${data.vehicle}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.vehicle)}</td>
         </tr>
         ` : ''}
       </table>
@@ -613,7 +628,7 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
     <div style="padding: 24px; background-color: #f8f9fa;">
       <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 16px;">Message</h2>
       <p style="margin: 0; padding: 12px; background-color: #fff; border-radius: 6px; color: #2D3436; white-space: pre-wrap;">
-        ${data.message}
+        ${escapeHtml(data.message)}
       </p>
     </div>
     ` : ''}
@@ -655,7 +670,7 @@ function generateContactAutoReplyEmail(data: ContactData): string {
       <div style="width: 64px; height: 64px; background-color: #4D96FF; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
         <span style="font-size: 32px; color: white;">✓</span>
       </div>
-      <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 20px;">Hi ${data.name}!</h2>
+      <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 20px;">Hi ${escapeHtml(data.name)}!</h2>
       <p style="margin: 0; color: #666; font-size: 16px;">
         Thank you for your enquiry. Our team will contact you shortly.
       </p>
@@ -667,28 +682,28 @@ function generateContactAutoReplyEmail(data: ContactData): string {
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 6px 0; color: #666;">Name</td>
-          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.name}</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.name)}</td>
         </tr>
         <tr>
           <td style="padding: 6px 0; color: #666;">Phone</td>
-          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.phone}</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.phone)}</td>
         </tr>
         ${data.pickup ? `
         <tr>
           <td style="padding: 6px 0; color: #666;">Pickup</td>
-          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.pickup}</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.pickup)}</td>
         </tr>
         ` : ''}
         ${data.drop ? `
         <tr>
           <td style="padding: 6px 0; color: #666;">Drop</td>
-          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.drop}</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.drop)}</td>
         </tr>
         ` : ''}
         ${data.date ? `
         <tr>
           <td style="padding: 6px 0; color: #666;">Date</td>
-          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${data.date}</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.date)}</td>
         </tr>
         ` : ''}
       </table>

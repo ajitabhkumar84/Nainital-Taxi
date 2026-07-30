@@ -19,6 +19,7 @@ import {
   Heart,
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
+import { buildBookingUrl } from "@/lib/bookingLink";
 import { Package, Pricing, TourItinerary, GalleryImage } from "@/lib/supabase/types";
 import { Header, Footer } from "@/components/ui";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
@@ -143,7 +144,7 @@ export default async function TourPackagePage({
     name: pkg.title,
     description: pkg.description || `Book ${pkg.title} tour package with Nainital Taxi`,
     url: `https://nainialtaxi.com/tour/${pkg.slug}`,
-    image: pkg.image_url,
+    image: pkg.image_url ?? undefined,
     itinerary: itinerary?.days?.map(day => ({
       name: day.title,
       description: day.description,
@@ -221,7 +222,7 @@ export default async function TourPackagePage({
                   </div>
                 )}
                 <Link
-                  href={`/booking?packageId=${pkg.id}&packageTitle=${encodeURIComponent(pkg.title)}&packageType=tour`}
+                  href={buildBookingUrl({ packageId: pkg.id, packageTitle: pkg.title, packageType: 'tour' })}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-whatsapp text-white font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
                 >
                   Book Now
@@ -441,7 +442,7 @@ export default async function TourPackagePage({
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
-                href={`/booking?packageId=${pkg.id}&packageTitle=${encodeURIComponent(pkg.title)}&packageType=tour`}
+                href={buildBookingUrl({ packageId: pkg.id, packageTitle: pkg.title, packageType: 'tour' })}
                 className="inline-flex items-center gap-2 px-8 py-4 bg-sunshine text-ink font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
               >
                 Book Online

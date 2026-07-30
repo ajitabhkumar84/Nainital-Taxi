@@ -6,8 +6,6 @@ import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { RouteCategory } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 const ICON_OPTIONS = [
   { value: "car", label: "🚗 Car", emoji: "🚗" },
   { value: "mountain", label: "⛰️ Mountain", emoji: "⛰️" },
@@ -45,11 +43,7 @@ export default function RouteCategoryForm({ categoryId }: RouteCategoryFormProps
 
   const fetchCategory = async () => {
     try {
-      const response = await fetch(`/api/admin/route-categories?id=${categoryId}`, {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch(`/api/admin/route-categories?id=${categoryId}`);
 
       if (!response.ok) throw new Error("Failed to fetch category");
 
@@ -106,7 +100,6 @@ export default function RouteCategoryForm({ categoryId }: RouteCategoryFormProps
         method,
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify(body),
       });

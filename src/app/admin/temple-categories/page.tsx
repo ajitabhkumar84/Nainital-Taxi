@@ -5,8 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Edit, Trash2, Loader2, Save, X } from "lucide-react";
 import { TempleCategory } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 const ICON_OPTIONS = [
   "temple",
   "om",
@@ -42,11 +40,7 @@ export default function TempleCategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/admin/temple-categories", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/temple-categories");
 
       if (!response.ok) throw new Error("Failed to fetch categories");
 
@@ -69,9 +63,6 @@ export default function TempleCategoriesPage() {
     try {
       const response = await fetch(`/api/admin/temple-categories?id=${id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
       });
 
       const data = await response.json();
@@ -143,7 +134,6 @@ export default function TempleCategoriesPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify({
             id: editingId,
@@ -159,7 +149,6 @@ export default function TempleCategoriesPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify(formData),
         });

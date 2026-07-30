@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
-function verifyAuth(request: NextRequest) {
-  const authHeader = request.headers.get("x-admin-auth");
-  if (authHeader !== ADMIN_PASSWORD) {
-    return false;
-  }
-  return true;
-}
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 
 // GET - Fetch all categories or a specific category
 export async function GET(request: NextRequest) {
-  if (!verifyAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = await createClient();
+  const supabase = getAdminSupabaseClient();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -55,11 +41,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new category
 export async function POST(request: NextRequest) {
-  if (!verifyAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = await createClient();
+  const supabase = getAdminSupabaseClient();
 
   try {
     const body = await request.json();
@@ -84,11 +66,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH - Update a category
 export async function PATCH(request: NextRequest) {
-  if (!verifyAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = await createClient();
+  const supabase = getAdminSupabaseClient();
 
   try {
     const body = await request.json();
@@ -122,11 +100,7 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE - Delete a category
 export async function DELETE(request: NextRequest) {
-  if (!verifyAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = await createClient();
+  const supabase = getAdminSupabaseClient();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 

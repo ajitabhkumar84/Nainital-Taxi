@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { PackageType } from '@/lib/supabase/types';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
 
 function generateSlug(title: string): string {
   return title
@@ -37,7 +19,7 @@ export async function GET(request: NextRequest) {
     const slug = searchParams.get('slug');
     const type = searchParams.get('type') as PackageType | null;
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     if (id) {
       // Fetch single package by ID
@@ -98,10 +80,6 @@ export async function GET(request: NextRequest) {
 // POST: Create new package
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const {
       title,
@@ -138,7 +116,7 @@ export async function POST(request: NextRequest) {
     // Generate slug from title if not provided
     const slug = customSlug || generateSlug(title);
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     // Get max display_order if not provided
     let orderValue = display_order;
@@ -198,10 +176,6 @@ export async function POST(request: NextRequest) {
 // PATCH: Update existing package
 export async function PATCH(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { id, updates } = body;
 
@@ -217,7 +191,7 @@ export async function PATCH(request: NextRequest) {
       updates.slug = generateSlug(updates.title);
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('packages')
       .update({
@@ -243,10 +217,6 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Delete package (hard delete or soft delete via is_active)
 export async function DELETE(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const hard = searchParams.get('hard') === 'true';
@@ -255,7 +225,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     if (hard) {
       // Hard delete

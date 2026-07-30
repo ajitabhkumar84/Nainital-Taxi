@@ -10,25 +10,25 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
   ({ className, variant = "popular", size = "md", children, ...props }, ref) => {
     const variants = {
-      popular: "bg-coral text-white",
-      limited: "bg-sunshine text-ink",
-      available: "bg-green-500 text-white",
-      soldout: "bg-ink text-white",
-      secondary: "bg-gray-200 text-gray-800",
-      accent: "bg-[#FFD93D] text-[#2D3436]",
+      popular: "bg-sunshine-50 text-sunshine-600 border-sunshine-100",
+      limited: "bg-coral-50 text-coral border-coral-100",
+      available: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      soldout: "bg-slate-100 text-slate-600 border-slate-200",
+      secondary: "bg-slate-100 text-slate-700 border-slate-200",
+      accent: "bg-sunshine-50 text-sunshine-600 border-sunshine-100",
     };
 
     const sizes = {
-      sm: "px-2 py-0.5 text-xs",
-      md: "px-3 py-1 text-xs",
-      lg: "px-4 py-2 text-sm",
+      sm: "px-2 py-0.5 text-[11px]",
+      md: "px-2.5 py-1 text-[11px]",
+      lg: "px-3 py-1.5 text-xs",
     };
 
     return (
       <span
         ref={ref}
         className={cn(
-          "inline-flex items-center rounded-full font-bold border-2 border-ink",
+          "inline-flex items-center rounded-full font-semibold uppercase tracking-wide border",
           variants[variant],
           sizes[size],
           className

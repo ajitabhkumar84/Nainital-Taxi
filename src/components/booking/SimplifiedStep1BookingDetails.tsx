@@ -10,18 +10,18 @@ export default function SimplifiedStep1BookingDetails() {
     packageId,
     packageTitle,
     vehicleType,
-    bookingDate,
-    pickupTime,
+    tripDate,
+    tripTime,
     pickupLocation,
     dropoffLocation,
-    passengers,
-    finalPrice,
+    passengerCount,
+    calculatedPrice,
     setVehicleType,
-    setBookingDate,
-    setPickupTime,
+    setTripDate,
+    setTripTime,
     setPickupLocation,
     setDropoffLocation,
-    setPassengers,
+    setPassengerCount,
     nextStep,
   } = useBookingStore();
 
@@ -37,11 +37,11 @@ export default function SimplifiedStep1BookingDetails() {
       setError("Please select a vehicle");
       return;
     }
-    if (!bookingDate) {
+    if (!tripDate) {
       setError("Please select a date");
       return;
     }
-    if (!pickupTime) {
+    if (!tripTime) {
       setError("Please select pickup time");
       return;
     }
@@ -118,8 +118,8 @@ export default function SimplifiedStep1BookingDetails() {
             </label>
             <input
               type="date"
-              value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
+              value={tripDate || ""}
+              onChange={(e) => setTripDate(e.target.value)}
               min={new Date().toISOString().split("T")[0]}
               className="w-full px-4 py-3 rounded-lg border-2 border-ink font-body focus:outline-none focus:border-teal"
             />
@@ -131,8 +131,8 @@ export default function SimplifiedStep1BookingDetails() {
             </label>
             <input
               type="time"
-              value={pickupTime}
-              onChange={(e) => setPickupTime(e.target.value)}
+              value={tripTime || ""}
+              onChange={(e) => setTripTime(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border-2 border-ink font-body focus:outline-none focus:border-teal"
             />
           </div>
@@ -176,8 +176,8 @@ export default function SimplifiedStep1BookingDetails() {
           </label>
           <input
             type="number"
-            value={passengers}
-            onChange={(e) => setPassengers(parseInt(e.target.value))}
+            value={passengerCount}
+            onChange={(e) => setPassengerCount(parseInt(e.target.value))}
             min={1}
             max={7}
             className="w-full px-4 py-3 rounded-lg border-2 border-ink font-body focus:outline-none focus:border-teal"
@@ -185,14 +185,14 @@ export default function SimplifiedStep1BookingDetails() {
         </div>
 
         {/* Estimated Price */}
-        {finalPrice > 0 && (
+        {calculatedPrice !== null && calculatedPrice > 0 && (
           <div className="bg-gradient-to-r from-whatsapp/10 to-teal/10 border-2 border-teal rounded-lg p-6 mb-6">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-ink/60 font-body mb-1">Estimated Fare</div>
                 <div className="text-3xl font-display text-ink flex items-center gap-2">
                   <IndianRupee className="w-7 h-7" />
-                  {finalPrice.toLocaleString("en-IN")}
+                  {calculatedPrice.toLocaleString("en-IN")}
                 </div>
               </div>
               <div className="text-sm text-ink/70 font-body">

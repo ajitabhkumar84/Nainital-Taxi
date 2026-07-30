@@ -37,6 +37,9 @@ export type {
   Waitlist,
   Review,
   AdminSetting,
+  TrustSection,
+  TrustPillar,
+  TickerBooking,
 
   // View types
   ActiveVehiclesSummary,
@@ -70,6 +73,8 @@ export {
   getPackagePrices,
   getPackagePriceRange,
   getAllPricingForPackage,
+  getMinPricePerPackage,
+  getTransferRoutes,
 
   // Season & Blackout helpers
   getSeasonForDate,
@@ -92,6 +97,9 @@ export {
   // Reviews
   getFeaturedReviews,
   getApprovedReviews,
+
+  // Trust & Safety section
+  getTrustSection,
 
   // Destinations
   getDestinations,

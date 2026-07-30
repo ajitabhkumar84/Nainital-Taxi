@@ -1,31 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 // POST: Create new season
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { name, description, start_date, end_date, is_recurring } = body;
 
@@ -36,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('seasons')
       .insert({
@@ -65,10 +43,6 @@ export async function POST(request: NextRequest) {
 // PATCH: Update season
 export async function PATCH(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { id, updates } = body;
 
@@ -79,7 +53,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('seasons')
       .update(updates)
@@ -102,10 +76,6 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Delete season
 export async function DELETE(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -113,7 +83,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { error } = await supabase
       .from('seasons')
       .delete()

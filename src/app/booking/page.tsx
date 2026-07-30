@@ -1,43 +1,37 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useBookingStore, BookingType } from '@/store/bookingStore';
+import { Suspense } from 'react';
+import { useBookingStore } from '@/store/bookingStore';
+import { useBookingEntry } from '@/hooks/useBookingEntry';
 import { CheckCircle2, Shield, Star, Users, Award } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
 import Step3ContactInfo from '@/components/booking/Step3ContactInfo';
 import Step4Payment from '@/components/booking/Step4Payment';
 
-const steps = [
-  { number: 1, title: 'Package & Vehicle', description: 'Select your ride' },
-  { number: 2, title: 'Trip Details', description: 'When & where' },
-  { number: 3, title: 'Contact Info', description: 'Your details' },
-  { number: 4, title: 'Payment', description: 'Complete booking' },
-];
-
 // Wrapper component to handle URL params
 function BookingPageContent() {
-  const searchParams = useSearchParams();
+  const { ready } = useBookingEntry();
   const currentStep = useBookingStore((state) => state.currentStep);
-  const setPackage = useBookingStore((state) => state.setPackage);
-  const setBookingType = useBookingStore((state) => state.setBookingType);
   const packageId = useBookingStore((state) => state.packageId);
 
-  // Pre-populate from URL parameters
-  useEffect(() => {
-    const urlPackageId = searchParams.get('packageId');
-    const urlPackageTitle = searchParams.get('packageTitle');
-    const urlPackageType = searchParams.get('packageType') as BookingType | null;
+  // Until the entry contract has been applied, currentStep is still the
+  // Zustand default of 1 — rendering before `ready` would flash the full
+  // "Choose Your Adventure" picker for a frame on every deep-linked arrival.
+  if (!ready) {
+    return <BookingLoading />;
+  }
 
-    // Only pre-populate if we have URL params AND no package is already selected
-    if (urlPackageId && urlPackageTitle && !packageId) {
-      setPackage(urlPackageId, decodeURIComponent(urlPackageTitle));
-      if (urlPackageType) {
-        setBookingType(urlPackageType);
-      }
-    }
-  }, [searchParams, packageId, setPackage, setBookingType]);
+  const steps = [
+    {
+      number: 1,
+      title: packageId ? 'Choose Your Vehicle' : 'Package & Vehicle',
+      description: packageId ? 'Pick your ride' : 'Select your ride',
+    },
+    { number: 2, title: 'Trip Details', description: 'When & where' },
+    { number: 3, title: 'Contact Info', description: 'Your details' },
+    { number: 4, title: 'Payment', description: 'Complete booking' },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">

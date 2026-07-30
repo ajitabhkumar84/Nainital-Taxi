@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 import { RouteCategory } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 const ICON_OPTIONS = [
   { value: "car", label: "🚗 Car", emoji: "🚗" },
   { value: "mountain", label: "⛰️ Mountain", emoji: "⛰️" },
@@ -39,11 +37,7 @@ export default function RouteCategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/admin/route-categories", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/route-categories");
 
       if (!response.ok) throw new Error("Failed to fetch categories");
 
@@ -66,9 +60,6 @@ export default function RouteCategoriesPage() {
     try {
       const response = await fetch(`/api/admin/route-categories?id=${id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
       });
 
       if (!response.ok) throw new Error("Failed to delete category");
@@ -89,7 +80,6 @@ export default function RouteCategoriesPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: category.id,
@@ -134,7 +124,6 @@ export default function RouteCategoriesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({ updates }),
       });

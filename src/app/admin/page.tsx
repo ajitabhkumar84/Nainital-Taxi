@@ -1,6 +1,3 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -12,18 +9,9 @@ import {
   AlertCircle,
   ArrowRight,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { verifyAdminSession } from "@/lib/auth/adminAuth";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
-
-interface DashboardStats {
-  totalBookings: number;
-  pendingBookings: number;
-  confirmedBookings: number;
-  todayBookings: number;
-  upcomingBookings: number;
-  totalVehicles: number;
-  availableCarsToday: number;
-}
 
 interface RecentBooking {
   id: string;
@@ -35,158 +23,125 @@ interface RecentBooking {
   created_at: string;
 }
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalBookings: 0,
-    pendingBookings: 0,
-    confirmedBookings: 0,
-    todayBookings: 0,
-    upcomingBookings: 0,
-    totalVehicles: 0,
-    availableCarsToday: 10,
-  });
-  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  async function fetchDashboardData() {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-
-      // Fetch booking stats
-      const { data: bookings, error: bookingsError } = await supabase
-        .from("bookings")
-        .select("id, status, booking_date, customer_name, package_name, final_price, created_at")
-        .order("created_at", { ascending: false });
-
-      if (bookingsError) throw bookingsError;
-
-      const allBookings = (bookings as RecentBooking[]) || [];
-      const pendingCount = allBookings.filter((b) => b.status === "pending" || b.status === "payment_pending").length;
-      const confirmedCount = allBookings.filter((b) => b.status === "confirmed").length;
-      const todayCount = allBookings.filter((b) => b.booking_date === today).length;
-      const upcomingCount = allBookings.filter((b) => b.booking_date > today && b.status === "confirmed").length;
-
-      // Fetch vehicle count
-      const { count: vehicleCount } = await supabase
-        .from("vehicles")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true);
-
-      // Fetch today's availability
-      const { data: availabilityData } = await supabase
-        .from("availability")
-        .select("cars_available")
-        .eq("date", today)
-        .single() as { data: { cars_available: number } | null };
-
-      setStats({
-        totalBookings: allBookings.length,
-        pendingBookings: pendingCount,
-        confirmedBookings: confirmedCount,
-        todayBookings: todayCount,
-        upcomingBookings: upcomingCount,
-        totalVehicles: vehicleCount || 0,
-        availableCarsToday: availabilityData?.cars_available ?? 10,
-      });
-
-      setRecentBookings(allBookings.slice(0, 5) as RecentBooking[]);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    } finally {
-      setLoading(false);
-    }
+function getStatusColor(status: string) {
+  switch (status) {
+    case "confirmed":
+      return "bg-whatsapp/20 text-whatsapp";
+    case "pending":
+    case "payment_pending":
+      return "bg-sunshine/30 text-ink";
+    case "completed":
+      return "bg-teal/20 text-teal";
+    case "cancelled":
+      return "bg-coral/20 text-coral";
+    default:
+      return "bg-ink/10 text-ink";
   }
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatPrice(price: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+export default async function AdminDashboard() {
+  // Defense in depth: middleware lets unauthenticated requests through to the
+  // exact "/admin" path so the client-side password gate in layout.tsx can
+  // render, so this Server Component must never fetch/render real data for
+  // an unauthenticated request itself, or that data leaks in the RSC payload
+  // regardless of what the client chooses to display.
+  const authenticated = await verifyAdminSession();
+  if (!authenticated) {
+    return null;
+  }
+
+  const supabase = getAdminSupabaseClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: bookings, error: bookingsError } = await supabase
+    .from("bookings")
+    .select("id, status, booking_date, customer_name, package_name, final_price, created_at")
+    .order("created_at", { ascending: false });
+
+  if (bookingsError) {
+    console.error("Error fetching dashboard bookings:", bookingsError);
+  }
+
+  const allBookings = (bookings as RecentBooking[]) || [];
+
+  const { count: vehicleCount } = await supabase
+    .from("vehicles")
+    .select("*", { count: "exact", head: true })
+    .eq("is_active", true);
+
+  const { data: availabilityRow } = (await supabase
+    .from("availability")
+    .select("cars_available")
+    .eq("date", today)
+    .single()) as { data: { cars_available: number } | null };
+
+  const pendingCount = allBookings.filter((b) => b.status === "pending" || b.status === "payment_pending").length;
+  const confirmedCount = allBookings.filter((b) => b.status === "confirmed").length;
+  const todayCount = allBookings.filter((b) => b.booking_date === today).length;
+  const upcomingCount = allBookings.filter((b) => b.booking_date > today && b.status === "confirmed").length;
+  const availableCarsToday = availabilityRow?.cars_available ?? 10;
+  const recentBookings = allBookings.slice(0, 5);
 
   const statCards = [
     {
       label: "Total Bookings",
-      value: stats.totalBookings,
+      value: allBookings.length,
       icon: <BookOpen className="w-6 h-6" />,
       color: "bg-teal",
       href: "/admin/bookings",
     },
     {
       label: "Pending",
-      value: stats.pendingBookings,
+      value: pendingCount,
       icon: <Clock className="w-6 h-6" />,
       color: "bg-sunshine",
       href: "/admin/bookings?status=pending",
     },
     {
       label: "Confirmed",
-      value: stats.confirmedBookings,
+      value: confirmedCount,
       icon: <CheckCircle className="w-6 h-6" />,
       color: "bg-whatsapp",
       href: "/admin/bookings?status=confirmed",
     },
     {
       label: "Today",
-      value: stats.todayBookings,
+      value: todayCount,
       icon: <Calendar className="w-6 h-6" />,
       color: "bg-coral",
       href: "/admin/bookings?date=today",
     },
     {
       label: "Upcoming",
-      value: stats.upcomingBookings,
+      value: upcomingCount,
       icon: <TrendingUp className="w-6 h-6" />,
       color: "bg-teal",
       href: "/admin/bookings?status=upcoming",
     },
     {
       label: "Cars Available Today",
-      value: stats.availableCarsToday,
+      value: availableCarsToday,
       icon: <Car className="w-6 h-6" />,
       color: "bg-sunshine",
       href: "/admin/availability",
     },
   ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-whatsapp/20 text-whatsapp";
-      case "pending":
-      case "payment_pending":
-        return "bg-sunshine/30 text-ink";
-      case "completed":
-        return "bg-teal/20 text-teal";
-      case "cancelled":
-        return "bg-coral/20 text-coral";
-      default:
-        return "bg-ink/10 text-ink";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-xl font-display text-ink animate-pulse">
-          Loading dashboard...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -355,9 +310,9 @@ export default function AdminDashboard() {
               Today: {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
             </h2>
             <p className="text-ink/80 font-body mt-1">
-              {stats.todayBookings} booking{stats.todayBookings !== 1 ? "s" : ""} scheduled
+              {todayCount} booking{todayCount !== 1 ? "s" : ""} scheduled
               {" • "}
-              {stats.availableCarsToday} car{stats.availableCarsToday !== 1 ? "s" : ""} available
+              {availableCarsToday} car{availableCarsToday !== 1 ? "s" : ""} available
             </p>
           </div>
           <Link

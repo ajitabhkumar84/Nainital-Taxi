@@ -1,0 +1,49 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useBookingStore, BookingEntryPatch, BookingStep } from '@/store/bookingStore';
+import { parseBookingEntry } from '@/lib/bookingLink';
+
+/**
+ * Applies the /booking URL entry contract to the store exactly once per
+ * distinct URL, then reports readiness. The ref guard (rather than relying
+ * solely on the effect's dependency array) means later re-renders driven by
+ * in-flow store changes — e.g. the user hitting Back, which changes
+ * currentStep — never re-trigger the entry patch and snap them back forward.
+ */
+export function useBookingEntry(): { ready: boolean } {
+  const searchParams = useSearchParams();
+  const applyEntry = useBookingStore((state) => state.applyEntry);
+  const [ready, setReady] = useState(false);
+  const appliedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const qs = searchParams.toString();
+    if (appliedForRef.current === qs) return;
+    appliedForRef.current = qs;
+
+    const parsed = parseBookingEntry(searchParams);
+
+    // Only a package + vehicle together mean every Step 1 decision is already
+    // made; anything less still needs Step 1 (collapsed summary, or the full
+    // picker with a vehicle pre-ticked for a fleet-only arrival).
+    const currentStep: BookingStep = parsed.packageId && parsed.vehicle ? 2 : 1;
+
+    const patch: BookingEntryPatch = { currentStep };
+    if (parsed.packageId) patch.packageId = parsed.packageId;
+    if (parsed.packageTitle) patch.packageTitle = parsed.packageTitle;
+    if (parsed.packageType) patch.bookingType = parsed.packageType;
+    if (parsed.vehicle) patch.vehicleType = parsed.vehicle;
+    if (parsed.date) patch.tripDate = parsed.date;
+    if (parsed.time) patch.tripTime = parsed.time;
+    if (parsed.pickup) patch.pickupLocation = parsed.pickup;
+    if (parsed.dropoff) patch.dropoffLocation = parsed.dropoff;
+    if (parsed.passengers) patch.passengerCount = parsed.passengers;
+
+    applyEntry(patch);
+    setReady(true);
+  }, [searchParams, applyEntry]);
+
+  return { ready };
+}

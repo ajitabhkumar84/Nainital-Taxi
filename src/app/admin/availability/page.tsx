@@ -29,8 +29,6 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function AvailabilityPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availability, setAvailability] = useState<Record<string, DayAvailability>>({});
@@ -130,7 +128,6 @@ export default function AvailabilityPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           date: dateStr,
@@ -178,7 +175,6 @@ export default function AvailabilityPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           date: dateStr,
@@ -225,7 +221,6 @@ export default function AvailabilityPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           date: selectedDate,

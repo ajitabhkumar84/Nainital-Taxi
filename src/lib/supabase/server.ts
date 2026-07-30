@@ -7,16 +7,18 @@
 
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { Database } from './types';
 
 /**
  * Create a Supabase client for server-side operations
  * Automatically manages cookies for authentication
+ *
+ * Untyped (no `Database` generic): the generated `Database` type only
+ * models a subset of tables, and callers touch tables outside that subset.
  */
 export function createClient() {
   const cookieStore = cookies();
 
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

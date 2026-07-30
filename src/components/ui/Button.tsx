@@ -11,17 +11,17 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", children, asChild, ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center font-body font-bold border-3 border-ink rounded-lg transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] disabled:opacity-50 disabled:cursor-not-allowed";
+      "inline-flex items-center justify-center font-body font-semibold rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed";
 
     const variants = {
       primary:
-        "bg-sunshine text-ink shadow-retro hover:shadow-retro-pressed active:shadow-none",
+        "bg-sunshine text-white hover:bg-sunshine-500 shadow-retro-sm",
       secondary:
-        "bg-teal text-white shadow-retro hover:shadow-retro-pressed active:shadow-none",
+        "bg-white text-ink border border-slate-300 hover:bg-slate-50",
       whatsapp:
-        "bg-whatsapp text-white shadow-retro hover:shadow-retro-pressed active:shadow-none",
+        "bg-whatsapp text-white hover:brightness-95 shadow-retro-sm",
       outline:
-        "bg-white text-ink shadow-retro hover:shadow-retro-pressed active:shadow-none",
+        "bg-white text-ink border border-slate-300 hover:bg-slate-50",
     };
 
     const sizes = {

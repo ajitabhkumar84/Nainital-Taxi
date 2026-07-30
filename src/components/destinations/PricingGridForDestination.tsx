@@ -4,7 +4,7 @@ import React from 'react';
 import { IndianRupee, Users, Car } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { useBookingStore } from '@/store/bookingStore';
+import { buildBookingUrl } from '@/lib/bookingLink';
 
 interface VehicleCategoryImages {
   sedan?: string;
@@ -69,24 +69,18 @@ export default function PricingGridForDestination({
   destinationName,
 }: PricingGridForDestinationProps) {
   const router = useRouter();
-  const setBookingContext = useBookingStore((state) => state.setBookingContext);
 
   const seasons = ['Off-Season', 'Season'];
 
-  const handleBookNow = (vehicleType: VehicleType, seasonPrice: number, offSeasonPrice: number) => {
-    // Set booking context with route information
-    setBookingContext({
-      packageId,
-      packageTitle,
-      packageType: 'transfer',
-      vehicleType,
-      basePrice: offSeasonPrice, // Use off-season as base
-      seasonPrice,
-      destination: destinationName,
-    });
-
-    // Navigate to booking page
-    router.push('/booking');
+  const handleBookNow = (vehicleType: VehicleType) => {
+    router.push(
+      buildBookingUrl({
+        packageId,
+        packageTitle,
+        packageType: 'transfer',
+        vehicle: vehicleType,
+      })
+    );
   };
 
   return (
@@ -126,8 +120,6 @@ export default function PricingGridForDestination({
             const vehicle = VEHICLE_DISPLAY[vehicleType];
             const vehiclePricing = pricingByVehicle[vehicleType];
             const categoryImage = vehicleCategoryImages?.[vehicleType];
-            const seasonPrice = vehiclePricing['Season'] || 0;
-            const offSeasonPrice = vehiclePricing['Off-Season'] || 0;
 
             return (
               <div
@@ -177,7 +169,7 @@ export default function PricingGridForDestination({
 
                   {/* Book Now Button */}
                   <button
-                    onClick={() => handleBookNow(vehicleType, seasonPrice, offSeasonPrice)}
+                    onClick={() => handleBookNow(vehicleType)}
                     className="w-full bg-teal hover:bg-teal/90 text-white px-4 py-3 rounded-xl font-bold font-body border-3 border-ink shadow-retro hover:shadow-retro-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
                   >
                     Book Now
@@ -215,8 +207,6 @@ export default function PricingGridForDestination({
               const vehicle = VEHICLE_DISPLAY[vehicleType];
               const vehiclePricing = pricingByVehicle[vehicleType];
               const categoryImage = vehicleCategoryImages?.[vehicleType];
-              const seasonPrice = vehiclePricing['Season'] || 0;
-              const offSeasonPrice = vehiclePricing['Off-Season'] || 0;
 
               return (
                 <div
@@ -269,7 +259,7 @@ export default function PricingGridForDestination({
                   {/* Book Now Button */}
                   <div className="p-4 border-l-2 border-ink/20 flex items-center justify-center">
                     <button
-                      onClick={() => handleBookNow(vehicleType, seasonPrice, offSeasonPrice)}
+                      onClick={() => handleBookNow(vehicleType)}
                       className="bg-teal hover:bg-teal/90 text-white px-4 py-2 rounded-lg font-bold font-body border-2 border-ink shadow-retro-sm hover:shadow-retro-pressed hover:translate-x-[1px] hover:translate-y-[1px] transition-all text-sm"
                     >
                       Book Now

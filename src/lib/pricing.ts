@@ -74,6 +74,7 @@ export async function getPackagePrice(
       .eq('package_id', packageId)
       .eq('vehicle_type', vehicleType)
       .eq('season_name', season.name)
+      .eq('is_active', true)
       .single();
 
     if (pricingError) {

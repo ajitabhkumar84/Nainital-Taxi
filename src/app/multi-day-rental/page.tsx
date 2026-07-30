@@ -1,6 +1,6 @@
 import React from "react";
 import { Star, Check, X, Phone, MessageCircle } from "lucide-react";
-import { MultiDayRentalPage } from "@/lib/supabase/types";
+import type { MultiDayRentalPage } from "@/lib/supabase/types";
 import { Metadata } from "next";
 
 async function getPageData(): Promise<MultiDayRentalPage | null> {

@@ -7,8 +7,6 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import TempleForm from "@/components/admin/TempleForm";
 import { Temple, TemplePricing, TempleFAQ } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function EditTemplePage() {
   const router = useRouter();
   const params = useParams();
@@ -26,11 +24,7 @@ export default function EditTemplePage() {
 
   const fetchTemple = async () => {
     try {
-      const response = await fetch(`/api/admin/temples?id=${templeId}&withPricing=true&withRelations=true`, {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch(`/api/admin/temples?id=${templeId}&withPricing=true&withRelations=true`);
 
       if (!response.ok) throw new Error("Failed to fetch temple");
 
@@ -47,11 +41,7 @@ export default function EditTemplePage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/admin/temple-categories", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/temple-categories");
 
       if (!response.ok) throw new Error("Failed to fetch categories");
 
@@ -69,7 +59,6 @@ export default function EditTemplePage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: templeId,

@@ -16,6 +16,7 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
     name: '',
     phone: '',
     message: '',
+    company: '', // honeypot — real users never fill this
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -37,7 +38,7 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
 
       if (response.ok && data.success) {
         setShowSuccess(true);
-        setFormData({ name: '', phone: '', message: '' });
+        setFormData({ name: '', phone: '', message: '', company: '' });
         setTimeout(() => {
           setShowSuccess(false);
           onClose?.();
@@ -71,7 +72,7 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
       {showSuccess && (
         <div className="mb-4 p-3 bg-teal/10 border-2 border-teal rounded-xl">
           <p className="text-teal font-body font-semibold text-sm">
-            ✓ Thank you! We'll contact you shortly.
+            ✓ Thank you! We&apos;ll contact you shortly.
           </p>
         </div>
       )}
@@ -85,6 +86,21 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Honeypot — hidden from real users, left open for bots. See
+            /api/contact/route.ts for the server-side check. */}
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true">
+          <label htmlFor="quick-company">Company</label>
+          <input
+            type="text"
+            id="quick-company"
+            value={formData.company}
+            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
+        </div>
+
         <div>
           <label htmlFor="quick-name" className="block text-sm font-bold font-body text-ink mb-2">
             Name <span className="text-coral">*</span>

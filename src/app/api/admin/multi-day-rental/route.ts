@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { MultiDayRentalPage, DEFAULT_MULTI_DAY_RENTAL_PAGE } from '@/lib/supabase/types';
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
 const FIXED_ID = '00000000-0000-0000-0000-000000000001';
-
-function isAuthenticated(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === ADMIN_PASSWORD;
-}
 
 // GET - Fetch multi-day rental page configuration
 export async function GET() {
@@ -50,14 +45,8 @@ export async function GET() {
 
 // POST - Update multi-day rental page configuration (requires auth)
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
 
     // Prepare update data
@@ -72,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert the configuration
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase
+    const { data, error } = await (adminSupabase
       .from('multi_day_rental_page') as any)
       .upsert(updateData, { onConflict: 'id' })
       .select()
@@ -97,18 +86,12 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Initialize with default configuration (requires auth)
-export async function PUT(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-
+export async function PUT() {
   try {
+    const adminSupabase = getAdminSupabaseClient();
     // Check if config already exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing } = await (supabase
+    const { data: existing } = await (adminSupabase
       .from('multi_day_rental_page') as any)
       .select('id')
       .eq('id', FIXED_ID)
@@ -130,7 +113,7 @@ export async function PUT(request: NextRequest) {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase
+    const { data, error } = await (adminSupabase
       .from('multi_day_rental_page') as any)
       .insert(defaultConfig)
       .select()
@@ -159,14 +142,8 @@ export async function PUT(request: NextRequest) {
 
 // PATCH - Toggle published status (requires auth)
 export async function PATCH(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const { is_published } = await request.json();
 
     if (typeof is_published !== 'boolean') {
@@ -177,7 +154,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase
+    const { data, error } = await (adminSupabase
       .from('multi_day_rental_page') as any)
       .update({
         is_published,

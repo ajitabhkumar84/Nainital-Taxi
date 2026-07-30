@@ -80,10 +80,6 @@ export function useAdminSiteConfig(): UseAdminSiteConfigReturn {
   const [isSaving, setIsSaving] = useState(false);
 
   const updateConfig = useCallback(async (updates: Partial<SiteConfig>): Promise<boolean> => {
-    const adminPassword = localStorage.getItem('admin_password') ||
-                          process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-                          'nainital2024';
-
     try {
       setIsSaving(true);
 
@@ -91,7 +87,6 @@ export function useAdminSiteConfig(): UseAdminSiteConfigReturn {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': adminPassword,
         },
         body: JSON.stringify(updates),
       });
@@ -118,16 +113,11 @@ export function useAdminSiteConfig(): UseAdminSiteConfigReturn {
   }, [refetch]);
 
   const initializeConfig = useCallback(async (): Promise<boolean> => {
-    const adminPassword = localStorage.getItem('admin_password') ||
-                          process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-                          'nainital2024';
-
     try {
       const response = await fetch('/api/admin/site-config', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': adminPassword,
         },
       });
 

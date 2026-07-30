@@ -1,31 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 // POST: Upload image to Supabase Storage
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const folder = formData.get('folder') as string || 'packages';
@@ -62,7 +40,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -97,10 +75,6 @@ export async function POST(request: NextRequest) {
 // DELETE: Remove image from Supabase Storage
 export async function DELETE(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const path = searchParams.get('path');
 
@@ -108,7 +82,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'No path provided' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     const { error } = await supabase.storage
       .from('images')

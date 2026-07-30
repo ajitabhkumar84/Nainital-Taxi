@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import {
+  ADMIN_SESSION_COOKIE,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
+  createSessionToken,
+} from '@/lib/auth/adminAuth';
+import { checkLoginRateLimit, getClientIp } from '@/lib/rateLimit';
 
-// Admin credentials - stored server-side only
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nainital2024';
-
-// Session duration: 24 hours
-const SESSION_DURATION = 24 * 60 * 60 * 1000;
+// Admin password - server-side only. Must be set via env; no client-exposed fallback.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rl = await checkLoginRateLimit(ip);
+    if (!rl.success) {
+      const retryAfterSeconds = Math.max(0, Math.ceil((rl.reset - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+      );
+    }
+
+    if (!ADMIN_PASSWORD) {
+      console.error('ADMIN_PASSWORD is not configured on the server.');
+      return NextResponse.json(
+        { error: 'Admin login is not configured.' },
+        { status: 500 }
+      );
+    }
+
     const { password } = await request.json();
 
     if (!password) {
@@ -18,10 +39,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password
     if (password !== ADMIN_PASSWORD) {
-      // Add a small delay to prevent brute force attacks
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small delay to slow down brute-force attempts
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       return NextResponse.json(
         { error: 'Incorrect password' },
@@ -29,23 +49,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate session token (simple timestamp-based for now)
-    // In production, use a proper JWT or session token library
-    const sessionToken = Buffer.from(
-      JSON.stringify({
-        authenticated: true,
-        timestamp: Date.now(),
-      })
-    ).toString('base64');
+    const sessionToken = await createSessionToken();
 
-    // Set HTTP-only cookie
     const cookieStore = await cookies();
-    cookieStore.set('admin_session', sessionToken, {
+    cookieStore.set(ADMIN_SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: SESSION_DURATION / 1000, // Convert to seconds
-      path: '/admin',
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+      path: '/',
     });
 
     return NextResponse.json({ success: true });

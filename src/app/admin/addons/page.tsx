@@ -17,8 +17,6 @@ import { cn } from "@/lib/utils";
 import { Addon } from "@/lib/supabase/types";
 import AddonForm from "@/components/admin/AddonForm";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function AddonsPage() {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,11 +28,7 @@ export default function AddonsPage() {
 
   const fetchAddons = useCallback(async () => {
     try {
-      const response = await fetch("/api/admin/addons", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/addons");
 
       if (!response.ok) throw new Error("Failed to fetch addons");
 
@@ -59,11 +53,7 @@ export default function AddonsPage() {
   const handleEdit = async (addon: Addon) => {
     // Fetch full addon data with relationships
     try {
-      const response = await fetch(`/api/admin/addons?id=${addon.id}`, {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch(`/api/admin/addons?id=${addon.id}`);
 
       if (!response.ok) throw new Error("Failed to fetch addon");
 
@@ -89,7 +79,6 @@ export default function AddonsPage() {
         method,
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify(body),
       });
@@ -117,7 +106,6 @@ export default function AddonsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: addon.id,
@@ -146,7 +134,6 @@ export default function AddonsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: addon.id,
@@ -187,7 +174,6 @@ export default function AddonsPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify({
             id: newAddons[currentIndex].id,
@@ -198,7 +184,6 @@ export default function AddonsPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify({
             id: newAddons[targetIndex].id,
@@ -222,7 +207,6 @@ export default function AddonsPage() {
     try {
       const response = await fetch(`/api/admin/addons?id=${addon.id}`, {
         method: "DELETE",
-        headers: { "x-admin-auth": ADMIN_PASSWORD },
       });
 
       if (!response.ok) throw new Error("Failed to delete");

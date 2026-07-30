@@ -5,8 +5,6 @@ import Link from "next/link";
 import { Plus, Edit, Trash2, Church, Loader2, ToggleLeft, ToggleRight, MapPin, Star } from "lucide-react";
 import { Temple } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function TemplesPage() {
   const [temples, setTemples] = useState<Temple[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,11 +16,7 @@ export default function TemplesPage() {
 
   const fetchTemples = async () => {
     try {
-      const response = await fetch("/api/admin/temples", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/temples");
 
       if (!response.ok) throw new Error("Failed to fetch temples");
 
@@ -45,9 +39,6 @@ export default function TemplesPage() {
     try {
       const response = await fetch(`/api/admin/temples?id=${id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
       });
 
       if (!response.ok) throw new Error("Failed to delete temple");
@@ -68,7 +59,6 @@ export default function TemplesPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: temple.id,

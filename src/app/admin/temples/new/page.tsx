@@ -7,8 +7,6 @@ import { ArrowLeft } from "lucide-react";
 import TempleForm from "@/components/admin/TempleForm";
 import { Temple, TemplePricing, TempleFAQ } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function NewTemplePage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,11 +18,7 @@ export default function NewTemplePage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/admin/temple-categories", {
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
-      });
+      const response = await fetch("/api/admin/temple-categories");
 
       if (!response.ok) throw new Error("Failed to fetch categories");
 
@@ -42,7 +36,6 @@ export default function NewTemplePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify(data),
       });

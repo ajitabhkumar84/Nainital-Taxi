@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { Destination } from '@/lib/supabase/types';
-
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-
-function isAuthenticated(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === ADMIN_PASSWORD;
-}
 
 function generateSlug(name: string): string {
   return name
@@ -73,18 +67,15 @@ export async function GET(request: NextRequest) {
 
 // POST - Create destination
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
 
     // Generate slug if not provided
     const slug = body.slug || generateSlug(body.name);
 
     // Get max display order
-    const { data: maxOrderData } = await supabase
+    const { data: maxOrderData } = await adminSupabase
       .from('destinations')
       .select('display_order')
       .order('display_order', { ascending: false })
@@ -114,7 +105,7 @@ export async function POST(request: NextRequest) {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('destinations') as any)
+    const { data, error } = await (adminSupabase.from('destinations') as any)
       .insert(newDestination)
       .select()
       .single();
@@ -133,11 +124,8 @@ export async function POST(request: NextRequest) {
 
 // PATCH - Update destination
 export async function PATCH(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -153,7 +141,7 @@ export async function PATCH(request: NextRequest) {
     updates.updated_at = new Date().toISOString();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('destinations') as any)
+    const { data, error } = await (adminSupabase.from('destinations') as any)
       .update(updates)
       .eq('id', id)
       .select()
@@ -173,11 +161,8 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE - Delete destination
 export async function DELETE(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const adminSupabase = getAdminSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const hard = searchParams.get('hard') === 'true';
@@ -188,7 +173,7 @@ export async function DELETE(request: NextRequest) {
 
     if (hard) {
       // Hard delete
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from('destinations')
         .delete()
         .eq('id', id);
@@ -200,7 +185,7 @@ export async function DELETE(request: NextRequest) {
     } else {
       // Soft delete (set is_active to false)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('destinations') as any)
+      const { error } = await (adminSupabase.from('destinations') as any)
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq('id', id);
 

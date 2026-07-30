@@ -1,23 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 interface OrderUpdate {
   id: string;
@@ -27,10 +9,6 @@ interface OrderUpdate {
 // POST: Bulk update display_order for packages
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { orders } = body as { orders: OrderUpdate[] };
 
@@ -41,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     // Update each package's display_order
     const updatePromises = orders.map(({ id, display_order }) =>

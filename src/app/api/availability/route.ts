@@ -20,13 +20,6 @@ function getAdminClient() {
   });
 }
 
-// Simple admin password check
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
-
 // GET: Fetch availability for a date range
 export async function GET(request: NextRequest) {
   try {
@@ -66,14 +59,6 @@ export async function GET(request: NextRequest) {
 // POST: Update or create availability
 export async function POST(request: NextRequest) {
   try {
-    // Check admin authorization
-    if (!isAuthorized(request)) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json();
     const { date, total_fleet_size, cars_booked, is_blocked, internal_notes } = body;
 

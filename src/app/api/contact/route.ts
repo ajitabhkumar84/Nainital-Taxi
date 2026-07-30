@@ -1,54 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendContactEnquiry } from '@/lib/notifications';
-
-// Simple in-memory rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 3;
-const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const userLimit = rateLimitMap.get(ip);
-
-  if (!userLimit || now > userLimit.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-
-  if (userLimit.count >= RATE_LIMIT) {
-    return false;
-  }
-
-  userLimit.count++;
-  return true;
-}
-
-// Clean up old entries every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, limit] of rateLimitMap.entries()) {
-    if (now > limit.resetTime) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, 60 * 60 * 1000);
+import { checkContactRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get IP for rate limiting
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-               request.headers.get('x-real-ip') ||
-               'unknown';
+    const ip = getClientIp(request);
 
-    // Check rate limit
-    if (!checkRateLimit(ip)) {
+    const rl = await checkContactRateLimit(ip);
+    if (!rl.success) {
+      const retryAfterSeconds = Math.max(0, Math.ceil((rl.reset - Date.now()) / 1000));
       return NextResponse.json(
         { success: false, error: 'Too many requests. Please try again in a few minutes.' },
-        { status: 429 }
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
       );
     }
 
     const body = await request.json();
+
+    // Honeypot — a hidden field real users never see or fill. Bots that
+    // blindly fill every input trip it. Respond exactly like a normal
+    // success so the bot gets no signal it was caught, but drop the submission.
+    if (typeof body.company === 'string' && body.company.trim().length > 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'Enquiry received! We will contact you shortly.',
+      });
+    }
 
     // Validate required fields
     const { name, phone, email, message, pickup, drop, date, passengers, vehicle } = body;

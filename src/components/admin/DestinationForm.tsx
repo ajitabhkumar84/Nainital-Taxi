@@ -63,8 +63,6 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
     setError("");
     setSaving(true);
 
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     const data = {
       name,
       slug,
@@ -87,7 +85,6 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
         method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify(isEditing ? { id: destination?.id, ...data } : data),
       });

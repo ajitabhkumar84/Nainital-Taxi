@@ -32,11 +32,18 @@ export default function Step4Payment() {
   const [isBookingCreated, setIsBookingCreated] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdAdvanceAmount, setCreatedAdvanceAmount] = useState<number | null>(null);
+  const [createdTotalAmount, setCreatedTotalAmount] = useState<number | null>(null);
 
-  // Calculate advance amount (including addons)
+  // Pre-submit estimate only — for the success screen, the authoritative
+  // total/advance/remaining come from the create API response (see below).
   const totalAmount = (booking.calculatedPrice || 0) + booking.addonsTotal;
   const advanceAmount = calculateAdvanceAmount(totalAmount);
   const remainingAmount = totalAmount - advanceAmount;
+
+  // Authoritative figures for the success screen, once known.
+  const confirmedTotal = createdTotalAmount ?? totalAmount;
+  const confirmedAdvance = createdAdvanceAmount ?? advanceAmount;
+  const confirmedRemaining = confirmedTotal - confirmedAdvance;
 
   // Check if booking was already created (from store)
   useEffect(() => {
@@ -44,8 +51,9 @@ export default function Step4Payment() {
       setIsBookingCreated(true);
       setCreatedBookingId(booking.bookingId);
       setCreatedAdvanceAmount(booking.advanceAmount);
+      setCreatedTotalAmount(booking.confirmedTotalAmount);
     }
-  }, [booking.isBookingComplete, booking.bookingId, booking.advanceAmount]);
+  }, [booking.isBookingComplete, booking.bookingId, booking.advanceAmount, booking.confirmedTotalAmount]);
 
   const copyToClipboard = async (text: string, field: string) => {
     try {
@@ -96,12 +104,13 @@ export default function Step4Payment() {
         throw new Error(data.error || 'Failed to create booking');
       }
 
-      // Update store with booking result
-      booking.setBookingResult(data.bookingId, data.advanceAmount);
+      // Update store with the authoritative result (server-computed, not booking.calculatedPrice)
+      booking.setBookingResult(data.bookingId, data.advanceAmount, data.totalAmount);
 
       // Update local state
       setCreatedBookingId(data.bookingId);
       setCreatedAdvanceAmount(data.advanceAmount);
+      setCreatedTotalAmount(data.totalAmount);
       setIsBookingCreated(true);
     } catch (error) {
       console.error('Booking creation error:', error);
@@ -116,7 +125,6 @@ export default function Step4Payment() {
   // Generate WhatsApp message with booking ID and advance
   const generateWhatsAppMessage = () => {
     const bookingIdText = createdBookingId || 'Pending';
-    const advanceText = createdAdvanceAmount || advanceAmount;
 
     const message = `Hi, I have made the advance payment for my booking.
 
@@ -131,9 +139,9 @@ export default function Step4Payment() {
 - Passengers: ${booking.passengerCount}
 
 *Payment:*
-- Total Amount: ${formatPrice(totalAmount)}
-- Advance Paid: ${formatPrice(advanceText)}
-- Remaining: ${formatPrice(totalAmount - advanceText)}
+- Total Amount: ${formatPrice(confirmedTotal)}
+- Advance Paid: ${formatPrice(confirmedAdvance)}
+- Remaining: ${formatPrice(confirmedRemaining)}
 
 *Customer:*
 - Name: ${booking.customerName}
@@ -189,7 +197,7 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-3 border-b-2 border-gray-200">
               <span className="text-gray-600">Total Amount</span>
-              <span className="font-bold text-xl text-[#2D3436]">{formatPrice(totalAmount)}</span>
+              <span className="font-bold text-xl text-[#2D3436]">{formatPrice(confirmedTotal)}</span>
             </div>
             <div className="flex justify-between items-center py-3 bg-green-50 -mx-6 px-6 border-y-2 border-green-200">
               <div>
@@ -197,12 +205,12 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
                 <span className="text-sm text-green-600 ml-2">(25%)</span>
               </div>
               <span className="font-bold text-2xl text-green-700">
-                {formatPrice(createdAdvanceAmount || advanceAmount)}
+                {formatPrice(confirmedAdvance)}
               </span>
             </div>
             <div className="flex justify-between items-center pt-3">
               <span className="text-gray-600">Pay to Driver</span>
-              <span className="font-bold text-lg text-[#2D3436]">{formatPrice(remainingAmount)}</span>
+              <span className="font-bold text-lg text-[#2D3436]">{formatPrice(confirmedRemaining)}</span>
             </div>
           </div>
         </div>

@@ -9,55 +9,57 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Retro Pop Vacation Color Palette
+        // Preview: pastel tokens repointed to a premium-utility palette.
+        // Names unchanged so no component needs touching for this test.
         sunshine: {
-          DEFAULT: "#FFD93D",
-          50: "#FFF9E6",
-          100: "#FFF3CC",
-          200: "#FFE799",
-          300: "#FFDB66",
-          400: "#FFD93D",
-          500: "#E6C237",
-          600: "#CCAB31",
+          DEFAULT: "#1D4ED8", // primary action blue (was pastel yellow)
+          50: "#EFF4FF",
+          100: "#DBE7FE",
+          200: "#BFD3FD",
+          300: "#93B4FB",
+          400: "#1D4ED8",
+          500: "#1E40AF",
+          600: "#1E3A8A",
         },
         teal: {
-          DEFAULT: "#4D96FF",
-          50: "#EBF3FF",
-          100: "#D6E7FF",
-          200: "#ADD0FF",
-          300: "#85B8FF",
-          400: "#4D96FF",
-          500: "#3D78CC",
-          600: "#2E5A99",
+          DEFAULT: "#334155", // secondary slate (was pastel blue)
+          50: "#F8FAFC",
+          100: "#F1F5F9",
+          200: "#E2E8F0",
+          300: "#CBD5E1",
+          400: "#64748B",
+          500: "#475569",
+          600: "#334155",
         },
         coral: {
-          DEFAULT: "#FF6B6B",
-          50: "#FFEFEF",
-          100: "#FFDFDF",
-          200: "#FFBFBF",
-          300: "#FF9F9F",
-          400: "#FF6B6B",
-          500: "#E65555",
-          600: "#CC4040",
+          DEFAULT: "#B45309", // warning amber (was pastel coral)
+          50: "#FFFBEB",
+          100: "#FEF3C7",
+          200: "#FDE68A",
+          300: "#FCD34D",
+          400: "#D97706",
+          500: "#B45309",
+          600: "#92400E",
         },
         whatsapp: "#25D366",
-        ink: "#2D3436",
-        // Background gradient colors
-        sunrise: "#FFF8E7",
-        lake: "#E8F4F8",
+        ink: "#0F172A",
+        // Background gradient colors — flattened toward white
+        sunrise: "#FFFFFF",
+        lake: "#F6F8FA",
       },
       fontFamily: {
         display: ["var(--font-chewy)", "Chewy", "cursive"],
         body: ["var(--font-nunito)", "Nunito", "sans-serif"],
       },
       boxShadow: {
-        retro: "4px 4px 0px 0px #2D3436",
-        "retro-sm": "2px 2px 0px 0px #2D3436",
-        "retro-lg": "6px 6px 0px 0px #2D3436",
-        "retro-pressed": "2px 2px 0px 0px #2D3436",
+        // Preview: hard sticker offsets replaced with soft elevation
+        retro: "0 1px 2px rgba(15,23,42,.06)",
+        "retro-sm": "0 1px 2px rgba(15,23,42,.06)",
+        "retro-lg": "0 8px 28px rgba(15,23,42,.10)",
+        "retro-pressed": "0 1px 2px rgba(15,23,42,.06)",
       },
       borderWidth: {
-        3: "3px",
+        3: "1px",
       },
       animation: {
         "tilt-hover": "tilt 0.3s ease-in-out forwards",

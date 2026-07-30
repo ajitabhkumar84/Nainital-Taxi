@@ -130,7 +130,7 @@ export default function RatesPage() {
               No routes available
             </h3>
             <p className="text-ink/60 font-body mb-6">
-              We're updating our routes. Please check back soon or contact us
+              We&apos;re updating our routes. Please check back soon or contact us
               directly.
             </p>
             <Link
@@ -193,7 +193,7 @@ export default function RatesPage() {
         <div className="container mx-auto px-4 py-16">
           <div className="max-w-3xl mx-auto text-center text-white">
             <h2 className="text-4xl font-display mb-6">
-              Can't Find Your Route?
+              Can&apos;t Find Your Route?
             </h2>
             <p className="text-xl font-body mb-8 text-white/90">
               We offer custom routes and packages. Contact us for a personalized

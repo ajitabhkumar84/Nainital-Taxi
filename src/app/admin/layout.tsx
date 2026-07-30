@@ -23,6 +23,9 @@ import {
   Church,
   FolderTree,
   Gift,
+  MessageSquareQuote,
+  Radio,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +40,9 @@ const navItems: NavItem[] = [
   { href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
   { href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
   { href: "/admin/addons", label: "Revenue Addons", icon: <Gift className="w-5 h-5" /> },
+  { href: "/admin/testimonials", label: "Testimonials", icon: <MessageSquareQuote className="w-5 h-5" /> },
+  { href: "/admin/ticker", label: "Booking Ticker", icon: <Radio className="w-5 h-5" /> },
+  { href: "/admin/trust-section", label: "Trust & Safety", icon: <ShieldCheck className="w-5 h-5" /> },
   { href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
   { href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
   { href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },

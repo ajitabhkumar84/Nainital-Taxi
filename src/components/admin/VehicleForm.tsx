@@ -82,11 +82,6 @@ export default function VehicleForm({ vehicle, isEditing }: VehicleFormProps) {
     setError("");
     setSaving(true);
 
-    const adminPassword =
-      localStorage.getItem("admin_password") ||
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD ||
-      "nainital2024";
-
     const data = {
       name,
       nickname: nickname || null,
@@ -119,7 +114,6 @@ export default function VehicleForm({ vehicle, isEditing }: VehicleFormProps) {
         method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify(isEditing ? { id: vehicle?.id, ...data } : data),
       });

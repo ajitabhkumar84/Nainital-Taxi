@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useBookingStore, VehicleType, BookingType } from '@/store/bookingStore';
+import { useBookingStore, VehicleType } from '@/store/bookingStore';
 import { Button, Badge } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, Users, MapPin, Clock, Car, ExternalLink } from 'lucide-react';
+import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil } from 'lucide-react';
 import { getVehicleTypeName, getVehicleCapacity } from '@/lib/pricing';
 
 interface Package {
@@ -30,6 +30,7 @@ export default function Step1PackageSelection() {
   const {
     bookingType,
     packageId,
+    packageTitle,
     vehicleType,
     setBookingType,
     setPackage,
@@ -38,12 +39,26 @@ export default function Step1PackageSelection() {
   } = useBookingStore();
 
   const [packages, setPackages] = useState<Package[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedPackageData, setSelectedPackageData] = useState<Package | null>(null);
+  const [error, setError] = useState('');
+
+  // Whether the picker is open is derived, never initialized from packageId:
+  // on first render after a package-arrival, packageId is still null (the
+  // entry contract applies a moment later via the booking-entry hook). A
+  // useState(!packageId) initializer would latch open forever once that
+  // value flips true, since initializers only run once. isEditing is the
+  // only piece of real state; showPicker is computed from it every render.
+  const [isEditing, setIsEditing] = useState(false);
+  const showPicker = isEditing || !packageId;
 
   useEffect(() => {
+    if (!showPicker) return;
     fetchPackages();
-  }, [bookingType]);
+    // Only refetch when the picker is open and the type filter changes —
+    // skip entirely while collapsed behind a summary card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingType, showPicker]);
 
   async function fetchPackages() {
     setLoading(true);
@@ -58,10 +73,10 @@ export default function Step1PackageSelection() {
       query.eq('type', bookingType);
     }
 
-    const { data, error } = await query;
+    const { data, error: fetchError } = await query;
 
-    if (error) {
-      console.error('Error fetching packages:', error);
+    if (fetchError) {
+      console.error('Error fetching packages:', fetchError);
     } else {
       setPackages(data || []);
     }
@@ -72,149 +87,178 @@ export default function Step1PackageSelection() {
   const handlePackageSelect = (pkg: Package) => {
     setPackage(pkg.id, pkg.title);
     setSelectedPackageData(pkg);
+    setIsEditing(false);
+    setError('');
   };
 
   const handleNext = () => {
     if (!packageId || !vehicleType) {
-      alert('Please select both a package and vehicle type');
+      setError('Please select both a package and vehicle type');
       return;
     }
+    setError('');
     nextStep();
   };
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-[#2D3436] mb-2">
-          Choose Your Adventure
-        </h2>
-        <p className="text-gray-600">
-          Select a package and your preferred vehicle
-        </p>
-      </div>
-
-      {/* Booking Type Selector */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-3">
-          What are you looking for?
-        </label>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            onClick={() => setBookingType('tour')}
-            className={`
-              p-6 rounded-2xl border-4 transition-all duration-200
-              ${
-                bookingType === 'tour'
-                  ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
-                  : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-              }
-            `}
-          >
-            <div className="text-3xl mb-2">🏔️</div>
-            <div className="font-bold text-[#2D3436]">Tour Packages</div>
-            <div className="text-xs text-gray-500 mt-1">Sightseeing tours</div>
-          </button>
-
-          <button
-            onClick={() => setBookingType('transfer')}
-            className={`
-              p-6 rounded-2xl border-4 transition-all duration-200
-              ${
-                bookingType === 'transfer'
-                  ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
-                  : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-              }
-            `}
-          >
-            <div className="text-3xl mb-2">✈️</div>
-            <div className="font-bold text-[#2D3436]">Transfers</div>
-            <div className="text-xs text-gray-500 mt-1">Airport & station</div>
-          </button>
-        </div>
-      </div>
-
-      {/* Package Selection */}
-      {bookingType && (
+      {!showPicker ? (
         <div>
           <label className="block text-sm font-bold text-[#2D3436] mb-3">
-            Select Package
+            Your Trip
           </label>
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">Loading packages...</div>
-          ) : (
-            <div className="grid gap-4">
-              {packages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className={`
-                    relative p-6 rounded-2xl border-4 transition-all duration-200
-                    ${
-                      packageId === pkg.id
-                        ? 'border-[#FFD93D] bg-gradient-to-br from-[#FFF8E7] to-[#FFF0D4] shadow-[6px_6px_0px_#FFD93D] ring-4 ring-[#FFD93D]/30'
-                        : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                    }
-                  `}
-                >
-                  <button
-                    onClick={() => handlePackageSelect(pkg)}
-                    className="text-left w-full"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className={`font-bold text-lg mb-1 ${packageId === pkg.id ? 'text-[#2D3436]' : 'text-[#2D3436]'}`}>
-                          {pkg.title}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
-                          {pkg.duration && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{pkg.duration}</span>
+          <div className="flex items-center justify-between gap-4 p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-[#4D96FF] flex-shrink-0" />
+              <span className="font-bold text-lg text-[#2D3436]">
+                {selectedPackageData?.title || packageTitle}
+              </span>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-1 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
+            >
+              <Pencil className="w-4 h-4" />
+              Change
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div>
+            <h2 className="text-3xl font-bold text-[#2D3436] mb-2">
+              Choose Your Adventure
+            </h2>
+            <p className="text-gray-600">
+              Select a package and your preferred vehicle
+            </p>
+          </div>
+
+          {/* Booking Type Selector */}
+          <div>
+            <label className="block text-sm font-bold text-[#2D3436] mb-3">
+              What are you looking for?
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setBookingType('tour')}
+                className={`
+                  p-6 rounded-2xl border-4 transition-all duration-200
+                  ${
+                    bookingType === 'tour'
+                      ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
+                      : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                  }
+                `}
+              >
+                <div className="text-3xl mb-2">🏔️</div>
+                <div className="font-bold text-[#2D3436]">Tour Packages</div>
+                <div className="text-xs text-gray-500 mt-1">Sightseeing tours</div>
+              </button>
+
+              <button
+                onClick={() => setBookingType('transfer')}
+                className={`
+                  p-6 rounded-2xl border-4 transition-all duration-200
+                  ${
+                    bookingType === 'transfer'
+                      ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
+                      : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                  }
+                `}
+              >
+                <div className="text-3xl mb-2">✈️</div>
+                <div className="font-bold text-[#2D3436]">Transfers</div>
+                <div className="text-xs text-gray-500 mt-1">Airport & station</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Package Selection */}
+          {bookingType && (
+            <div>
+              <label className="block text-sm font-bold text-[#2D3436] mb-3">
+                Select Package
+              </label>
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">Loading packages...</div>
+              ) : (
+                <div className="grid gap-4">
+                  {packages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      className={`
+                        relative p-6 rounded-2xl border-4 transition-all duration-200
+                        ${
+                          packageId === pkg.id
+                            ? 'border-[#FFD93D] bg-gradient-to-br from-[#FFF8E7] to-[#FFF0D4] shadow-[6px_6px_0px_#FFD93D] ring-4 ring-[#FFD93D]/30'
+                            : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                        }
+                      `}
+                    >
+                      <button
+                        onClick={() => handlePackageSelect(pkg)}
+                        className="text-left w-full"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className={`font-bold text-lg mb-1 ${packageId === pkg.id ? 'text-[#2D3436]' : 'text-[#2D3436]'}`}>
+                              {pkg.title}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
+                              {pkg.duration && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{pkg.duration}</span>
+                                </div>
+                              )}
+                              {pkg.distance && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="w-4 h-4" />
+                                  <span>{pkg.distance}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {pkg.distance && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{pkg.distance}</span>
-                            </div>
+                          </div>
+                          {pkg.is_popular && (
+                            <Badge variant="accent">Popular</Badge>
                           )}
                         </div>
+
+                        {pkg.places_covered && pkg.places_covered.length > 0 && (
+                          <div className="text-sm text-gray-600">
+                            <span className="font-semibold">Covers:</span>{' '}
+                            {pkg.places_covered.slice(0, 3).join(', ')}
+                            {pkg.places_covered.length > 3 && ` +${pkg.places_covered.length - 3} more`}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* View Details Button */}
+                      <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                        <a
+                          href={`/tour/${pkg.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View Full Details
+                        </a>
                       </div>
-                      {pkg.is_popular && (
-                        <Badge variant="accent">Popular</Badge>
-                      )}
                     </div>
-
-                    {pkg.places_covered && pkg.places_covered.length > 0 && (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-semibold">Covers:</span>{' '}
-                        {pkg.places_covered.slice(0, 3).join(', ')}
-                        {pkg.places_covered.length > 3 && ` +${pkg.places_covered.length - 3} more`}
-                      </div>
-                    )}
-                  </button>
-
-                  {/* View Details Button */}
-                  <div className="mt-4 pt-4 border-t-2 border-gray-200">
-                    <a
-                      href={`/tour/${pkg.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      View Full Details
-                    </a>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* Vehicle Type Selection - appears after package selection */}
-      {packageId && (
+      {/* Vehicle Type Selection — ungated from packageId so a vehicle-only
+          fleet arrival can show its pre-ticked chip before a package is chosen */}
+      {(packageId || vehicleType) && (
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-bold text-[#2D3436] mb-3">
@@ -254,7 +298,14 @@ export default function Step1PackageSelection() {
             </div>
           </div>
 
-          {/* Next Button - appears right after vehicle selection */}
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+              <p className="text-sm font-body text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Next Button */}
           <div className="flex justify-end pt-6 border-t-2 border-gray-200">
             <Button
               onClick={handleNext}

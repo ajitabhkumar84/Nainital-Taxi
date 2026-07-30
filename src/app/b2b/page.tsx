@@ -374,7 +374,7 @@ export default async function B2BPage() {
                           <Star key={i} className="w-5 h-5 fill-sunshine text-sunshine" />
                         ))}
                       </div>
-                      <p className="text-ink/80 font-body mb-4 italic">"{testimonial.testimonial}"</p>
+                      <p className="text-ink/80 font-body mb-4 italic">&quot;{testimonial.testimonial}&quot;</p>
                       <div className="border-t-2 border-ink/10 pt-4">
                         <div className="font-body font-bold text-ink">{testimonial.person_name}</div>
                         <div className="text-sm text-ink/60">{testimonial.designation}</div>

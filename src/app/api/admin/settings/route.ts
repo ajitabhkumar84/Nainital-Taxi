@@ -1,23 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'nainital2024';
-  const authHeader = request.headers.get('x-admin-auth');
-  return authHeader === adminPassword;
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 // GET: Fetch a setting by key
 export async function GET(request: NextRequest) {
@@ -28,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'key parameter is required' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('admin_settings')
       .select('*')
@@ -53,10 +35,6 @@ export async function GET(request: NextRequest) {
 // POST: Upsert settings
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { settings } = body;
 
@@ -67,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     // Upsert each setting
     for (const setting of settings) {

@@ -7,8 +7,6 @@ import { ArrowLeft, Eye, Loader2 } from "lucide-react";
 import PackageForm from "@/components/admin/PackageForm";
 import { Package } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function EditPackagePage() {
   const router = useRouter();
   const params = useParams();
@@ -45,7 +43,6 @@ export default function EditPackagePage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": ADMIN_PASSWORD,
         },
         body: JSON.stringify({
           id: packageId,

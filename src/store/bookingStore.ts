@@ -14,6 +14,22 @@ export interface RouteContext {
   prefilledDropoff: string;
 }
 
+// Data-only patch applied atomically on arrival at /booking. Deliberately a
+// plain data shape (not Partial<BookingState>) so it can't smuggle in actions
+// or submission-result fields — only what a URL entry contract can carry.
+export interface BookingEntryPatch {
+  currentStep?: BookingStep;
+  bookingType?: BookingType;
+  packageId?: string;
+  packageTitle?: string;
+  vehicleType?: VehicleType;
+  tripDate?: string;
+  tripTime?: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  passengerCount?: number;
+}
+
 export interface BookingState {
   // Current step in the booking flow
   currentStep: BookingStep;
@@ -36,6 +52,8 @@ export interface BookingState {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
+  customerWhatsapp: string;
+  requiresChildSeat: boolean;
 
   // Pricing
   calculatedPrice: number | null;
@@ -56,6 +74,9 @@ export interface BookingState {
   // Submission State
   bookingId: string | null;
   advanceAmount: number | null;
+  // Authoritative total from the create API response — never the client's
+  // pre-submit estimate. Used to render the post-submit UPI screen.
+  confirmedTotalAmount: number | null;
   isSubmitting: boolean;
   submitError: string | null;
   isBookingComplete: boolean;
@@ -82,6 +103,8 @@ export interface BookingState {
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
   setCustomerEmail: (email: string) => void;
+  setCustomerWhatsapp: (whatsapp: string) => void;
+  setRequiresChildSeat: (requiresChildSeat: boolean) => void;
 
   // Pricing actions
   setCalculatedPrice: (price: number, seasonId: string, seasonName: string) => void;
@@ -98,19 +121,13 @@ export interface BookingState {
   setRouteContext: (context: RouteContext) => void;
   clearRouteContext: () => void;
 
-  // Booking context (simpler method for setting multiple fields at once)
-  setBookingContext: (context: {
-    packageId: string;
-    packageTitle: string;
-    packageType: BookingType;
-    vehicleType: VehicleType;
-    basePrice?: number;
-    seasonPrice?: number;
-    destination?: string;
-  }) => void;
+  // Applies an entry-URL patch atomically on top of a full reset — arriving
+  // at /booking always starts a clean booking, never a leftover one (see
+  // resetBooking below for why a hand-rolled partial reset is unsafe here).
+  applyEntry: (entry: BookingEntryPatch) => void;
 
   // Submission actions
-  setBookingResult: (bookingId: string, advanceAmount: number) => void;
+  setBookingResult: (bookingId: string, advanceAmount: number, totalAmount: number) => void;
   setSubmitting: (isSubmitting: boolean) => void;
   setSubmitError: (error: string | null) => void;
   setBookingComplete: (complete: boolean) => void;
@@ -134,6 +151,8 @@ const initialState = {
   customerName: '',
   customerPhone: '',
   customerEmail: '',
+  customerWhatsapp: '',
+  requiresChildSeat: false,
   calculatedPrice: null,
   seasonId: null,
   seasonName: null,
@@ -144,6 +163,7 @@ const initialState = {
   routeContext: null,
   bookingId: null,
   advanceAmount: null,
+  confirmedTotalAmount: null,
   isSubmitting: false,
   submitError: null,
   isBookingComplete: false,
@@ -180,6 +200,8 @@ export const useBookingStore = create<BookingState>()(
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
       setCustomerEmail: (email) => set({ customerEmail: email }),
+      setCustomerWhatsapp: (whatsapp) => set({ customerWhatsapp: whatsapp }),
+      setRequiresChildSeat: (requiresChildSeat) => set({ requiresChildSeat }),
 
       // Pricing actions
       setCalculatedPrice: (price, seasonId, seasonName) => set({
@@ -234,18 +256,17 @@ export const useBookingStore = create<BookingState>()(
       }),
       clearRouteContext: () => set({ routeContext: null }),
 
-      // Booking context (simpler method for setting multiple fields at once)
-      setBookingContext: (context) => set({
-        bookingType: context.packageType,
-        packageId: context.packageId,
-        packageTitle: context.packageTitle,
-        vehicleType: context.vehicleType,
-      }),
+      // Full reset + entry patch in one atomic write. Also clears bookingId /
+      // confirmedTotalAmount / isBookingComplete — without that, a returning
+      // customer with a persisted completed booking would land back on the
+      // success screen for their previous trip instead of a fresh form.
+      applyEntry: (entry) => set({ ...initialState, ...entry }),
 
       // Submission actions
-      setBookingResult: (bookingId, advanceAmount) => set({
+      setBookingResult: (bookingId, advanceAmount, totalAmount) => set({
         bookingId,
         advanceAmount,
+        confirmedTotalAmount: totalAmount,
         isBookingComplete: true,
         isSubmitting: false,
         submitError: null,
@@ -263,12 +284,10 @@ export const useBookingStore = create<BookingState>()(
     {
       name: 'nainital-taxi-booking', // localStorage key
       partialize: (state) => ({
-        // Only persist certain fields
-        currentStep: state.currentStep,
-        bookingType: state.bookingType,
-        packageId: state.packageId,
-        packageTitle: state.packageTitle,
-        vehicleType: state.vehicleType,
+        // currentStep, bookingType, packageId, packageTitle and vehicleType are
+        // deliberately NOT persisted — the URL is the sole entry contract for
+        // these, and persisting them would let a stale localStorage value
+        // override the package/vehicle the user just picked (see applyEntry).
         tripDate: state.tripDate,
         tripTime: state.tripTime,
         passengerCount: state.passengerCount,
@@ -278,6 +297,8 @@ export const useBookingStore = create<BookingState>()(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         customerEmail: state.customerEmail,
+        customerWhatsapp: state.customerWhatsapp,
+        requiresChildSeat: state.requiresChildSeat,
         // Addons
         selectedAddons: state.selectedAddons,
         addonsTotal: state.addonsTotal,
@@ -286,6 +307,7 @@ export const useBookingStore = create<BookingState>()(
         // Booking result (persisted until reset)
         bookingId: state.bookingId,
         advanceAmount: state.advanceAmount,
+        confirmedTotalAmount: state.confirmedTotalAmount,
         isBookingComplete: state.isBookingComplete,
       }),
     }

@@ -6,8 +6,6 @@ import { Upload, X, Link as LinkIcon, Loader2, AlertCircle, Image as ImageIcon, 
 import { cn } from "@/lib/utils";
 import { GalleryImage } from "@/lib/supabase/types";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 interface ImageUploaderProps {
   value: string;
   onChange: (url: string) => void;
@@ -41,9 +39,6 @@ export default function ImageUploader({
 
       const response = await fetch("/api/admin/upload", {
         method: "POST",
-        headers: {
-          "x-admin-auth": ADMIN_PASSWORD,
-        },
         body: formData,
       });
 
@@ -271,9 +266,6 @@ export function GalleryUploader({
 
         const response = await fetch("/api/admin/upload", {
           method: "POST",
-          headers: {
-            "x-admin-auth": ADMIN_PASSWORD,
-          },
           body: formData,
         });
 
@@ -504,9 +496,6 @@ export function GalleryWithNamesUploader({
 
         const response = await fetch("/api/admin/upload", {
           method: "POST",
-          headers: {
-            "x-admin-auth": ADMIN_PASSWORD,
-          },
           body: formData,
         });
 

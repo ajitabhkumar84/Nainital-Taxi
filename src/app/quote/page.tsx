@@ -4,12 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Header, Footer, Button } from "@/components/ui";
 import { Car, Calendar, MapPin, IndianRupee, Phone, MessageCircle, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-export const metadata = {
-  title: "Instant Taxi Fare Calculator - Get Quote in Seconds | Nainital Taxi",
-  description: "Get instant taxi fare quotes for Nainital. No form submission needed. Select route, vehicle, and date to see exact pricing with real-time availability.",
-  keywords: ["nainital taxi fare", "taxi fare calculator", "instant quote", "taxi price nainital"],
-};
+import { buildBookingUrl } from "@/lib/bookingLink";
+import type { VehicleType } from "@/store/bookingStore";
 
 interface Route {
   id: string;
@@ -310,7 +306,14 @@ export default function InstantQuotePage() {
 
                     {/* CTA Buttons */}
                     <div className="space-y-3 pt-4">
-                      <Link href="/booking" className="block">
+                      <Link
+                        href={buildBookingUrl({
+                          vehicle: selectedVehicle as VehicleType,
+                          date: selectedDate,
+                          packageType: 'transfer',
+                        })}
+                        className="block"
+                      >
                         <Button variant="primary" className="w-full">
                           Book Now
                         </Button>

@@ -7,6 +7,8 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { getVehicles, getPackagePrices, getSeasonForDate, getPackages } from '@/lib/supabase/queries_enhanced';
 import type { Vehicle, Season } from '@/lib/supabase/types';
+import type { VehicleType } from '@/store/bookingStore';
+import { buildBookingUrl } from '@/lib/bookingLink';
 import { Car, Users, Music, Wind, Baby, Luggage, ArrowRight, Shield, UserCheck, Heart, Award } from 'lucide-react';
 import Link from 'next/link';
 
@@ -588,7 +590,7 @@ const VehicleCard = memo(function VehicleCard({ vehicle, pricing, showSeasonPric
       </CardContent>
 
       <CardFooter className="p-6 pt-0 mt-auto">
-        <Link href={`/booking?vehicle=${vehicleType}`} className="w-full">
+        <Link href={buildBookingUrl({ vehicle: vehicleType as VehicleType, packageType: 'tour' })} className="w-full">
           <Button className="w-full group" disabled={!isAvailable}>
             {isAvailable ? (
               <>

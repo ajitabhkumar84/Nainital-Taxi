@@ -43,14 +43,11 @@ export default function MultiDayRentalForm() {
     setSuccess("");
     setSaving(true);
 
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     try {
       const response = await fetch("/api/admin/multi-day-rental", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify(pageData),
       });
@@ -72,14 +69,11 @@ export default function MultiDayRentalForm() {
   };
 
   const togglePublished = async () => {
-    const adminPassword = localStorage.getItem("admin_password") || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
     try {
       const response = await fetch("/api/admin/multi-day-rental", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": adminPassword,
         },
         body: JSON.stringify({ is_published: !pageData?.is_published }),
       });

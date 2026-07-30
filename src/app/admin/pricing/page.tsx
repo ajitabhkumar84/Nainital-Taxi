@@ -31,8 +31,6 @@ interface Season {
 
 const VEHICLE_TYPES: VehicleType[] = ["sedan", "suv_normal", "suv_deluxe", "suv_luxury"];
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "nainital2024";
-
 export default function PricingPage() {
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -150,7 +148,6 @@ export default function PricingPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify({ id: existingEntry.id, price: newPrice }),
         });
@@ -171,7 +168,6 @@ export default function PricingPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-auth": ADMIN_PASSWORD,
           },
           body: JSON.stringify({
             package_id: packageId,

@@ -40,12 +40,20 @@ export default function Step2TripDetails() {
 
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
+  const [priceError, setPriceError] = useState(false);
   const [selectedDate, setSelectedDate] = useState(tripDate || '');
 
   // Get tomorrow's date as minimum
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
+
+  // tripDate can change out from under this component (e.g. an entry-contract
+  // arrival applying a URL-supplied date) — resync rather than only reading
+  // tripDate once into local state.
+  useEffect(() => {
+    setSelectedDate(tripDate || '');
+  }, [tripDate]);
 
   useEffect(() => {
     if (selectedDate && packageId && vehicleType) {
@@ -58,6 +66,7 @@ export default function Step2TripDetails() {
 
     setCheckingAvailability(true);
     setFetchingPrice(true);
+    setPriceError(false);
 
     try {
       // Check availability
@@ -70,9 +79,12 @@ export default function Step2TripDetails() {
       const priceData = await getPackagePrice(packageId, vehicleType, date);
       if (priceData) {
         setCalculatedPrice(priceData.price, priceData.seasonId, priceData.seasonName);
+      } else {
+        setPriceError(true);
       }
     } catch (error) {
       console.error('Error checking availability and price:', error);
+      setPriceError(true);
     } finally {
       setCheckingAvailability(false);
       setFetchingPrice(false);
@@ -194,6 +206,16 @@ export default function Step2TripDetails() {
           </div>
         )}
       </div>
+
+      {/* Price Unavailable */}
+      {tripDate && !checkingAvailability && !fetchingPrice && priceError && (
+        <div className="p-6 rounded-2xl border-4 border-red-400 bg-red-50">
+          <p className="font-medium text-red-700">
+            We couldn&apos;t find a price for this package, vehicle and date combination.
+            Please try a different date or vehicle, or contact us directly.
+          </p>
+        </div>
+      )}
 
       {/* Price Display */}
       {tripDate && calculatedPrice !== null && (
@@ -343,6 +365,7 @@ export default function Step2TripDetails() {
             !tripDate ||
             !tripTime ||
             !pickupLocation ||
+            priceError ||
             availabilityStatus === 'sold_out' ||
             availabilityStatus === 'blocked'
           }
