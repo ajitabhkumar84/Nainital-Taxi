@@ -33,6 +33,7 @@ export function useBookingEntry(): { ready: boolean } {
     const patch: BookingEntryPatch = { currentStep };
     if (parsed.packageId) patch.packageId = parsed.packageId;
     if (parsed.packageTitle) patch.packageTitle = parsed.packageTitle;
+    if (parsed.packageSlug) patch.packageSlug = parsed.packageSlug;
     if (parsed.packageType) patch.bookingType = parsed.packageType;
     if (parsed.vehicle) patch.vehicleType = parsed.vehicle;
     if (parsed.date) patch.tripDate = parsed.date;

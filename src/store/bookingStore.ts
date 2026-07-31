@@ -22,6 +22,7 @@ export interface BookingEntryPatch {
   bookingType?: BookingType;
   packageId?: string;
   packageTitle?: string;
+  packageSlug?: string;
   vehicleType?: VehicleType;
   tripDate?: string;
   tripTime?: string;
@@ -38,6 +39,7 @@ export interface BookingState {
   bookingType: BookingType | null;
   packageId: string | null;
   packageTitle: string | null;
+  packageSlug: string | null;
   vehicleType: VehicleType | null;
 
   // Step 2: Trip Details
@@ -88,7 +90,7 @@ export interface BookingState {
 
   // Step 1 actions
   setBookingType: (type: BookingType) => void;
-  setPackage: (id: string, title: string) => void;
+  setPackage: (id: string, title: string, slug?: string) => void;
   setVehicleType: (type: VehicleType) => void;
 
   // Step 2 actions
@@ -141,6 +143,7 @@ const initialState = {
   bookingType: null,
   packageId: null,
   packageTitle: null,
+  packageSlug: null,
   vehicleType: null,
   tripDate: null,
   tripTime: null,
@@ -185,7 +188,7 @@ export const useBookingStore = create<BookingState>()(
 
       // Step 1 actions
       setBookingType: (type) => set({ bookingType: type }),
-      setPackage: (id, title) => set({ packageId: id, packageTitle: title }),
+      setPackage: (id, title, slug) => set({ packageId: id, packageTitle: title, packageSlug: slug ?? null }),
       setVehicleType: (type) => set({ vehicleType: type }),
 
       // Step 2 actions
@@ -284,10 +287,13 @@ export const useBookingStore = create<BookingState>()(
     {
       name: 'nainital-taxi-booking', // localStorage key
       partialize: (state) => ({
-        // currentStep, bookingType, packageId, packageTitle and vehicleType are
-        // deliberately NOT persisted — the URL is the sole entry contract for
-        // these, and persisting them would let a stale localStorage value
-        // override the package/vehicle the user just picked (see applyEntry).
+        // currentStep, bookingType, packageId, packageTitle, packageSlug and
+        // vehicleType are deliberately NOT persisted — the URL is the sole
+        // entry contract for these, and persisting them would let a stale
+        // localStorage value override the package/vehicle the user just
+        // picked (see applyEntry). packageSlug in particular is treated as
+        // recoverable rather than persisted: if it's ever missing on arrival,
+        // the consuming UI re-derives it from packageId (see getPackageById).
         tripDate: state.tripDate,
         tripTime: state.tripTime,
         passengerCount: state.passengerCount,

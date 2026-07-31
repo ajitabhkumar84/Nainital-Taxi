@@ -8,6 +8,7 @@ import type { BookingType, VehicleType } from '@/store/bookingStore';
 export interface BookingEntry {
   packageId?: string;
   packageTitle?: string;
+  packageSlug?: string;
   packageType?: BookingType;
   vehicle?: VehicleType;
   date?: string;
@@ -37,6 +38,7 @@ export function buildBookingUrl(entry: BookingEntry): string {
 
   if (entry.packageId) params.set('packageId', entry.packageId);
   if (entry.packageTitle) params.set('packageTitle', entry.packageTitle);
+  if (entry.packageSlug) params.set('packageSlug', entry.packageSlug);
   if (entry.packageType) params.set('packageType', entry.packageType);
   if (entry.vehicle) params.set('vehicle', entry.vehicle);
   if (entry.date) params.set('date', entry.date);
@@ -60,6 +62,9 @@ export function parseBookingEntry(sp: URLSearchParams): BookingEntry {
 
   const packageTitle = sp.get('packageTitle');
   if (packageTitle) entry.packageTitle = packageTitle;
+
+  const packageSlug = sp.get('packageSlug');
+  if (packageSlug) entry.packageSlug = packageSlug;
 
   const packageType = sp.get('packageType');
   if (packageType && (PACKAGE_TYPES as string[]).includes(packageType)) {

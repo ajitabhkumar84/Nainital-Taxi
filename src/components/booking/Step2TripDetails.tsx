@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input } from '@/components/ui';
-import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle } from 'lucide-react';
-import { getPackagePrice, getAvailabilityForDate, formatPrice } from '@/lib/pricing';
+import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
+import { getPackagePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
+import { getPackageById } from '@/lib/supabase';
+import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import AddonSelector from './AddonSelector';
 
 const timeSlots = [
@@ -15,6 +17,9 @@ const timeSlots = [
 export default function Step2TripDetails() {
   const {
     packageId,
+    packageTitle,
+    packageSlug,
+    bookingType,
     vehicleType,
     tripDate,
     tripTime,
@@ -37,11 +42,32 @@ export default function Step2TripDetails() {
     nextStep,
     prevStep,
   } = useBookingStore();
+  const { labels: vehicleLabels } = useVehicleLabels();
 
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState(false);
   const [selectedDate, setSelectedDate] = useState(tripDate || '');
+
+  // packageSlug is a URL-only field (never persisted). If it's missing on
+  // arrival — e.g. a hand-built /booking URL, or a non-tour entry path —
+  // fall back to resolving it from packageId rather than just hiding the
+  // details link.
+  const [resolvedSlug, setResolvedSlug] = useState(packageSlug);
+  useEffect(() => {
+    setResolvedSlug(packageSlug);
+  }, [packageSlug]);
+
+  useEffect(() => {
+    if (packageSlug || !packageId || bookingType !== 'tour') return;
+    let cancelled = false;
+    getPackageById(packageId).then((pkg) => {
+      if (!cancelled && pkg?.slug) setResolvedSlug(pkg.slug);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [packageId, packageSlug, bookingType]);
 
   // Get tomorrow's date as minimum
   const tomorrow = new Date();
@@ -96,6 +122,10 @@ export default function Step2TripDetails() {
     setTripDate(date);
   };
 
+  const capacityExceeded = Boolean(
+    vehicleType && passengerCount > getVehicleCapacity(vehicleType)
+  );
+
   const handleNext = () => {
     if (!tripDate || !tripTime || !pickupLocation) {
       alert('Please fill in all required fields');
@@ -104,6 +134,11 @@ export default function Step2TripDetails() {
 
     if (availabilityStatus === 'sold_out' || availabilityStatus === 'blocked') {
       alert('This date is not available. Please contact us or choose another date.');
+      return;
+    }
+
+    if (capacityExceeded) {
+      alert('This vehicle is too small for your passenger count. Please go back and choose a larger vehicle.');
       return;
     }
 
@@ -150,6 +185,41 @@ export default function Step2TripDetails() {
           When and where do you want to go?
         </p>
       </div>
+
+      {/* Booking Summary */}
+      {packageId && vehicleType && (
+        <div className="p-6 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
+              Your Trip
+            </div>
+            <div className="font-bold text-lg text-[#2D3436] truncate">
+              {packageTitle}
+            </div>
+            <div className="text-sm text-gray-600 mt-1">
+              {vehicleLabels[vehicleType] ?? getVehicleTypeName(vehicleType)}
+            </div>
+            {resolvedSlug && bookingType === 'tour' && (
+              <a
+                href={`/tour/${resolvedSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors mt-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Package Details
+              </a>
+            )}
+          </div>
+          <button
+            onClick={prevStep}
+            className="flex items-center gap-1 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
+          >
+            <Pencil className="w-4 h-4" />
+            Change
+          </button>
+        </div>
+      )}
 
       {/* Date Selection */}
       <div>
@@ -299,6 +369,27 @@ export default function Step2TripDetails() {
             required
           />
         </div>
+
+        {capacityExceeded && vehicleType && (
+          <div className="mt-3 p-4 rounded-xl border-2 border-amber-500 bg-amber-50">
+            <p className="font-medium text-amber-700">
+              This vehicle seats up to {getVehicleCapacity(vehicleType)} passengers.
+            </p>
+            <a
+              href={`https://wa.me/918445206116?text=${encodeURIComponent(
+                `Hi, I need a vehicle for ${passengerCount} passengers${
+                  tripDate ? ` on ${tripDate}` : ''
+                }. Can you help with a larger-group arrangement?`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#20BA59] transition-colors"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Ask us on WhatsApp for larger-group arrangements
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Pickup Location */}
@@ -367,7 +458,8 @@ export default function Step2TripDetails() {
             !pickupLocation ||
             priceError ||
             availabilityStatus === 'sold_out' ||
-            availabilityStatus === 'blocked'
+            availabilityStatus === 'blocked' ||
+            capacityExceeded
           }
           size="lg"
           className="group"

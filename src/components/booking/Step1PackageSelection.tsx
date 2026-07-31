@@ -6,6 +6,7 @@ import { Button, Badge } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil } from 'lucide-react';
 import { getVehicleTypeName, getVehicleCapacity } from '@/lib/pricing';
+import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 
 interface Package {
   id: string;
@@ -37,6 +38,7 @@ export default function Step1PackageSelection() {
     setVehicleType,
     nextStep,
   } = useBookingStore();
+  const { labels: vehicleLabels } = useVehicleLabels();
 
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,7 +87,7 @@ export default function Step1PackageSelection() {
   }
 
   const handlePackageSelect = (pkg: Package) => {
-    setPackage(pkg.id, pkg.title);
+    setPackage(pkg.id, pkg.title, pkg.slug);
     setSelectedPackageData(pkg);
     setIsEditing(false);
     setError('');
@@ -286,8 +288,8 @@ export default function Step1PackageSelection() {
                       </Badge>
                     )}
                   </div>
-                  <div className="font-bold text-[#2D3436] mb-1">
-                    {getVehicleTypeName(vehicle.type)}
+                  <div className="font-bold text-[#2D3436] mb-1 truncate">
+                    {vehicleLabels[vehicle.type] ?? getVehicleTypeName(vehicle.type)}
                   </div>
                   <div className="flex items-center gap-1 text-sm text-gray-600">
                     <Users className="w-4 h-4" />

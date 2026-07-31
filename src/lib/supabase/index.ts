@@ -61,6 +61,7 @@ export {
   // Packages
   getPackages,
   getPackageBySlug,
+  getPackageById,
   getPopularPackages,
 
   // Vehicles

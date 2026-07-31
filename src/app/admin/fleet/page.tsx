@@ -27,6 +27,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Vehicle, VehicleType, VehicleStatus } from "@/lib/supabase/types";
 import ImageUploader from "@/components/admin/ImageUploader";
+import { getVehicleTypeName } from "@/lib/pricing";
+
+const MAX_LABEL_LENGTH = 24;
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   sedan: "Sedan",
@@ -74,6 +77,17 @@ export default function FleetAdminPage() {
   const [categoryImagesSaving, setCategoryImagesSaving] = useState(false);
   const [categoryImagesSaved, setCategoryImagesSaved] = useState(false);
 
+  // Vehicle Category Labels state — customer-facing display names per fixed
+  // category (does not add/remove categories, only renames them)
+  const [categoryLabels, setCategoryLabels] = useState<Record<VehicleType, string>>({
+    sedan: getVehicleTypeName("sedan"),
+    suv_normal: getVehicleTypeName("suv_normal"),
+    suv_deluxe: getVehicleTypeName("suv_deluxe"),
+    suv_luxury: getVehicleTypeName("suv_luxury"),
+  });
+  const [categoryLabelsSaving, setCategoryLabelsSaving] = useState(false);
+  const [categoryLabelsSaved, setCategoryLabelsSaved] = useState(false);
+
   // Fetch vehicle category images from admin_settings
   useEffect(() => {
     const fetchCategoryImages = async () => {
@@ -92,6 +106,62 @@ export default function FleetAdminPage() {
     };
     fetchCategoryImages();
   }, []);
+
+  // Fetch vehicle category labels from admin_settings
+  useEffect(() => {
+    const fetchCategoryLabels = async () => {
+      try {
+        const response = await fetch("/api/admin/settings?key=vehicle_category_labels");
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.value) {
+            const parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+            setCategoryLabels((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching category labels:", error);
+      }
+    };
+    fetchCategoryLabels();
+  }, []);
+
+  const saveCategoryLabels = async () => {
+    setCategoryLabelsSaving(true);
+    setCategoryLabelsSaved(false);
+
+    try {
+      // Defense in depth beyond the input's maxLength attribute
+      const trimmed = Object.fromEntries(
+        Object.entries(categoryLabels).map(([key, value]) => [key, value.slice(0, MAX_LABEL_LENGTH)])
+      ) as Record<VehicleType, string>;
+
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          settings: [
+            {
+              key: "vehicle_category_labels",
+              value: JSON.stringify(trimmed),
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        setCategoryLabels(trimmed);
+        setCategoryLabelsSaved(true);
+        setTimeout(() => setCategoryLabelsSaved(false), 3000);
+      }
+    } catch (error) {
+      console.error("Error saving category labels:", error);
+    } finally {
+      setCategoryLabelsSaving(false);
+    }
+  };
 
   const saveCategoryImages = async () => {
     setCategoryImagesSaving(true);
@@ -339,6 +409,56 @@ export default function FleetAdminPage() {
               recommendedSize="400 x 300"
               aspectRatio="4:3"
             />
+          ))}
+        </div>
+      </div>
+
+      {/* Vehicle Category Labels */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 shadow-retro-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg text-ink flex items-center gap-2">
+            <Car className="w-5 h-5 text-teal" />
+            Vehicle Category Labels
+          </h2>
+          <button
+            onClick={saveCategoryLabels}
+            disabled={categoryLabelsSaving}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl font-body text-sm font-semibold border-2 transition-all",
+              categoryLabelsSaved
+                ? "bg-whatsapp/20 border-whatsapp text-whatsapp"
+                : "bg-sunshine text-ink border-ink hover:shadow-retro-sm"
+            )}
+          >
+            <Save className="w-4 h-4" />
+            {categoryLabelsSaving ? "Saving..." : categoryLabelsSaved ? "Saved!" : "Save Labels"}
+          </button>
+        </div>
+        <p className="text-sm text-ink/50 font-body mb-4">
+          Customize the display name shown to customers for each vehicle category (booking widget,
+          booking flow, pricing tables) — e.g. name the exact car model. This renames the 4 fixed
+          categories only; it does not add or remove categories.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(Object.keys(CATEGORY_LABELS) as VehicleType[]).map((key) => (
+            <div key={key}>
+              <label className="block text-xs font-body font-semibold text-ink/60 mb-1">
+                {CATEGORY_LABELS[key]}
+              </label>
+              <input
+                type="text"
+                maxLength={MAX_LABEL_LENGTH}
+                value={categoryLabels[key]}
+                onChange={(e) =>
+                  setCategoryLabels((prev) => ({ ...prev, [key]: e.target.value }))
+                }
+                className="w-full px-3 py-2 rounded-lg border-2 border-ink/20 font-body text-sm focus:border-teal focus:outline-none"
+                placeholder={CATEGORY_LABELS[key]}
+              />
+              <div className="text-right text-xs font-body text-ink/40 mt-1">
+                {categoryLabels[key].length}/{MAX_LABEL_LENGTH}
+              </div>
+            </div>
           ))}
         </div>
       </div>

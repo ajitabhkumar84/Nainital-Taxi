@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Card, Button, Input, Select, Label } from "@/components/ui";
 import { Calendar, MapPin, Users, Car, Loader2, MessageCircle } from "lucide-react";
 import { getPackages, getPrice } from "@/lib/supabase";
+import { getVehicleCapacity } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing } from "@/lib/supabase/types";
 import { useBookingStore } from "@/store/bookingStore";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useVehicleLabels } from "@/hooks/useVehicleLabels";
 import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
@@ -25,6 +27,7 @@ export default function BookingWidget() {
   const router = useRouter();
   const bookingStore = useBookingStore();
   const { config: siteConfig } = useSiteConfig();
+  const { labels: vehicleLabels } = useVehicleLabels();
   const phoneNumber =
     siteConfig?.header?.phoneNumber || DEFAULT_SITE_CONFIG.header.phoneNumber;
   const [activeTab, setActiveTab] = useState<"tours" | "transfers">("tours");
@@ -35,15 +38,16 @@ export default function BookingWidget() {
 
   // Tour form state
   const [tourPackage, setTourPackage] = useState("");
-  const [tourVehicle, setTourVehicle] = useState<VehicleType>("sedan");
+  const [tourVehicle, setTourVehicle] = useState<VehicleType | "">("sedan");
   const [tourDate, setTourDate] = useState("");
   const [tourPassengers, setTourPassengers] = useState("2");
 
   // Transfer form state
   const [transferFrom, setTransferFrom] = useState("");
   const [transferTo, setTransferTo] = useState("");
-  const [transferVehicle, setTransferVehicle] = useState<VehicleType>("sedan");
+  const [transferVehicle, setTransferVehicle] = useState<VehicleType | "">("sedan");
   const [transferDate, setTransferDate] = useState("");
+  const [transferPassengers, setTransferPassengers] = useState("2");
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
   // Price display
@@ -124,6 +128,46 @@ export default function BookingWidget() {
     return VEHICLE_OPTIONS.filter((v) => availableVehicleTypes.has(v.value));
   };
 
+  const tourPassengerCount = parseInt(tourPassengers, 10) || 1;
+  const tourVehicleOptions = VEHICLE_OPTIONS.filter(
+    (v) => getVehicleCapacity(v.value) >= tourPassengerCount
+  );
+
+  const transferPassengerCount = parseInt(transferPassengers, 10) || 1;
+  const transferVehicleOptions = selectedRoute
+    ? getAvailableVehiclesForRoute(selectedRoute).filter(
+        (v) => getVehicleCapacity(v.value) >= transferPassengerCount
+      )
+    : [];
+
+  // Passenger-driven capacity changes CLEAR the selection rather than
+  // auto-switching to a bigger (pricier) vehicle — silently upgrading a
+  // user's vehicle choice is a price-shock risk. The user must actively pick
+  // a larger vehicle, so any fare increase is their own choice. This is
+  // deliberately separate from the route-driven auto-switch effect below,
+  // which handles a different case (no pricing for the current vehicle on a
+  // newly selected route) and is left untouched.
+  useEffect(() => {
+    const passengers = parseInt(tourPassengers, 10) || 1;
+    setTourVehicle((current) => {
+      if (current && getVehicleCapacity(current) < passengers) {
+        return "";
+      }
+      return current;
+    });
+  }, [tourPassengers]);
+
+  useEffect(() => {
+    if (!selectedRoute) return;
+    const passengers = parseInt(transferPassengers, 10) || 1;
+    setTransferVehicle((current) => {
+      if (current && getVehicleCapacity(current) < passengers) {
+        return "";
+      }
+      return current;
+    });
+  }, [transferPassengers, selectedRoute]);
+
   // Find matching route
   useEffect(() => {
     if (!transferFrom || !transferTo) {
@@ -149,7 +193,7 @@ export default function BookingWidget() {
     }
 
     // Calculate transfer price if route found
-    if (route && route.pricing && transferDate) {
+    if (route && route.pricing && transferDate && transferVehicle) {
       calculateTransferPrice(route);
     } else {
       setPriceInfo(null);
@@ -158,7 +202,7 @@ export default function BookingWidget() {
 
   // Calculate transfer price
   const calculateTransferPrice = (route: Route & { pricing?: RoutePricing[] }) => {
-    if (!route.pricing || !transferDate) return;
+    if (!route.pricing || !transferDate || !transferVehicle) return;
 
     // Determine season based on date (simple check)
     const month = new Date(transferDate).getMonth() + 1;
@@ -187,7 +231,7 @@ export default function BookingWidget() {
   // Check price when form changes (for tours)
   useEffect(() => {
     async function checkPrice() {
-      if (!tourPackage || !tourDate) {
+      if (!tourPackage || !tourDate || !tourVehicle) {
         setPriceInfo(null);
         return;
       }
@@ -228,12 +272,18 @@ export default function BookingWidget() {
       return;
     }
 
+    if (!tourVehicle) {
+      alert("Please select a vehicle that fits your passenger count");
+      return;
+    }
+
     const selectedPkg = packages.find((p) => p.id === tourPackage);
 
     router.push(
       buildBookingUrl({
         packageId: tourPackage,
         packageTitle: selectedPkg?.title || "Tour Package",
+        packageSlug: selectedPkg?.slug,
         packageType: "tour",
         vehicle: tourVehicle,
         date: tourDate,
@@ -267,6 +317,11 @@ export default function BookingWidget() {
       return;
     }
 
+    if (!transferVehicle) {
+      alert("Please select a vehicle that fits your passenger count");
+      return;
+    }
+
     setLoading(true);
     try {
       bookingStore.resetBooking();
@@ -279,6 +334,7 @@ export default function BookingWidget() {
       bookingStore.setTripDate(transferDate);
       bookingStore.setPickupLocation(transferFrom);
       bookingStore.setDropoffLocation(transferTo);
+      bookingStore.setPassengerCount(parseInt(transferPassengers, 10) || 1);
 
       if (priceInfo) {
         bookingStore.setCalculatedPrice(priceInfo.price, "", priceInfo.season);
@@ -293,7 +349,13 @@ export default function BookingWidget() {
     }
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  // Tour/transfer bookings require at least a day's notice — this mirrors
+  // Step2TripDetails' minDate exactly. min={today} would let a same-day date
+  // reach the /booking URL, where isValidFutureDate silently drops it,
+  // leaving Step 2's date field mysteriously empty.
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const minDate = tomorrowDate.toISOString().split("T")[0];
   const dropLocations = getDropLocations();
 
   return (
@@ -357,12 +419,19 @@ export default function BookingWidget() {
                 value={tourVehicle}
                 onChange={(e) => setTourVehicle(e.target.value as VehicleType)}
               >
-                {VEHICLE_OPTIONS.map((v) => (
+                {!tourVehicle && <option value="">Select a vehicle</option>}
+                {tourVehicleOptions.map((v) => (
                   <option key={v.value} value={v.value}>
-                    {v.label} ({v.capacity})
+                    {vehicleLabels[v.value] ?? v.label} ({v.capacity})
                   </option>
                 ))}
               </Select>
+              {!tourVehicle && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Your vehicle selection was cleared — it doesn&apos;t fit {tourPassengerCount}{" "}
+                  passengers. Please choose a larger vehicle.
+                </p>
+              )}
             </div>
 
             <div>
@@ -373,7 +442,7 @@ export default function BookingWidget() {
               <Input
                 id="tour-date"
                 type="date"
-                min={today}
+                min={minDate}
                 value={tourDate}
                 onChange={(e) => setTourDate(e.target.value)}
               />
@@ -431,7 +500,7 @@ export default function BookingWidget() {
             size="lg"
             className="w-full"
             onClick={handleTourBooking}
-            disabled={loading || !tourPackage || !tourDate}
+            disabled={loading || !tourPackage || !tourDate || !tourVehicle}
           >
             {loading ? (
               <>
@@ -502,10 +571,29 @@ export default function BookingWidget() {
               <Input
                 id="transfer-date"
                 type="date"
-                min={today}
+                min={minDate}
                 value={transferDate}
                 onChange={(e) => setTransferDate(e.target.value)}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="transfer-passengers">
+                <Users className="w-4 h-4 inline mr-1" />
+                Passengers
+              </Label>
+              <Select
+                id="transfer-passengers"
+                value={transferPassengers}
+                onChange={(e) => setTransferPassengers(e.target.value)}
+              >
+                <option value="1">1 Person</option>
+                <option value="2">2 People</option>
+                <option value="3">3 People</option>
+                <option value="4">4 People</option>
+                <option value="5">5 People</option>
+                <option value="6">6+ People</option>
+              </Select>
             </div>
 
             <div>
@@ -520,11 +608,14 @@ export default function BookingWidget() {
                 disabled={!selectedRoute}
               >
                 {selectedRoute ? (
-                  getAvailableVehiclesForRoute(selectedRoute).map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label} ({v.capacity})
-                    </option>
-                  ))
+                  <>
+                    {!transferVehicle && <option value="">Select a vehicle</option>}
+                    {transferVehicleOptions.map((v) => (
+                      <option key={v.value} value={v.value}>
+                        {vehicleLabels[v.value] ?? v.label} ({v.capacity})
+                      </option>
+                    ))}
+                  </>
                 ) : (
                   <option value="">Select route first</option>
                 )}
@@ -534,6 +625,14 @@ export default function BookingWidget() {
                   No vehicles available for this route. Please contact us directly.
                 </p>
               )}
+              {selectedRoute &&
+                getAvailableVehiclesForRoute(selectedRoute).length > 0 &&
+                !transferVehicle && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Your vehicle selection was cleared — it doesn&apos;t fit{" "}
+                    {transferPassengerCount} passengers. Please choose a larger vehicle.
+                  </p>
+                )}
             </div>
           </div>
 
@@ -584,7 +683,8 @@ export default function BookingWidget() {
               !transferTo ||
               !transferDate ||
               !selectedRoute ||
-              !selectedRoute.enable_online_booking
+              !selectedRoute.enable_online_booking ||
+              !transferVehicle
             }
           >
             {loading ? (

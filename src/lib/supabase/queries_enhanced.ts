@@ -246,6 +246,22 @@ export async function getPopularPackages(limit: number = 6): Promise<Package[]> 
   return data || [];
 }
 
+export async function getPackageById(id: string): Promise<Package | null> {
+  const { data, error } = await supabase
+    .from('packages')
+    .select('*')
+    .eq('id', id)
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    console.error('Error fetching package:', error);
+    return null;
+  }
+
+  return data;
+}
+
 export async function getPackageBySlug(slug: string): Promise<Package | null> {
   const { data, error } = await supabase
     .from('packages')
