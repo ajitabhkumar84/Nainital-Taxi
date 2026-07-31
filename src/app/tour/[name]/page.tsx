@@ -20,12 +20,13 @@ import {
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { buildBookingUrl } from "@/lib/bookingLink";
-import { Package, Pricing, TourItinerary, GalleryImage } from "@/lib/supabase/types";
+import { Package, Pricing, TourItinerary, GalleryImage, hasHotelOption } from "@/lib/supabase/types";
 import { Header, Footer } from "@/components/ui";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { generateTouristTripSchema } from "@/lib/structuredData";
 import ItineraryTimeline from "@/components/packages/ItineraryTimeline";
 import HotelOptionsCard from "@/components/packages/HotelOptionsCard";
+import PackageTypeBadge from "@/components/packages/PackageTypeBadge";
 import PricingGridWithHotel from "@/components/packages/PricingGridWithHotel";
 import PackageGallery from "@/components/packages/PackageGallery";
 import PackageFAQ from "@/components/packages/PackageFAQ";
@@ -135,6 +136,7 @@ export default async function TourPackagePage({
     getVehicleCategoryImages(),
   ]);
   const itinerary = pkg.itinerary as TourItinerary | undefined;
+  const isTaxiHotel = hasHotelOption(itinerary);
 
   // Get minimum price for display
   const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p) => p.price)) : 0;
@@ -164,7 +166,7 @@ export default async function TourPackagePage({
 
       <main className="min-h-screen bg-white">
         {/* Hero Section */}
-        <section className="relative min-h-[60vh] md:min-h-[70vh] flex items-end">
+        <section className="relative min-h-[38vh] md:min-h-[70vh] flex items-end">
           {/* Background Image */}
           <div className="absolute inset-0">
             {pkg.image_url ? (
@@ -180,10 +182,11 @@ export default async function TourPackagePage({
           </div>
 
           {/* Hero Content */}
-          <div className="relative container mx-auto px-4 pb-12 md:pb-16 pt-32">
+          <div className="relative container mx-auto px-4 pb-8 md:pb-16 pt-20 md:pt-32">
             <div className="max-w-4xl">
               {/* Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-3 md:mb-4">
+                <PackageTypeBadge hasHotel={isTaxiHotel} size="md" />
                 {pkg.is_popular && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-sunshine text-ink font-body font-semibold text-sm rounded-full border-2 border-ink">
                     <Star className="w-4 h-4" />
@@ -199,7 +202,7 @@ export default async function TourPackagePage({
               </div>
 
               {/* Title */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-display text-white mb-4">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-display text-white mb-3 md:mb-4">
                 {pkg.title}
               </h1>
 

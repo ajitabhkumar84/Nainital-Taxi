@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Phone, MessageCircle, Send, X } from 'lucide-react';
 import QuickEnquiryForm from './QuickEnquiryForm';
 
 export default function MobileEnquiryBar() {
   const [isVisible, setIsVisible] = useState(false);
   const [showEnquiryForm, setShowEnquiryForm] = useState(false);
+  const pathname = usePathname();
+  const isEnquiryActive = pathname === '/contact';
 
   // Show bar after scrolling past hero
   useEffect(() => {
@@ -68,11 +71,14 @@ export default function MobileEnquiryBar() {
           {/* Enquiry Button */}
           <button
             onClick={handleEnquiryClick}
-            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl hover:bg-sunshine/20 transition-colors min-w-[44px] min-h-[44px]"
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors min-w-[44px] min-h-[44px] ${
+              isEnquiryActive ? 'bg-sunshine/30' : 'hover:bg-sunshine/20'
+            }`}
             aria-label="Send enquiry"
+            aria-current={isEnquiryActive ? 'page' : undefined}
           >
-            <Send className="w-6 h-6 text-ink" />
-            <span className="text-xs font-body font-bold text-ink">Enquiry</span>
+            <Send className={`w-6 h-6 ${isEnquiryActive ? 'text-ink' : 'text-ink/70'}`} strokeWidth={isEnquiryActive ? 2.5 : 2} />
+            <span className={`text-xs font-body ${isEnquiryActive ? 'font-extrabold text-ink' : 'font-bold text-ink/70'}`}>Enquiry</span>
           </button>
         </div>
       </div>

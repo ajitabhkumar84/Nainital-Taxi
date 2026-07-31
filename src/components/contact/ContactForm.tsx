@@ -11,7 +11,7 @@ interface ContactFormProps {
 
 export default function ContactForm({
   formTitle = "Request a Free Quote",
-  formDescription = "Fill out the form below and we'll get back to you within minutes"
+  formDescription = "Fill out the form below and our team will get back to you shortly to confirm your booking."
 }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -171,7 +171,7 @@ export default function ContactForm({
                   id="email"
                   name="email"
                   className="w-full px-4 py-3 rounded-xl border-3 border-ink/20 focus:border-teal focus:ring-0 transition-all font-body"
-                  placeholder="your.email@example.com"
+                  placeholder="your.email@example.com (Optional)"
                 />
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function ContactForm({
                   className="w-full px-4 py-3 rounded-xl border-3 border-ink/20 focus:border-teal focus:ring-0 transition-all font-body"
                 >
                   <option value="1-4">1-4 Passengers (Sedan)</option>
-                  <option value="5-7">5-7 Passengers (SUV/Innova)</option>
+                  <option value="5-7">5-7 Passengers (SUV / Innova / Crysta)</option>
                   <option value="8-12">8-12 Passengers (Tempo Traveller)</option>
                   <option value="12+">12+ Passengers (Mini Bus)</option>
                 </select>
@@ -310,7 +310,7 @@ export default function ContactForm({
             <button
               type="button"
               onClick={handleWhatsAppClick}
-              className="flex-1 inline-flex items-center justify-center bg-whatsapp text-white px-8 py-4 rounded-xl font-bold font-body border-3 border-ink shadow-retro hover:shadow-retro-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+              className="flex-1 inline-flex items-center justify-center bg-transparent text-whatsapp px-8 py-4 rounded-xl font-bold font-body border-3 border-whatsapp hover:bg-whatsapp/10 transition-all"
             >
               <MessageCircle className="w-5 h-5 mr-2" />
               Send via WhatsApp

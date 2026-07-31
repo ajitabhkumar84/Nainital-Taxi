@@ -1195,6 +1195,13 @@ export interface Database {
 // ============================================================================
 
 /**
+ * A package is "Taxi + Hotel" only if it has non-empty hotel_options; otherwise it's taxi-only.
+ */
+export function hasHotelOption(itinerary: Pick<TourItinerary, 'hotel_options'> | null | undefined): boolean {
+  return Boolean(itinerary?.hotel_options && itinerary.hotel_options.length > 0);
+}
+
+/**
  * Type for creating a new booking
  */
 export type CreateBookingInput = Omit<

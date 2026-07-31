@@ -7,10 +7,10 @@ interface ContactHeroProps {
 
 export default function ContactHero({
   title = "Get in Touch",
-  subtitle = "Book your taxi or request a quote - we're here to help 24/7"
+  subtitle = "Book your reliable ride across the region. Request a quote below for our best rates."
 }: ContactHeroProps) {
   return (
-    <section className="relative min-h-[400px] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[280px] md:min-h-[400px] flex items-center justify-center overflow-hidden">
       {/* Background with Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-ink via-ink/95 to-ink">
         {/* Decorative floating elements */}
@@ -22,7 +22,7 @@ export default function ContactHero({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-8 md:py-20">
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-display text-white mb-4 drop-shadow-lg">
           {title}
         </h1>
@@ -31,7 +31,7 @@ export default function ContactHero({
         </p>
 
         {/* Quick Contact Badges */}
-        <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+        <div className="mt-4 md:mt-8 flex flex-wrap justify-center gap-4 text-sm">
           <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white border-2 border-white/20">
             <svg className="w-5 h-5 text-sunshine mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -40,7 +40,7 @@ export default function ContactHero({
                 clipRule="evenodd"
               />
             </svg>
-            <span className="font-body font-semibold">24/7 Available</span>
+            <span className="font-body font-semibold">Experienced Drivers</span>
           </div>
           <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white border-2 border-white/20">
             <svg className="w-5 h-5 text-sunshine mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -50,7 +50,7 @@ export default function ContactHero({
                 clipRule="evenodd"
               />
             </svg>
-            <span className="font-body font-semibold">Instant Response</span>
+            <span className="font-body font-semibold">Transparent Pricing</span>
           </div>
           <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white border-2 border-white/20">
             <svg className="w-5 h-5 text-sunshine mr-2" fill="currentColor" viewBox="0 0 20 20">

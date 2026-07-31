@@ -22,13 +22,13 @@ export default function ContactPage() {
         {/* Hero Section */}
         <ContactHero
           title="Get in Touch"
-          subtitle="Book your taxi or request a quote - we're here to help 24/7"
+          subtitle="Book your reliable ride across the region. Request a quote below for our best rates."
         />
 
         {/* Contact Form Section */}
         <ContactForm
           formTitle="Request a Free Quote"
-          formDescription="Fill out the form below and we'll get back to you within minutes"
+          formDescription="Fill out the form below and our team will get back to you shortly to confirm your booking."
         />
 
         {/* Contact Information & Map */}

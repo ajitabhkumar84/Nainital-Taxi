@@ -3,11 +3,13 @@ import { Metadata } from "next";
 import { Header, Footer, Button } from "@/components/ui";
 import { Clock, MapPin, Star, ArrowRight, Users, IndianRupee } from "lucide-react";
 import { getPackages, getAllPricingForPackage } from "@/lib/supabase/queries_enhanced";
+import { TourItinerary, hasHotelOption } from "@/lib/supabase/types";
+import PackageTypeBadge from "@/components/packages/PackageTypeBadge";
 
 export const metadata: Metadata = {
-  title: "Tour Packages | Nainital Taxi - Hotel + Taxi Packages",
-  description: "Explore our curated tour packages with hotel accommodations and taxi services. Multi-day tours to Nainital, Ranikhet, Mukteshwar, Jim Corbett and more.",
-  keywords: "Nainital tour packages, hotel taxi package, Uttarakhand tours, Nainital holiday packages, hill station tours",
+  title: "Tour Packages | Nainital Taxi - Taxi-Only & Taxi+Hotel Tours",
+  description: "Explore our curated tour packages across Nainital and the Kumaon hills. Choose taxi-only service or taxi + hotel packages with accommodation included. Multi-day tours to Nainital, Ranikhet, Mukteshwar, Jim Corbett and more.",
+  keywords: "Nainital tour packages, taxi tour package, hotel taxi package, Uttarakhand tours, Nainital holiday packages, hill station tours",
 };
 
 const CARD_GRADIENTS = [
@@ -48,27 +50,26 @@ export default async function TourPackagesPage() {
       <Header />
 
       {/* Hero Section — Colorful Gradient with Floating Shapes */}
-      <section className="relative pt-32 pb-20 px-4 bg-gradient-to-br from-teal via-teal-400 to-coral overflow-hidden">
+      <section className="relative pt-20 pb-10 md:pt-32 md:pb-20 px-4 bg-gradient-to-br from-teal via-teal-400 to-coral overflow-hidden">
         {/* Animated floating shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="absolute top-16 left-[10%] w-24 h-24 bg-sunshine/30 rounded-full blur-sm animate-bounce" style={{ animationDuration: "4s" }} />
-          <div className="absolute top-32 right-[15%] w-16 h-16 bg-white/20 rounded-2xl rotate-45 animate-pulse" style={{ animationDuration: "3s" }} />
-          <div className="absolute bottom-12 left-[20%] w-20 h-20 bg-coral/20 rounded-full blur-sm animate-bounce" style={{ animationDuration: "5s" }} />
-          <div className="absolute bottom-24 right-[10%] w-12 h-12 bg-sunshine/40 rounded-lg rotate-12 animate-pulse" style={{ animationDuration: "3.5s" }} />
-          <div className="absolute top-1/2 left-[50%] w-32 h-32 bg-white/10 rounded-full blur-md animate-pulse" style={{ animationDuration: "6s" }} />
+          <div className="absolute top-16 left-[10%] w-16 h-16 md:w-24 md:h-24 bg-sunshine/20 md:bg-sunshine/30 rounded-full blur-sm animate-bounce" style={{ animationDuration: "4s" }} />
+          <div className="hidden md:block absolute top-32 right-[15%] w-16 h-16 bg-white/20 rounded-2xl rotate-45 animate-pulse" style={{ animationDuration: "3s" }} />
+          <div className="absolute bottom-12 left-[20%] w-12 h-12 md:w-20 md:h-20 bg-coral/15 md:bg-coral/20 rounded-full blur-sm animate-bounce" style={{ animationDuration: "5s" }} />
+          <div className="hidden md:block absolute bottom-24 right-[10%] w-12 h-12 bg-sunshine/40 rounded-lg rotate-12 animate-pulse" style={{ animationDuration: "3.5s" }} />
+          <div className="hidden md:block absolute top-1/2 left-[50%] w-32 h-32 bg-white/10 rounded-full blur-md animate-pulse" style={{ animationDuration: "6s" }} />
         </div>
 
         <div className="relative container mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6 border border-white/30">
-            <Star className="w-5 h-5 text-sunshine" />
-            <span className="font-body text-sm text-white font-semibold">Hotel + Taxi Packages</span>
+          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full mb-3 md:mb-6 border border-white/30">
+            <Star className="w-4 h-4 md:w-5 md:h-5 text-sunshine" />
+            <span className="font-body text-xs md:text-sm text-white font-semibold">Tour Packages</span>
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display text-white mb-6 drop-shadow-lg">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-display text-white mb-3 md:mb-6 drop-shadow-lg">
             Popular Tour Packages
           </h1>
-          <p className="text-lg md:text-xl font-body text-white/90 max-w-2xl mx-auto">
-            Handpicked adventures with comfortable stays and reliable transportation.
-            Everything arranged for a hassle-free vacation.
+          <p className="text-base md:text-xl font-body text-white/90 max-w-2xl mx-auto">
+            Handpicked adventures across Nainital and the Kumaon hills — choose taxi-only or taxi with hotel stays included.
           </p>
         </div>
       </section>
@@ -85,18 +86,18 @@ export default async function TourPackagesPage() {
             </div>
           ) : (
             <>
-              {/* Mobile: Horizontal scroll-snap carousel */}
-              <div className="md:hidden -mx-4 px-4">
-                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-6 scrollbar-hide" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+              {/* Mobile: Vertical stacked list */}
+              <div className="md:hidden">
+                <div className="flex flex-col gap-4">
                   {packagesWithPricing.map((pkg, idx) => (
                     <Link
                       key={pkg.id}
                       href={`/tour/${pkg.slug}`}
-                      className="snap-start flex-shrink-0 w-[85vw] max-w-[340px]"
+                      className="block"
                     >
-                      <div className={`bg-gradient-to-br ${CARD_GRADIENTS[idx % CARD_GRADIENTS.length]} rounded-2xl border-3 border-ink border-l-[6px] ${CARD_BORDERS[idx % CARD_BORDERS.length]} shadow-retro-sm overflow-hidden h-full flex flex-col group`}>
+                      <div className={`bg-gradient-to-br ${CARD_GRADIENTS[idx % CARD_GRADIENTS.length]} rounded-2xl border-3 border-ink border-l-[6px] ${CARD_BORDERS[idx % CARD_BORDERS.length]} shadow-retro-sm overflow-hidden flex flex-col group`}>
                         {/* Image */}
-                        <div className="h-48 relative overflow-hidden">
+                        <div className="h-56 relative overflow-hidden">
                           {pkg.image_url ? (
                             <img
                               src={pkg.image_url}
@@ -126,13 +127,16 @@ export default async function TourPackagesPage() {
                             </div>
                           )}
 
-                          {/* Popular Badge */}
-                          {pkg.is_popular && (
-                            <div className="absolute top-3 left-3 bg-coral text-white px-3 py-1 rounded-full text-xs font-body font-bold flex items-center gap-1 border-2 border-ink">
-                              <Star className="w-3 h-3" />
-                              Popular
-                            </div>
-                          )}
+                          {/* Popular + Taxi/Hotel Badges */}
+                          <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+                            {pkg.is_popular && (
+                              <div className="bg-coral text-white px-3 py-1 rounded-full text-xs font-body font-bold flex items-center gap-1 border-2 border-ink">
+                                <Star className="w-3 h-3" />
+                                Popular
+                              </div>
+                            )}
+                            <PackageTypeBadge hasHotel={hasHotelOption(pkg.itinerary as TourItinerary | undefined)} size="sm" />
+                          </div>
                         </div>
 
                         <div className="p-4 flex flex-col flex-grow">
@@ -170,7 +174,6 @@ export default async function TourPackagesPage() {
                     </Link>
                   ))}
                 </div>
-                <p className="text-center text-xs text-ink/40 font-body mt-1">Swipe to explore more packages</p>
               </div>
 
               {/* Desktop: 3-column grid */}
@@ -209,8 +212,8 @@ export default async function TourPackagesPage() {
                           </div>
                         )}
 
-                        {/* Popular / Seasonal Badges */}
-                        <div className="absolute top-3 left-3 flex gap-2">
+                        {/* Popular / Seasonal / Taxi-Hotel Badges */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
                           {pkg.is_popular && (
                             <span className="bg-coral text-white px-3 py-1 rounded-full text-xs font-body font-bold flex items-center gap-1 border-2 border-ink">
                               <Star className="w-3 h-3" />
@@ -222,6 +225,7 @@ export default async function TourPackagesPage() {
                               Seasonal
                             </span>
                           )}
+                          <PackageTypeBadge hasHotel={hasHotelOption(pkg.itinerary as TourItinerary | undefined)} size="sm" />
                         </div>
                       </div>
 
