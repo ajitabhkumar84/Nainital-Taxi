@@ -5,6 +5,10 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Explicit entry as purge insurance for the seasonal theme token strings
+    // (already covered by the glob above since it's a .ts file, but the
+    // landing page's Tailwind classes are load-bearing enough to pin down).
+    "./src/components/landing/themes.ts",
   ],
   theme: {
     extend: {

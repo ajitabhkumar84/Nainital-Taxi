@@ -1456,6 +1456,54 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
 }
 
 // ============================================================================
+// PPC LANDING PAGE CONFIGURATION TYPES
+// ============================================================================
+
+export type LandingTheme = 'rainy' | 'autumn' | 'winter';
+export type LandingThemeMode = 'auto' | LandingTheme;
+
+export interface LandingPricingLine {
+  id: string;
+  label: string;
+  priceText: string;
+  note?: string;
+  isActive: boolean;
+  displayOrder: number;
+}
+
+export interface LandingPageConfig {
+  themeMode: LandingThemeMode;
+  hero: {
+    badgeText: string;
+    headline: string;
+    subheadline: string;
+  };
+  whatsappMessageTemplate: string;
+  pricingLines: LandingPricingLine[];
+  featuredPackageSlugs: string[];
+  showBookingWidget: boolean;
+  updatedAt?: string;
+}
+
+export const DEFAULT_LANDING_PAGE_CONFIG: LandingPageConfig = {
+  themeMode: 'auto',
+  hero: {
+    badgeText: '🟢 Off-Season Rates Live — Save up to 30%',
+    headline: 'Reliable Nainital Taxis at Honest Off-Season Rates',
+    subheadline: 'Local drivers who know every bend of these hills. Fixed prices, clean cabs, on-time pickup from Kathgodam, Delhi & beyond — no haggling, no surprises.',
+  },
+  whatsappMessageTemplate: 'Hi! 👋 I need a taxi quote for Nainital 🚕 Looking for the off-season rate ✨',
+  pricingLines: [
+    { id: 'pl-1', label: 'Sedan (Dzire / Aura)', priceText: '₹2,500/day', note: 'Seats 4 · AC', isActive: true, displayOrder: 0 },
+    { id: 'pl-2', label: 'SUV (Ertiga)', priceText: '₹3,500/day', note: 'Seats 6 · AC', isActive: true, displayOrder: 1 },
+    { id: 'pl-3', label: 'Innova', priceText: '₹4,500/day', note: 'Seats 7 · AC', isActive: true, displayOrder: 2 },
+    { id: 'pl-4', label: 'Innova Crysta', priceText: '₹5,500/day', note: 'Seats 7 · Premium', isActive: true, displayOrder: 3 },
+  ],
+  featuredPackageSlugs: ['lake-tour-kainchi-dham', 'nainital-darshan', 'neem-karoli-4-dham'],
+  showBookingWidget: true,
+};
+
+// ============================================================================
 // B2B PAGE CONFIGURATION TYPES
 // ============================================================================
 

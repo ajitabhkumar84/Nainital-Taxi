@@ -26,6 +26,7 @@ import {
   MessageSquareQuote,
   Radio,
   ShieldCheck,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },
   { href: "/admin/seasons", label: "Seasons", icon: <Sun className="w-5 h-5" /> },
   { href: "/admin/site-config", label: "Site Config", icon: <Globe className="w-5 h-5" /> },
+  { href: "/admin/landing-page", label: "PPC Landing Page", icon: <Megaphone className="w-5 h-5" /> },
   { href: "/admin/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
