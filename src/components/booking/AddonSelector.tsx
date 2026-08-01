@@ -8,16 +8,23 @@ import { Gift, Sparkles } from 'lucide-react';
 
 interface AddonSelectorProps {
   packageId?: string;
+  routeId?: string;
   destinationId?: string;
   seasonName: 'Off-Season' | 'Season';
   stage: 'before_booking' | 'after_booking';
+  // Fires once the fetch resolves, so a parent wrapping this in its own
+  // border/background/header can hold off rendering that chrome until it
+  // knows there's actually something to show.
+  onAvailabilityChange?: (hasAddons: boolean) => void;
 }
 
 export default function AddonSelector({
   packageId,
+  routeId,
   destinationId,
   seasonName,
   stage,
+  onAvailabilityChange,
 }: AddonSelectorProps) {
   const [addons, setAddons] = useState<AddonWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +34,7 @@ export default function AddonSelector({
 
   useEffect(() => {
     fetchAddons();
-  }, [packageId, destinationId, seasonName, stage]);
+  }, [packageId, routeId, destinationId, seasonName, stage]);
 
   const fetchAddons = async () => {
     try {
@@ -36,6 +43,7 @@ export default function AddonSelector({
 
       const params = new URLSearchParams();
       if (packageId) params.append('package_id', packageId);
+      if (routeId) params.append('route_id', routeId);
       if (destinationId) params.append('destination_id', destinationId);
       params.append('stage', stage);
       params.append('season', seasonName);
@@ -47,10 +55,13 @@ export default function AddonSelector({
         throw new Error(result.error || 'Failed to fetch addons');
       }
 
-      setAddons(result.data || []);
+      const fetchedAddons = result.data || [];
+      setAddons(fetchedAddons);
+      onAvailabilityChange?.(fetchedAddons.length > 0);
     } catch (err) {
       console.error('Error fetching addons:', err);
       setError(err instanceof Error ? err.message : 'Failed to load addons');
+      onAvailabilityChange?.(false);
     } finally {
       setLoading(false);
     }

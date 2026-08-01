@@ -51,20 +51,32 @@ export function formatPrice(amount: number): string {
 }
 
 /**
- * Validate Indian phone number (10 digits, starting with 6-9)
+ * Validate a phone number. For India ('91', the default) this enforces the
+ * strict 10-digit-starting-6-9 format. Any other country code is the
+ * free-form international fallback (see Step3ContactInfo) — the customer
+ * typed their own full number including its country code, so we only do a
+ * loose length check rather than trying to validate every country's format.
  * Accepts formats: 9876543210, +919876543210, 919876543210
  */
-export function validatePhone(phone: string): boolean {
+export function validatePhone(phone: string, countryCode: string = '91'): boolean {
   const cleaned = phone.replace(/[\s-]/g, '');
-  return /^(\+91|91)?[6-9]\d{9}$/.test(cleaned);
+  if (countryCode === '91') {
+    return /^(\+91|91)?[6-9]\d{9}$/.test(cleaned);
+  }
+  return /^\+?\d{7,15}$/.test(cleaned);
 }
 
 /**
- * Normalize phone number to 10-digit format
- * Removes country code prefix if present
+ * Normalize a phone number for storage. For India, strips the country code
+ * prefix down to the bare 10 digits (matching existing bookings). For the
+ * international fallback, the customer typed their full number themselves —
+ * keep all of it, just strip formatting characters and any leading '+'.
  */
-export function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string, countryCode: string = '91'): string {
   const cleaned = phone.replace(/[\s-]/g, '');
+  if (countryCode !== '91') {
+    return cleaned.replace(/^\+/, '');
+  }
   if (cleaned.startsWith('+91')) return cleaned.slice(3);
   if (cleaned.startsWith('91') && cleaned.length === 12) return cleaned.slice(2);
   return cleaned;

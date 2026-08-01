@@ -21,6 +21,7 @@ export interface BookingEntryPatch {
   currentStep?: BookingStep;
   bookingType?: BookingType;
   packageId?: string;
+  routeId?: string;
   packageTitle?: string;
   packageSlug?: string;
   vehicleType?: VehicleType;
@@ -38,6 +39,9 @@ export interface BookingState {
   // Step 1: Package & Vehicle Selection
   bookingType: BookingType | null;
   packageId: string | null;
+  // Set for route-based transfers instead of packageId — mutually exclusive
+  // with it, never both set (see BookingEntryPatch / applyEntry).
+  routeId: string | null;
   packageTitle: string | null;
   packageSlug: string | null;
   vehicleType: VehicleType | null;
@@ -53,6 +57,9 @@ export interface BookingState {
   // Step 3: Contact Information
   customerName: string;
   customerPhone: string;
+  // '91' (default, India) or the 'INTL' sentinel for the free-form
+  // international-number fallback (see Step3ContactInfo).
+  customerCountryCode: string;
   customerEmail: string;
   customerWhatsapp: string;
   requiresChildSeat: boolean;
@@ -91,6 +98,7 @@ export interface BookingState {
   // Step 1 actions
   setBookingType: (type: BookingType) => void;
   setPackage: (id: string, title: string, slug?: string) => void;
+  setRoute: (id: string, title: string) => void;
   setVehicleType: (type: VehicleType) => void;
 
   // Step 2 actions
@@ -104,6 +112,7 @@ export interface BookingState {
   // Step 3 actions
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
+  setCustomerCountryCode: (countryCode: string) => void;
   setCustomerEmail: (email: string) => void;
   setCustomerWhatsapp: (whatsapp: string) => void;
   setRequiresChildSeat: (requiresChildSeat: boolean) => void;
@@ -142,6 +151,7 @@ const initialState = {
   currentStep: 1 as BookingStep,
   bookingType: null,
   packageId: null,
+  routeId: null,
   packageTitle: null,
   packageSlug: null,
   vehicleType: null,
@@ -153,6 +163,7 @@ const initialState = {
   specialRequests: '',
   customerName: '',
   customerPhone: '',
+  customerCountryCode: '91',
   customerEmail: '',
   customerWhatsapp: '',
   requiresChildSeat: false,
@@ -188,7 +199,8 @@ export const useBookingStore = create<BookingState>()(
 
       // Step 1 actions
       setBookingType: (type) => set({ bookingType: type }),
-      setPackage: (id, title, slug) => set({ packageId: id, packageTitle: title, packageSlug: slug ?? null }),
+      setPackage: (id, title, slug) => set({ packageId: id, routeId: null, packageTitle: title, packageSlug: slug ?? null }),
+      setRoute: (id, title) => set({ routeId: id, packageId: null, packageTitle: title, packageSlug: null }),
       setVehicleType: (type) => set({ vehicleType: type }),
 
       // Step 2 actions
@@ -202,6 +214,7 @@ export const useBookingStore = create<BookingState>()(
       // Step 3 actions
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
+      setCustomerCountryCode: (countryCode) => set({ customerCountryCode: countryCode }),
       setCustomerEmail: (email) => set({ customerEmail: email }),
       setCustomerWhatsapp: (whatsapp) => set({ customerWhatsapp: whatsapp }),
       setRequiresChildSeat: (requiresChildSeat) => set({ requiresChildSeat }),
@@ -287,8 +300,8 @@ export const useBookingStore = create<BookingState>()(
     {
       name: 'nainital-taxi-booking', // localStorage key
       partialize: (state) => ({
-        // currentStep, bookingType, packageId, packageTitle, packageSlug and
-        // vehicleType are deliberately NOT persisted — the URL is the sole
+        // currentStep, bookingType, packageId, routeId, packageTitle,
+        // packageSlug and vehicleType are deliberately NOT persisted — the URL is the sole
         // entry contract for these, and persisting them would let a stale
         // localStorage value override the package/vehicle the user just
         // picked (see applyEntry). packageSlug in particular is treated as
@@ -302,6 +315,7 @@ export const useBookingStore = create<BookingState>()(
         specialRequests: state.specialRequests,
         customerName: state.customerName,
         customerPhone: state.customerPhone,
+        customerCountryCode: state.customerCountryCode,
         customerEmail: state.customerEmail,
         customerWhatsapp: state.customerWhatsapp,
         requiresChildSeat: state.requiresChildSeat,

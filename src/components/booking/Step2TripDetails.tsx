@@ -4,19 +4,21 @@ import { useState, useEffect } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input } from '@/components/ui';
 import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
-import { getPackagePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
+import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
 import { getPackageById } from '@/lib/supabase';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import AddonSelector from './AddonSelector';
 
-const timeSlots = [
+const allTimeSlots = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00'
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00'
 ];
 
 export default function Step2TripDetails() {
   const {
     packageId,
+    routeId,
     packageTitle,
     packageSlug,
     bookingType,
@@ -48,6 +50,40 @@ export default function Step2TripDetails() {
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState(false);
   const [selectedDate, setSelectedDate] = useState(tripDate || '');
+  const [hasAddons, setHasAddons] = useState(false);
+
+  // Tours don't start until the park/gate opens; transfers can be picked up
+  // earlier for airport/rail connections.
+  const earliestSlot = bookingType === 'tour' ? '09:00' : '07:00';
+  const timeSlots = allTimeSlots.filter((time) => time >= earliestSlot);
+
+  // Passenger count needs to allow a temporarily-empty field while the user
+  // is backspacing to retype a value — clamping to 1 on every keystroke traps
+  // them mid-edit. The minimum is only enforced on blur/submit.
+  const [passengerInput, setPassengerInput] = useState(String(passengerCount));
+  useEffect(() => {
+    setPassengerInput(String(passengerCount));
+  }, [passengerCount]);
+
+  const handlePassengerChange = (value: string) => {
+    if (value === '') {
+      setPassengerInput('');
+      return;
+    }
+    const num = parseInt(value, 10);
+    if (!isNaN(num)) {
+      setPassengerInput(value);
+      setPassengerCount(num);
+    }
+  };
+
+  const handlePassengerBlur = () => {
+    const num = parseInt(passengerInput, 10);
+    if (passengerInput === '' || isNaN(num) || num < 1) {
+      setPassengerInput('1');
+      setPassengerCount(1);
+    }
+  };
 
   // packageSlug is a URL-only field (never persisted). If it's missing on
   // arrival — e.g. a hand-built /booking URL, or a non-tour entry path —
@@ -82,13 +118,13 @@ export default function Step2TripDetails() {
   }, [tripDate]);
 
   useEffect(() => {
-    if (selectedDate && packageId && vehicleType) {
+    if (selectedDate && (packageId || routeId) && vehicleType) {
       checkAvailabilityAndPrice(selectedDate);
     }
-  }, [selectedDate, packageId, vehicleType]);
+  }, [selectedDate, packageId, routeId, vehicleType]);
 
   async function checkAvailabilityAndPrice(date: string) {
-    if (!packageId || !vehicleType) return;
+    if ((!packageId && !routeId) || !vehicleType) return;
 
     setCheckingAvailability(true);
     setFetchingPrice(true);
@@ -101,8 +137,10 @@ export default function Step2TripDetails() {
         setAvailability(availabilityData.status, availabilityData.carsAvailable);
       }
 
-      // Get price
-      const priceData = await getPackagePrice(packageId, vehicleType, date);
+      // Get price — routeId and packageId are mutually exclusive
+      const priceData = routeId
+        ? await getRoutePrice(routeId, vehicleType, date)
+        : await getPackagePrice(packageId!, vehicleType, date);
       if (priceData) {
         setCalculatedPrice(priceData.price, priceData.seasonId, priceData.seasonName);
       } else {
@@ -129,6 +167,13 @@ export default function Step2TripDetails() {
   const handleNext = () => {
     if (!tripDate || !tripTime || !pickupLocation) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    const parsedPassengerCount = parseInt(passengerInput, 10);
+    if (passengerInput === '' || isNaN(parsedPassengerCount) || parsedPassengerCount < 1) {
+      setPassengerInput('1');
+      setPassengerCount(1);
       return;
     }
 
@@ -187,7 +232,7 @@ export default function Step2TripDetails() {
       </div>
 
       {/* Booking Summary */}
-      {packageId && vehicleType && (
+      {(packageId || routeId) && vehicleType && (
         <div className="p-6 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
@@ -350,6 +395,9 @@ export default function Step2TripDetails() {
             </button>
           ))}
         </div>
+        <p className="text-sm text-gray-500 mt-2">
+          Time slot not listed? Please contact us and we will arrange it for you.
+        </p>
       </div>
 
       {/* Passenger Count */}
@@ -361,8 +409,9 @@ export default function Step2TripDetails() {
           <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <Input
             type="number"
-            value={passengerCount}
-            onChange={(e) => setPassengerCount(parseInt(e.target.value) || 1)}
+            value={passengerInput}
+            onChange={(e) => handlePassengerChange(e.target.value)}
+            onBlur={handlePassengerBlur}
             min={1}
             max={10}
             className="pl-12"
@@ -408,6 +457,10 @@ export default function Step2TripDetails() {
             required
           />
         </div>
+        <p className="text-sm text-gray-500 mt-2">
+          Note: Pickups from Zoo Road, Birla Road, or Snow View Point are not possible.
+          We can easily pick you up from Mall Road, High Court, Ayarpatta, or your specific hotel.
+        </p>
       </div>
 
       {/* Drop-off Location (Optional) */}
@@ -427,14 +480,18 @@ export default function Step2TripDetails() {
         </div>
       </div>
 
-      {/* Addons Section */}
+      {/* Addons Section — the wrapper box only renders once the fetch inside
+          AddonSelector confirms there's something to show, so an empty box
+          never flashes when a package has zero addons. */}
       {tripDate && calculatedPrice !== null && seasonName && (
-        <div className="p-6 rounded-2xl border-4 border-[#4D96FF] bg-[#E8F4F8]">
+        <div className={hasAddons ? 'p-6 rounded-2xl border-4 border-[#4D96FF] bg-[#E8F4F8]' : undefined}>
           <AddonSelector
             packageId={packageId || undefined}
+            routeId={routeId || undefined}
             destinationId={routeContext?.destinationSlug || undefined}
             seasonName={seasonName as 'Off-Season' | 'Season'}
             stage="before_booking"
+            onAvailabilityChange={setHasAddons}
           />
         </div>
       )}

@@ -7,13 +7,14 @@ import {
   Image as ImageIcon,
   Package,
   MapPin,
+  Car,
   Sparkles,
 } from "lucide-react";
 import ImageUploader from "@/components/admin/ImageUploader";
 import { Addon } from "@/lib/supabase/types";
 
 interface AddonFormProps {
-  initialData?: (Addon & { package_ids?: string[]; destination_ids?: string[] }) | null;
+  initialData?: (Addon & { package_ids?: string[]; route_ids?: string[]; destination_ids?: string[] }) | null;
   onSubmit: (data: any) => Promise<void>;
   isSubmitting: boolean;
   onCancel: () => void;
@@ -22,6 +23,12 @@ interface AddonFormProps {
 interface PackageOption {
   id: string;
   title: string;
+}
+
+interface RouteOption {
+  id: string;
+  pickup_location: string;
+  drop_location: string;
 }
 
 interface DestinationOption {
@@ -62,12 +69,14 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
   const [isFeatured, setIsFeatured] = useState(initialData?.is_featured ?? false);
   const [isActive, setIsActive] = useState(initialData?.is_active ?? true);
 
-  // Scope - Packages and Destinations
+  // Scope - Packages, Routes, and Destinations
   const [selectedPackages, setSelectedPackages] = useState<string[]>(initialData?.package_ids || []);
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>(initialData?.route_ids || []);
   const [selectedDestinations, setSelectedDestinations] = useState<string[]>(initialData?.destination_ids || []);
 
   // Options for multi-select
   const [packages, setPackages] = useState<PackageOption[]>([]);
+  const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [destinations, setDestinations] = useState<DestinationOption[]>([]);
 
   // Auto-generate slug when name changes
@@ -77,9 +86,10 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
     }
   }, [name, initialData]);
 
-  // Fetch packages and destinations for assignment
+  // Fetch packages, routes, and destinations for assignment
   useEffect(() => {
     fetchPackages();
+    fetchRoutes();
     fetchDestinations();
   }, []);
 
@@ -92,6 +102,22 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
       }
     } catch (error) {
       console.error('Error fetching packages:', error);
+    }
+  };
+
+  const fetchRoutes = async () => {
+    try {
+      const response = await fetch('/api/admin/routes');
+      const result = await response.json();
+      if (result.data) {
+        setRoutes(result.data.map((r: any) => ({
+          id: r.id,
+          pickup_location: r.pickup_location,
+          drop_location: r.drop_location,
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching routes:', error);
     }
   };
 
@@ -125,6 +151,7 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
       is_featured: isFeatured,
       is_active: isActive,
       package_ids: selectedPackages,
+      route_ids: selectedRoutes,
       destination_ids: selectedDestinations,
     };
 
@@ -136,6 +163,14 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
       prev.includes(packageId)
         ? prev.filter(id => id !== packageId)
         : [...prev, packageId]
+    );
+  };
+
+  const toggleRoute = (routeId: string) => {
+    setSelectedRoutes(prev =>
+      prev.includes(routeId)
+        ? prev.filter(id => id !== routeId)
+        : [...prev, routeId]
     );
   };
 
@@ -330,7 +365,7 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
       <div className="bg-white rounded-xl border-3 border-ink p-6 shadow-retro">
         <h3 className="text-lg font-display text-ink mb-4">Scope Assignment</h3>
         <p className="text-sm text-ink/60 mb-4">
-          Select which packages and destinations this addon should be available for. Leave empty to show for all.
+          Select which packages, transfer routes, and destinations this addon should be available for. Leave empty to show for all.
         </p>
 
         <div className="space-y-4">
@@ -358,6 +393,34 @@ export default function AddonForm({ initialData, onSubmit, isSubmitting, onCance
               )}
             </div>
             <p className="text-xs text-ink/60 mt-1">{selectedPackages.length} packages selected</p>
+          </div>
+
+          {/* Routes */}
+          <div>
+            <label className="block text-sm font-body text-ink mb-2 flex items-center gap-2">
+              <Car className="w-4 h-4" />
+              Transfer Routes
+            </label>
+            <div className="max-h-48 overflow-y-auto border-3 border-ink rounded-xl p-3 space-y-2">
+              {routes.length === 0 ? (
+                <p className="text-sm text-ink/60">Loading routes...</p>
+              ) : (
+                routes.map(route => (
+                  <label key={route.id} className="flex items-center gap-2 cursor-pointer hover:bg-sunrise/20 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedRoutes.includes(route.id)}
+                      onChange={() => toggleRoute(route.id)}
+                      className="w-4 h-4 border-2 border-ink rounded accent-teal"
+                    />
+                    <span className="text-sm font-body text-ink">
+                      {route.pickup_location} → {route.drop_location}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            <p className="text-xs text-ink/60 mt-1">{selectedRoutes.length} routes selected</p>
           </div>
 
           {/* Destinations */}

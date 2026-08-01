@@ -8,7 +8,6 @@ import { getPackages, getPrice } from "@/lib/supabase";
 import { getVehicleCapacity } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing } from "@/lib/supabase/types";
-import { useBookingStore } from "@/store/bookingStore";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useVehicleLabels } from "@/hooks/useVehicleLabels";
@@ -25,7 +24,6 @@ const VEHICLE_OPTIONS: { value: VehicleType; label: string; capacity: string }[]
 
 export default function BookingWidget() {
   const router = useRouter();
-  const bookingStore = useBookingStore();
   const { config: siteConfig } = useSiteConfig();
   const { labels: vehicleLabels } = useVehicleLabels();
   const phoneNumber =
@@ -292,16 +290,12 @@ export default function BookingWidget() {
     );
   };
 
-  // Handle transfer booking — unlike tours, this keeps writing straight to
-  // the store rather than pushing a URL. selectedRoute.id is a `routes` row,
-  // not a `packages` row, so it can't be priced through the same
-  // packageId-based entry contract the tour path uses; /booking's pricing
-  // lookup (and the create API's) only knows how to resolve packages.
-  // Making this a pure URL push would land on Step 2 with no fare and a
-  // permanently disabled Submit. Fixing that needs a distinct routeId
-  // concept end-to-end (Phase 3 follow-up) — until then this handler stays
-  // as the one place that pre-seeds calculatedPrice into the store.
-  const handleTransferBooking = async () => {
+  // Handle transfer booking — a pure navigation, mirroring handleTourBooking.
+  // selectedRoute.id travels as routeId (distinct from packageId — see
+  // bookingLink.ts), so /booking and the create API resolve it against
+  // route_pricing/routes rather than pricing/packages. The store is never
+  // pre-seeded here; /booking always recomputes price itself.
+  const handleTransferBooking = () => {
     if (!transferFrom || !transferTo || !transferDate) {
       alert("Please select pickup location, drop location, and date");
       return;
@@ -322,31 +316,18 @@ export default function BookingWidget() {
       return;
     }
 
-    setLoading(true);
-    try {
-      bookingStore.resetBooking();
-      bookingStore.setBookingType("transfer");
-      bookingStore.setPackage(
-        selectedRoute.id,
-        `Transfer: ${transferFrom} to ${transferTo}`
-      );
-      bookingStore.setVehicleType(transferVehicle);
-      bookingStore.setTripDate(transferDate);
-      bookingStore.setPickupLocation(transferFrom);
-      bookingStore.setDropoffLocation(transferTo);
-      bookingStore.setPassengerCount(parseInt(transferPassengers, 10) || 1);
-
-      if (priceInfo) {
-        bookingStore.setCalculatedPrice(priceInfo.price, "", priceInfo.season);
-      }
-
-      router.push("/booking");
-    } catch (error) {
-      console.error("Transfer booking error:", error);
-      alert("Something went wrong. Please try again or contact us directly.");
-    } finally {
-      setLoading(false);
-    }
+    router.push(
+      buildBookingUrl({
+        routeId: selectedRoute.id,
+        packageTitle: `Transfer: ${transferFrom} to ${transferTo}`,
+        packageType: "transfer",
+        vehicle: transferVehicle,
+        date: transferDate,
+        pickup: transferFrom,
+        dropoff: transferTo,
+        passengers: parseInt(transferPassengers, 10),
+      })
+    );
   };
 
   // Tour/transfer bookings require at least a day's notice — this mirrors

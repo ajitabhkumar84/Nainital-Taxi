@@ -102,6 +102,93 @@ export async function getPackagePrice(
   }
 }
 
+interface RoutePricingRow {
+  price: number;
+}
+
+/**
+ * Get the price for a specific transfer route, vehicle type, and date.
+ * Mirrors getPackagePrice() but resolves against route_pricing/routes
+ * instead of pricing/packages — routes are a separate concept from
+ * packages (see BookingWidget's pickup/drop picker), priced independently.
+ */
+export async function getRoutePrice(
+  routeId: string,
+  vehicleType: VehicleType,
+  date: string // ISO date string
+): Promise<PriceResult | null> {
+  try {
+    const { data: seasonData, error: seasonError } = await supabase
+      .from('seasons')
+      .select('id, name')
+      .eq('is_active', true)
+      .lte('start_date', date)
+      .gte('end_date', date)
+      .order('name', { ascending: false })
+      .limit(1)
+      .single();
+
+    let season: SeasonResult;
+
+    if (seasonError || !seasonData) {
+      const { data: offSeasonData } = await supabase
+        .from('seasons')
+        .select('id, name')
+        .eq('is_active', true)
+        .eq('name', 'Off-Season')
+        .limit(1)
+        .single();
+
+      if (offSeasonData) {
+        season = offSeasonData as SeasonResult;
+      } else {
+        season = { id: '', name: 'Off-Season' };
+      }
+    } else {
+      season = seasonData as SeasonResult;
+    }
+
+    const { data, error: pricingError } = await supabase
+      .from('route_pricing')
+      .select('price')
+      .eq('route_id', routeId)
+      .eq('vehicle_type', vehicleType)
+      .eq('season_name', season.name)
+      .eq('is_active', true)
+      .single();
+
+    if (pricingError || !data) {
+      console.error('Error fetching route pricing:', pricingError);
+      return null;
+    }
+
+    // `routes` isn't part of the generated Database type (see supabase/types.ts),
+    // so the typed client infers `never` for this row — cast like the
+    // `packages` join above.
+    const { data: route } = await supabase
+      .from('routes')
+      .select('pickup_location, drop_location')
+      .eq('id', routeId)
+      .single();
+    const routeRow = route as unknown as { pickup_location: string; drop_location: string } | null;
+
+    const packageTitle = routeRow
+      ? `Transfer: ${routeRow.pickup_location} to ${routeRow.drop_location}`
+      : 'Transfer';
+
+    return {
+      price: (data as RoutePricingRow).price,
+      seasonId: season.id,
+      seasonName: season.name,
+      vehicleType,
+      packageTitle,
+    };
+  } catch (error) {
+    console.error('Error in getRoutePrice:', error);
+    return null;
+  }
+}
+
 interface AvailabilityRow {
   total_fleet_size: number;
   cars_booked: number;

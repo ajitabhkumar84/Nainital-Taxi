@@ -72,7 +72,7 @@ export default function AddonsPage() {
       const url = "/api/admin/addons";
       const method = editingAddon ? "PATCH" : "POST";
       const body = editingAddon
-        ? { id: editingAddon.id, updates: data, package_ids: data.package_ids, destination_ids: data.destination_ids }
+        ? { id: editingAddon.id, updates: data, package_ids: data.package_ids, route_ids: data.route_ids, destination_ids: data.destination_ids }
         : data;
 
       const response = await fetch(url, {

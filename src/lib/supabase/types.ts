@@ -463,11 +463,17 @@ export interface Booking {
   user_id?: string | null;
   customer_name: string;
   customer_phone: string;
+  // Dial code without '+' (e.g. '91'). Defaults to '91' for older rows/callers
+  // that predate this column.
+  customer_country_code?: string | null;
   customer_email?: string | null;
   customer_whatsapp?: string | null;
 
   // Package & Vehicle
   package_id?: string | null;
+  // Set for route-based transfer bookings instead of package_id — mutually
+  // exclusive with it (see bookingLink.ts).
+  route_id?: string | null;
   package_name: string;
   vehicle_type: VehicleType;
   vehicle_id?: string | null;

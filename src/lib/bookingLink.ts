@@ -7,6 +7,10 @@ import type { BookingType, VehicleType } from '@/store/bookingStore';
  */
 export interface BookingEntry {
   packageId?: string;
+  // Set for route-based transfers (routes/route_pricing tables, see
+  // BookingWidget's pickup/drop picker) instead of packageId — the two are
+  // mutually exclusive, never both set (see parseBookingEntry).
+  routeId?: string;
   packageTitle?: string;
   packageSlug?: string;
   packageType?: BookingType;
@@ -37,6 +41,7 @@ export function buildBookingUrl(entry: BookingEntry): string {
   const params = new URLSearchParams();
 
   if (entry.packageId) params.set('packageId', entry.packageId);
+  if (entry.routeId) params.set('routeId', entry.routeId);
   if (entry.packageTitle) params.set('packageTitle', entry.packageTitle);
   if (entry.packageSlug) params.set('packageSlug', entry.packageSlug);
   if (entry.packageType) params.set('packageType', entry.packageType);
@@ -57,8 +62,18 @@ export function buildBookingUrl(entry: BookingEntry): string {
 export function parseBookingEntry(sp: URLSearchParams): BookingEntry {
   const entry: BookingEntry = {};
 
-  const packageId = sp.get('packageId');
-  if (packageId) entry.packageId = packageId;
+  // packageId and routeId are mutually exclusive — a URL carrying both
+  // (hand-built, scraped, stale bookmark) would otherwise let both a package
+  // and a route reach the pricing dispatch downstream, which decides by
+  // presence-check (routeId first) and would silently mask the conflict
+  // rather than surface it. routeId wins; packageId is dropped entirely.
+  const routeId = sp.get('routeId');
+  if (routeId) {
+    entry.routeId = routeId;
+  } else {
+    const packageId = sp.get('packageId');
+    if (packageId) entry.packageId = packageId;
+  }
 
   const packageTitle = sp.get('packageTitle');
   if (packageTitle) entry.packageTitle = packageTitle;

@@ -28,8 +28,13 @@ function getSupabaseClient() {
 interface CreateBookingRequest {
   customerName: string;
   customerPhone: string;
+  // Defaults to '91' (India) when omitted — see validatePhone/normalizePhone.
+  customerCountryCode?: string;
   customerEmail?: string;
   packageId?: string;
+  // Set for route-based transfers instead of packageId — mutually exclusive
+  // with it (see bookingLink.ts's parseBookingEntry).
+  routeId?: string;
   packageName: string;
   vehicleType: string;
   tripDate: string;
@@ -191,7 +196,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!body.packageId) {
+    if (!body.packageId && !body.routeId) {
       return NextResponse.json(
         { error: 'A package or vehicle selection is required' },
         { status: 400 }
@@ -199,9 +204,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate phone number
-    if (!validatePhone(body.customerPhone)) {
+    const customerCountryCode = body.customerCountryCode || '91';
+    if (!validatePhone(body.customerPhone, customerCountryCode)) {
       return NextResponse.json(
-        { error: 'Please enter a valid 10-digit phone number' },
+        { error: 'Please enter a valid phone number' },
         { status: 400 }
       );
     }
@@ -217,13 +223,14 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseClient();
 
     // Server-side price authority: body.totalAmount is never read from here on.
-    // We resolve the season, look up the real price (tour package, falling
-    // back to a transfer route), and re-price addons from their DB rows.
+    // We resolve the season, then look up the real price against whichever
+    // ID the client sent — routeId and packageId are mutually exclusive
+    // (see bookingLink.ts), so this is an explicit dispatch, not a guess.
     const seasonName = await resolveSeasonName(supabase, body.tripDate);
 
-    const pricing =
-      (await resolvePackagePrice(supabase, body.packageId, body.vehicleType, seasonName)) ||
-      (await resolveRoutePrice(supabase, body.packageId, body.vehicleType, seasonName));
+    const pricing = body.routeId
+      ? await resolveRoutePrice(supabase, body.routeId, body.vehicleType, seasonName)
+      : await resolvePackagePrice(supabase, body.packageId!, body.vehicleType, seasonName);
 
     if (!pricing) {
       return NextResponse.json(
@@ -241,14 +248,18 @@ export async function POST(request: NextRequest) {
     const totalAmount = pricing.price + addonsTotal;
     const advanceAmount = calculateAdvanceAmount(totalAmount);
 
-    const normalizedPhone = normalizePhone(body.customerPhone);
+    const normalizedPhone = normalizePhone(body.customerPhone, customerCountryCode);
 
     const bookingData = {
       customer_name: body.customerName.trim(),
       customer_phone: normalizedPhone,
+      customer_country_code: customerCountryCode,
       customer_email: body.customerEmail?.trim() || null,
       customer_whatsapp: normalizedPhone,
-      package_id: body.packageId || null,
+      // route_id-based bookings must never also carry a packageId — package_id
+      // has a real FK to packages(id), and a routes.id would violate it.
+      package_id: body.routeId ? null : body.packageId || null,
+      route_id: body.routeId || null,
       package_name: pricing.packageName,
       vehicle_type: body.vehicleType,
       booking_date: body.tripDate,

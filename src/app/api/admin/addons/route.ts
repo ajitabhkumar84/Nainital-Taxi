@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
         .select('package_id')
         .eq('addon_id', id);
 
+      // Fetch route relationships
+      const { data: routeRelations } = await supabase
+        .from('addon_routes')
+        .select('route_id')
+        .eq('addon_id', id);
+
       // Fetch destination relationships
       const { data: destinationRelations } = await supabase
         .from('addon_destinations')
@@ -46,6 +52,7 @@ export async function GET(request: NextRequest) {
       const result = {
         ...addon,
         package_ids: packageRelations?.map(r => r.package_id) || [],
+        route_ids: routeRelations?.map(r => r.route_id) || [],
         destination_ids: destinationRelations?.map(r => r.destination_id) || []
       };
 
@@ -89,6 +96,7 @@ export async function POST(request: NextRequest) {
       is_featured,
       is_active,
       package_ids,
+      route_ids,
       destination_ids,
     } = body;
 
@@ -160,6 +168,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Create route relationships
+    if (route_ids && route_ids.length > 0) {
+      const routeRecords = route_ids.map((route_id: string) => ({
+        addon_id: addon.id,
+        route_id
+      }));
+
+      const { error: routeError } = await supabase
+        .from('addon_routes')
+        .insert(routeRecords);
+
+      if (routeError) {
+        console.error('Error creating route relationships:', routeError);
+        // Continue even if relationships fail
+      }
+    }
+
     // Create destination relationships
     if (destination_ids && destination_ids.length > 0) {
       const destinationRecords = destination_ids.map((dest_id: string) => ({
@@ -188,7 +213,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, updates, package_ids, destination_ids } = body;
+    const { id, updates, package_ids, route_ids, destination_ids } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -238,6 +263,27 @@ export async function PATCH(request: NextRequest) {
         await supabase
           .from('addon_packages')
           .insert(packageRecords);
+      }
+    }
+
+    // Update route relationships if provided
+    if (route_ids !== undefined) {
+      // Delete existing relationships
+      await supabase
+        .from('addon_routes')
+        .delete()
+        .eq('addon_id', id);
+
+      // Create new relationships
+      if (route_ids.length > 0) {
+        const routeRecords = route_ids.map((route_id: string) => ({
+          addon_id: id,
+          route_id
+        }));
+
+        await supabase
+          .from('addon_routes')
+          .insert(routeRecords);
       }
     }
 

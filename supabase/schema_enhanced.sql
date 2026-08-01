@@ -260,6 +260,7 @@ CREATE TABLE bookings (
   user_id UUID REFERENCES profiles(id),
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
+  customer_country_code TEXT NOT NULL DEFAULT '91',
   customer_email TEXT,
   customer_whatsapp TEXT,
 

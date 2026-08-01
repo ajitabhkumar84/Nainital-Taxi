@@ -26,6 +26,11 @@ const WHATSAPP_NUMBER = '8445206116';
 
 export default function Step4Payment() {
   const booking = useBookingStore();
+  // The India path stores a bare 10-digit number ("+91" is implied); the
+  // international fallback stores whatever full number the customer typed,
+  // so it's already display-ready as-is.
+  const displayPhone =
+    booking.customerCountryCode === '91' ? `+91 ${booking.customerPhone}` : booking.customerPhone;
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -33,6 +38,7 @@ export default function Step4Payment() {
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdAdvanceAmount, setCreatedAdvanceAmount] = useState<number | null>(null);
   const [createdTotalAmount, setCreatedTotalAmount] = useState<number | null>(null);
+  const [hasAddons, setHasAddons] = useState(false);
 
   // Pre-submit estimate only — for the success screen, the authoritative
   // total/advance/remaining come from the create API response (see below).
@@ -81,8 +87,10 @@ export default function Step4Payment() {
         body: JSON.stringify({
           customerName: booking.customerName,
           customerPhone: booking.customerPhone,
+          customerCountryCode: booking.customerCountryCode,
           customerEmail: booking.customerEmail || undefined,
           packageId: booking.packageId || undefined,
+          routeId: booking.routeId || undefined,
           packageName: booking.packageTitle || 'Custom Booking',
           vehicleType: booking.vehicleType,
           tripDate: booking.tripDate,
@@ -145,7 +153,7 @@ export default function Step4Payment() {
 
 *Customer:*
 - Name: ${booking.customerName}
-- Phone: ${booking.customerPhone}
+- Phone: ${displayPhone}
 ${booking.customerEmail ? `- Email: ${booking.customerEmail}` : ''}
 
 Please confirm my booking. I will share the payment screenshot shortly.`;
@@ -270,22 +278,28 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
           </div>
         </div>
 
-        {/* After-Booking Upsell */}
+        {/* After-Booking Upsell — the box/header only render once the fetch
+            inside AddonSelector confirms there's something to show, so an
+            empty box never flashes when there are no addons available. */}
         {createdBookingId && booking.seasonName && (
-          <div className="p-6 rounded-2xl border-4 border-purple-500 bg-purple-50">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl">✨</span>
-              <div>
-                <h3 className="font-bold text-lg">Upgrade Your Experience</h3>
-                <p className="text-sm text-gray-600">Add these extras to your booking</p>
+          <div className={hasAddons ? 'p-6 rounded-2xl border-4 border-purple-500 bg-purple-50' : undefined}>
+            {hasAddons && (
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">✨</span>
+                <div>
+                  <h3 className="font-bold text-lg">Upgrade Your Experience</h3>
+                  <p className="text-sm text-gray-600">Add these extras to your booking</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <AddonSelector
               packageId={booking.packageId || undefined}
+              routeId={booking.routeId || undefined}
               destinationId={booking.routeContext?.destinationSlug || undefined}
               seasonName={booking.seasonName as 'Off-Season' | 'Season'}
               stage="after_booking"
+              onAvailabilityChange={setHasAddons}
             />
 
             {booking.selectedAddons.length > 0 && (
@@ -526,7 +540,7 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Phone:</span>
-            <span className="font-bold text-[#2D3436]">{booking.customerPhone}</span>
+            <span className="font-bold text-[#2D3436]">{displayPhone}</span>
           </div>
           {booking.customerEmail && (
             <div className="flex justify-between">

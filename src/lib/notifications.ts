@@ -42,6 +42,7 @@ interface BookingData {
   booking_id: string;
   customer_name: string;
   customer_phone: string;
+  customer_country_code?: string | null;
   customer_email?: string | null;
   package_name: string;
   vehicle_type: string;
@@ -336,6 +337,13 @@ function generatePaymentVerifiedEmail(booking: BookingData): string {
  */
 function generateAdminNewBookingEmail(booking: BookingData): string {
   const advanceAmount = booking.advance_amount || Math.max(Math.round(booking.final_price * 0.25), 500);
+  // India ('91', the default) stores a bare 10-digit number, so the dial
+  // code has to be prepended for a working wa.me/tel link. The international
+  // fallback stores the customer's full self-typed number, already complete.
+  const fullCustomerPhone =
+    !booking.customer_country_code || booking.customer_country_code === '91'
+      ? `91${booking.customer_phone}`
+      : booking.customer_phone;
 
   return `
 <!DOCTYPE html>
@@ -357,10 +365,10 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
 
     <!-- Quick Actions -->
     <div style="padding: 16px; background-color: #f8f9fa; text-align: center;">
-      <a href="https://wa.me/91${escapeHtml(booking.customer_phone)}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
+      <a href="https://wa.me/${escapeHtml(fullCustomerPhone)}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
         WhatsApp
       </a>
-      <a href="tel:+91${escapeHtml(booking.customer_phone)}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+      <a href="tel:+${escapeHtml(fullCustomerPhone)}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
         Call
       </a>
     </div>

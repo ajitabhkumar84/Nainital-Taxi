@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { useBookingEntry } from '@/hooks/useBookingEntry';
-import { CheckCircle2, Shield, Star, Users, Award } from 'lucide-react';
+import { CheckCircle2, Shield, Star, Users, Award, Lock } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
 import Step3ContactInfo from '@/components/booking/Step3ContactInfo';
@@ -14,6 +14,19 @@ function BookingPageContent() {
   const { ready } = useBookingEntry();
   const currentStep = useBookingStore((state) => state.currentStep);
   const packageId = useBookingStore((state) => state.packageId);
+  const stepContentRef = useRef<HTMLDivElement>(null);
+
+  // Each step transition leaves the scroll position wherever the previous
+  // step's "Continue" button was, which can be mid- or end-of-page for the
+  // newly rendered step. Jump instantly (no smooth-scroll lag on mobile),
+  // then focus the new step's first field so the user can start typing
+  // right away; preventScroll avoids the browser re-scrolling to it and
+  // undoing the jump to the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const firstField = stepContentRef.current?.querySelector<HTMLElement>('input, select, textarea');
+    firstField?.focus({ preventScroll: true });
+  }, [currentStep]);
 
   // Until the entry contract has been applied, currentStep is still the
   // Zustand default of 1 — rendering before `ready` would flash the full
@@ -36,55 +49,72 @@ function BookingPageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">
       <div className="max-w-6xl mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
-            Book Your Ride
-          </h1>
-          <p className="text-lg text-[#636E72] mb-6">
-            Complete your booking in 4 easy steps
-          </p>
+        {/* Header — full promotional banner only on step 1; steps 2-4 get a
+            compact title + a single trust cue so the flow doesn't repeat a
+            full hero section on every step. */}
+        {currentStep === 1 ? (
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
+              Book Your Ride
+            </h1>
+            <p className="text-lg text-[#636E72] mb-6">
+              Complete your booking in 4 easy steps
+            </p>
 
-          {/* Trust Signals */}
-          <div className="flex flex-wrap justify-center gap-6 mt-8">
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-              <div className="w-10 h-10 bg-teal/20 rounded-full flex items-center justify-center">
-                <Star className="w-5 h-5 text-teal fill-teal" />
+            {/* Trust Signals */}
+            <div className="flex flex-wrap justify-center gap-6 mt-8">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+                <div className="w-10 h-10 bg-teal/20 rounded-full flex items-center justify-center">
+                  <Star className="w-5 h-5 text-teal fill-teal" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">4.8/5 Rating</div>
+                  <div className="text-xs text-gray-500">Google Reviews</div>
+                </div>
               </div>
-              <div className="text-left">
-                <div className="font-bold">4.8/5 Rating</div>
-                <div className="text-xs text-gray-500">Google Reviews</div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+                <div className="w-10 h-10 bg-whatsapp/20 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-whatsapp" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">500+ Happy</div>
+                  <div className="text-xs text-gray-500">Customers</div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-              <div className="w-10 h-10 bg-whatsapp/20 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-whatsapp" />
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+                <div className="w-10 h-10 bg-coral/20 rounded-full flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-coral" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">100% Safe</div>
+                  <div className="text-xs text-gray-500">Verified Drivers</div>
+                </div>
               </div>
-              <div className="text-left">
-                <div className="font-bold">500+ Happy</div>
-                <div className="text-xs text-gray-500">Customers</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-              <div className="w-10 h-10 bg-coral/20 rounded-full flex items-center justify-center">
-                <Shield className="w-5 h-5 text-coral" />
-              </div>
-              <div className="text-left">
-                <div className="font-bold">100% Safe</div>
-                <div className="text-xs text-gray-500">Verified Drivers</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-              <div className="w-10 h-10 bg-sunshine/30 rounded-full flex items-center justify-center">
-                <Award className="w-5 h-5 text-ink" />
-              </div>
-              <div className="text-left">
-                <div className="font-bold">15+ Years</div>
-                <div className="text-xs text-gray-500">Experience</div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
+                <div className="w-10 h-10 bg-sunshine/30 rounded-full flex items-center justify-center">
+                  <Award className="w-5 h-5 text-ink" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">15+ Years</div>
+                  <div className="text-xs text-gray-500">Experience</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-[#2D3436]">
+              {steps[currentStep - 1].title}
+            </h2>
+            <p className="text-sm text-[#636E72] mb-2">
+              {steps[currentStep - 1].description}
+            </p>
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+              <Lock className="w-3.5 h-3.5" />
+              Secure Checkout
+            </div>
+          </div>
+        )}
 
         {/* Step Indicator */}
         <div className="mb-12">
@@ -172,7 +202,7 @@ function BookingPageContent() {
 
         {/* Step Content */}
         <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl border-4 border-[#2D3436] p-8 md:p-12">
+          <div ref={stepContentRef} className="bg-white rounded-3xl shadow-2xl border-4 border-[#2D3436] p-8 md:p-12">
             {currentStep === 1 && <Step1PackageSelection />}
             {currentStep === 2 && <Step2TripDetails />}
             {currentStep === 3 && <Step3ContactInfo />}

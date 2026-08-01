@@ -195,11 +195,24 @@ export default function BookingsListClient({ initialBookings }: { initialBooking
     }).format(price);
   };
 
+  // India numbers are stored bare (no dial code); the international
+  // fallback stores the customer's full self-typed number already.
+  const getFullPhone = (booking: Booking) => {
+    const phone = (booking.customer_whatsapp || booking.customer_phone).replace(/\D/g, "");
+    const countryCode = booking.customer_country_code || "91";
+    if (countryCode !== "91") return phone;
+    return phone.startsWith("91") ? phone : `91${phone}`;
+  };
+
   const generateWhatsAppLink = (booking: Booking, message: string) => {
-    const phone = booking.customer_whatsapp || booking.customer_phone;
-    const cleanPhone = phone.replace(/\D/g, "");
-    const formattedPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
-    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/${getFullPhone(booking)}?text=${encodeURIComponent(message)}`;
+  };
+
+  const generateTelHref = (booking: Booking) => `tel:+${getFullPhone(booking)}`;
+
+  const displayPhone = (booking: Booking) => {
+    const countryCode = booking.customer_country_code || "91";
+    return countryCode === "91" ? `+91 ${booking.customer_phone}` : booking.customer_phone;
   };
 
   return (
@@ -338,10 +351,10 @@ export default function BookingsListClient({ initialBookings }: { initialBooking
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-ink/40" />
                           <a
-                            href={`tel:${booking.customer_phone}`}
+                            href={generateTelHref(booking)}
                             className="text-teal font-body hover:underline"
                           >
-                            {booking.customer_phone}
+                            {displayPhone(booking)}
                           </a>
                         </div>
                         {booking.customer_email && (
@@ -369,7 +382,7 @@ export default function BookingsListClient({ initialBookings }: { initialBooking
                           WhatsApp
                         </a>
                         <a
-                          href={`tel:${booking.customer_phone}`}
+                          href={generateTelHref(booking)}
                           className="flex items-center gap-2 px-4 py-2 bg-teal text-white rounded-xl font-body text-sm hover:opacity-90 transition-opacity"
                         >
                           <Phone className="w-4 h-4" />

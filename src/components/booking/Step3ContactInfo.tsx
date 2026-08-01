@@ -2,21 +2,26 @@
 
 import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input } from '@/components/ui';
-import { ArrowRight, ArrowLeft, User, Phone, Mail, MessageSquare } from 'lucide-react';
+import { validatePhone } from '@/lib/booking';
+import { ArrowRight, ArrowLeft, User, Mail, MessageSquare } from 'lucide-react';
 
 export default function Step3ContactInfo() {
   const {
     customerName,
     customerPhone,
+    customerCountryCode,
     customerEmail,
     specialRequests,
     setCustomerName,
     setCustomerPhone,
+    setCustomerCountryCode,
     setCustomerEmail,
     setSpecialRequests,
     nextStep,
     prevStep,
   } = useBookingStore();
+
+  const isInternational = customerCountryCode !== '91';
 
   const handleNext = () => {
     if (!customerName || !customerPhone) {
@@ -24,10 +29,12 @@ export default function Step3ContactInfo() {
       return;
     }
 
-    // Validate phone number (10 digits)
-    const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(customerPhone)) {
-      alert('Please enter a valid 10-digit phone number');
+    if (!validatePhone(customerPhone, customerCountryCode)) {
+      alert(
+        isInternational
+          ? 'Please enter a valid phone number, including your country code'
+          : 'Please enter a valid 10-digit phone number'
+      );
       return;
     }
 
@@ -80,10 +87,20 @@ export default function Step3ContactInfo() {
         <label className="block text-sm font-bold text-[#2D3436] mb-2">
           Phone Number <span className="text-red-500">*</span>
         </label>
-        <div className="relative">
-          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+        {isInternational ? (
+          <Input
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => {
+              const value = e.target.value.replace(/[^\d+\s-]/g, '');
+              setCustomerPhone(value);
+            }}
+            placeholder="+1 415 555 2671"
+            required
+          />
+        ) : (
           <div className="flex">
-            <div className="flex items-center px-4 py-3 bg-gray-100 border-4 border-r-0 border-[#2D3436] rounded-l-xl font-bold text-[#2D3436]">
+            <div className="flex items-center justify-center h-11 px-4 bg-slate-50 border border-r-0 border-slate-300 rounded-l-md font-bold text-[#2D3436]">
               +91
             </div>
             <Input
@@ -102,10 +119,22 @@ export default function Step3ContactInfo() {
               required
             />
           </div>
+        )}
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-gray-500">
+            We&apos;ll send booking confirmation on WhatsApp
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setCustomerCountryCode(isInternational ? '91' : 'INTL');
+              setCustomerPhone('');
+            }}
+            className="text-xs font-semibold text-[#4D96FF] hover:underline whitespace-nowrap ml-3"
+          >
+            {isInternational ? 'Booking within India? Use +91' : 'Booking from outside India?'}
+          </button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          We&apos;ll send booking confirmation on WhatsApp
-        </p>
       </div>
 
       {/* Email Address (Optional) */}

@@ -31,6 +31,7 @@ export default function Step1PackageSelection() {
   const {
     bookingType,
     packageId,
+    routeId,
     packageTitle,
     vehicleType,
     setBookingType,
@@ -51,8 +52,10 @@ export default function Step1PackageSelection() {
   // useState(!packageId) initializer would latch open forever once that
   // value flips true, since initializers only run once. isEditing is the
   // only piece of real state; showPicker is computed from it every render.
+  // routeId is included alongside packageId since a route-based transfer
+  // arrival (BookingWidget) should also collapse to the summary card.
   const [isEditing, setIsEditing] = useState(false);
-  const showPicker = isEditing || !packageId;
+  const showPicker = isEditing || !(packageId || routeId);
 
   useEffect(() => {
     if (!showPicker) return;
@@ -94,7 +97,7 @@ export default function Step1PackageSelection() {
   };
 
   const handleNext = () => {
-    if (!packageId || !vehicleType) {
+    if ((!packageId && !routeId) || !vehicleType) {
       setError('Please select both a package and vehicle type');
       return;
     }
@@ -260,7 +263,7 @@ export default function Step1PackageSelection() {
 
       {/* Vehicle Type Selection — ungated from packageId so a vehicle-only
           fleet arrival can show its pre-ticked chip before a package is chosen */}
-      {(packageId || vehicleType) && (
+      {(packageId || routeId || vehicleType) && (
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-bold text-[#2D3436] mb-3">
@@ -311,7 +314,7 @@ export default function Step1PackageSelection() {
           <div className="flex justify-end pt-6 border-t-2 border-gray-200">
             <Button
               onClick={handleNext}
-              disabled={!packageId || !vehicleType}
+              disabled={(!packageId && !routeId) || !vehicleType}
               size="lg"
               className="group"
             >

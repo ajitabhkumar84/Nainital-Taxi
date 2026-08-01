@@ -15,6 +15,7 @@ function getPublicClient() {
  *
  * Query params:
  * - package_id: Filter by package
+ * - route_id: Filter by transfer route
  * - destination_id: Filter by destination
  * - stage: Filter by 'before_booking' or 'after_booking'
  * - season: Return price for 'Season' or 'Off-Season'
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const packageId = searchParams.get('package_id');
+    const routeId = searchParams.get('route_id');
     const destinationId = searchParams.get('destination_id');
     const stage = searchParams.get('stage'); // 'before_booking' or 'after_booking'
     const season = searchParams.get('season') || 'Season'; // Default to 'Season'
@@ -75,6 +77,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (routeId) {
+      // Get addon IDs that are linked to this transfer route
+      const { data: routeRelations } = await supabase
+        .from('addon_routes')
+        .select('addon_id')
+        .eq('route_id', routeId);
+
+      if (routeRelations && routeRelations.length > 0) {
+        const linkedAddonIds = new Set(routeRelations.map(r => r.addon_id));
+        filteredAddons = filteredAddons.filter(addon => linkedAddonIds.has(addon.id));
+      } else {
+        filteredAddons = [];
+      }
+    }
+
     if (destinationId && filteredAddons.length > 0) {
       // Get addon IDs that are linked to this destination
       const { data: destinationRelations } = await supabase
@@ -85,13 +102,13 @@ export async function GET(request: NextRequest) {
       if (destinationRelations && destinationRelations.length > 0) {
         const linkedAddonIds = new Set(destinationRelations.map(r => r.addon_id));
 
-        // If we already filtered by package, intersect the sets
-        if (packageId) {
+        // If we already filtered by package/route, intersect the sets
+        if (packageId || routeId) {
           filteredAddons = filteredAddons.filter(addon => linkedAddonIds.has(addon.id));
         } else {
           filteredAddons = addons.filter(addon => linkedAddonIds.has(addon.id));
         }
-      } else if (!packageId) {
+      } else if (!packageId && !routeId) {
         // Only destination filter and no results
         filteredAddons = [];
       }

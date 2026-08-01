@@ -25,13 +25,14 @@ export function useBookingEntry(): { ready: boolean } {
 
     const parsed = parseBookingEntry(searchParams);
 
-    // Only a package + vehicle together mean every Step 1 decision is already
-    // made; anything less still needs Step 1 (collapsed summary, or the full
-    // picker with a vehicle pre-ticked for a fleet-only arrival).
-    const currentStep: BookingStep = parsed.packageId && parsed.vehicle ? 2 : 1;
+    // Only a package/route + vehicle together mean every Step 1 decision is
+    // already made; anything less still needs Step 1 (collapsed summary, or
+    // the full picker with a vehicle pre-ticked for a fleet-only arrival).
+    const currentStep: BookingStep = (parsed.packageId || parsed.routeId) && parsed.vehicle ? 2 : 1;
 
     const patch: BookingEntryPatch = { currentStep };
     if (parsed.packageId) patch.packageId = parsed.packageId;
+    if (parsed.routeId) patch.routeId = parsed.routeId;
     if (parsed.packageTitle) patch.packageTitle = parsed.packageTitle;
     if (parsed.packageSlug) patch.packageSlug = parsed.packageSlug;
     if (parsed.packageType) patch.bookingType = parsed.packageType;
