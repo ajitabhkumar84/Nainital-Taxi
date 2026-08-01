@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { useBookingEntry } from '@/hooks/useBookingEntry';
+import { useBookingStepUrlSync } from '@/hooks/useBookingStepUrlSync';
 import { CheckCircle2, Shield, Star, Users, Award, Lock } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
@@ -12,6 +13,7 @@ import Step4Payment from '@/components/booking/Step4Payment';
 // Wrapper component to handle URL params
 function BookingPageContent() {
   const { ready } = useBookingEntry();
+  useBookingStepUrlSync(ready);
   const currentStep = useBookingStore((state) => state.currentStep);
   const packageId = useBookingStore((state) => state.packageId);
   const stepContentRef = useRef<HTMLDivElement>(null);

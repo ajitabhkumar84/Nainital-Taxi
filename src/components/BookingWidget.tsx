@@ -20,11 +20,11 @@ import {
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
-const VEHICLE_OPTIONS: { value: VehicleType; label: string; capacity: string }[] = [
-  { value: "sedan", label: "Sedan", capacity: "4 seater" },
-  { value: "suv_normal", label: "SUV", capacity: "6-7 seater" },
-  { value: "suv_deluxe", label: "SUV Deluxe", capacity: "7 seater" },
-  { value: "suv_luxury", label: "Innova Crysta", capacity: "7 seater" },
+const VEHICLE_OPTIONS: { value: VehicleType; label: string }[] = [
+  { value: "sedan", label: "Sedan" },
+  { value: "suv_normal", label: "SUV" },
+  { value: "suv_deluxe", label: "SUV Deluxe" },
+  { value: "suv_luxury", label: "Innova Crysta" },
 ];
 
 export default function BookingWidget() {
@@ -401,7 +401,7 @@ export default function BookingWidget() {
                 {!tourVehicle && <option value="">Select a vehicle</option>}
                 {tourVehicleOptions.map((v) => (
                   <option key={v.value} value={v.value}>
-                    {vehicleLabels[v.value] ?? v.label} ({v.capacity})
+                    {vehicleLabels[v.value] ?? v.label}
                   </option>
                 ))}
               </Select>
@@ -591,7 +591,7 @@ export default function BookingWidget() {
                     {!transferVehicle && <option value="">Select a vehicle</option>}
                     {transferVehicleOptions.map((v) => (
                       <option key={v.value} value={v.value}>
-                        {vehicleLabels[v.value] ?? v.label} ({v.capacity})
+                        {vehicleLabels[v.value] ?? v.label}
                       </option>
                     ))}
                   </>

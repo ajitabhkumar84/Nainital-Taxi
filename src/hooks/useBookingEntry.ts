@@ -19,7 +19,13 @@ export function useBookingEntry(): { ready: boolean } {
   const appliedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const qs = searchParams.toString();
+    // `step` is managed separately by useBookingStepUrlSync (browser
+    // Back/Forward support) and must never be part of this comparison —
+    // otherwise every step transition would look like a new entry URL and
+    // re-run applyEntry, wiping trip/contact details the user already typed.
+    const entryParams = new URLSearchParams(searchParams.toString());
+    entryParams.delete('step');
+    const qs = entryParams.toString();
     if (appliedForRef.current === qs) return;
     appliedForRef.current = qs;
 
