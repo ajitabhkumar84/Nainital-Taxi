@@ -47,7 +47,7 @@ function BookingPageContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-4 sm:pt-6 pb-16">
       <div className="max-w-6xl mx-auto px-4">
         {/* Header — full promotional banner only on step 1; steps 2-4 get a
             compact title + a single trust cue so the flow doesn't repeat a
@@ -241,7 +241,7 @@ function BookingPageContent() {
 // Loading fallback for Suspense
 function BookingLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-4 sm:pt-6 pb-16">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">

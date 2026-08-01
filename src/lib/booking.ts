@@ -18,16 +18,32 @@ export function generateBookingId(): string {
 
 /**
  * Calculate advance payment amount
- * Rule: 25% of total OR Rs 500 minimum (whichever is higher)
+ * Rule: 25% of total, rounded down to the nearest Rs 50, with a Rs 500 minimum.
  *
  * Examples:
- * - Total Rs 1000 -> 25% = Rs 250, but min Rs 500, so advance = Rs 500
- * - Total Rs 5000 -> 25% = Rs 1250, advance = Rs 1250
+ * - Total Rs 1500 -> 25% = Rs 375, below the Rs 500 minimum, so advance = Rs 500
+ * - Total Rs 2280 -> 25% = Rs 570, rounded down to Rs 550
+ * - Total Rs 2360 -> 25% = Rs 590, rounded down to Rs 550
  */
 export function calculateAdvanceAmount(totalAmount: number): number {
-  const percentage = totalAmount * 0.25;
   const minAdvance = 500;
-  return Math.max(Math.round(percentage), minAdvance);
+  const percentage = totalAmount * 0.25;
+  if (percentage <= minAdvance) return minAdvance;
+  return Math.floor(percentage / 50) * 50;
+}
+
+/**
+ * Whether the displayed advance is an exact 25% of the total, only
+ * approximately 25% (due to the round-down-to-50 rule), or the flat Rs 500
+ * minimum — determines what the "(25%)" style label should say, since
+ * claiming an exact percentage when it isn't true invites customer disputes.
+ */
+export type AdvanceLabelKind = 'exact' | 'approx' | 'minimum';
+
+export function getAdvanceLabelKind(totalAmount: number): AdvanceLabelKind {
+  const exactQuarter = totalAmount * 0.25;
+  if (exactQuarter < 500) return 'minimum';
+  return calculateAdvanceAmount(totalAmount) === exactQuarter ? 'exact' : 'approx';
 }
 
 /**
@@ -143,6 +159,17 @@ export function formatTime(timeStr: string): string {
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Earliest selectable booking date (tomorrow), as an ISO YYYY-MM-DD string —
+ * shared by every date picker in the booking flow so the cutoff rule only
+ * lives in one place.
+ */
+export function getMinBookingDate(): string {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split('T')[0];
 }
 
 /**

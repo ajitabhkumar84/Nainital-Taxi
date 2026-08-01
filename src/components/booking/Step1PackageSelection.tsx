@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useBookingStore, VehicleType } from '@/store/bookingStore';
-import { Button, Badge } from '@/components/ui';
+import { Button, Badge, Input } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil } from 'lucide-react';
-import { getVehicleTypeName, getVehicleCapacity } from '@/lib/pricing';
+import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil, Calendar } from 'lucide-react';
+import {
+  getVehicleTypeName,
+  getVehicleCapacity,
+  getVehicleModelExamples,
+  getAllPackagePrices,
+  getAllRoutePrices,
+  formatPrice,
+  PriceResult,
+} from '@/lib/pricing';
+import { getMinBookingDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 
 interface Package {
@@ -34,9 +43,11 @@ export default function Step1PackageSelection() {
     routeId,
     packageTitle,
     vehicleType,
+    tripDate,
     setBookingType,
     setPackage,
     setVehicleType,
+    setTripDate,
     nextStep,
   } = useBookingStore();
   const { labels: vehicleLabels } = useVehicleLabels();
@@ -45,6 +56,33 @@ export default function Step1PackageSelection() {
   const [loading, setLoading] = useState(false);
   const [selectedPackageData, setSelectedPackageData] = useState<Package | null>(null);
   const [error, setError] = useState('');
+  const [pricesByVehicle, setPricesByVehicle] = useState<Partial<Record<VehicleType, PriceResult>>>({});
+  const [pricingLoading, setPricingLoading] = useState(false);
+
+  // Fetch every vehicle's price in one shot once a date is picked, so the
+  // vehicle cards below can show a real price instead of only revealing it
+  // after the user picks a vehicle and reaches Step 2.
+  useEffect(() => {
+    if (!tripDate || (!packageId && !routeId)) {
+      setPricesByVehicle({});
+      return;
+    }
+    let cancelled = false;
+    setPricingLoading(true);
+    const fetchPrices = routeId
+      ? getAllRoutePrices(routeId, tripDate)
+      : getAllPackagePrices(packageId!, tripDate);
+    fetchPrices
+      .then((prices) => {
+        if (!cancelled) setPricesByVehicle(prices);
+      })
+      .finally(() => {
+        if (!cancelled) setPricingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripDate, packageId, routeId]);
 
   // Whether the picker is open is derived, never initialized from packageId:
   // on first render after a package-arrival, packageId is still null (the
@@ -97,8 +135,8 @@ export default function Step1PackageSelection() {
   };
 
   const handleNext = () => {
-    if ((!packageId && !routeId) || !vehicleType) {
-      setError('Please select both a package and vehicle type');
+    if ((!packageId && !routeId) || !vehicleType || !tripDate) {
+      setError('Please select a package, a date, and a vehicle type');
       return;
     }
     setError('');
@@ -261,45 +299,92 @@ export default function Step1PackageSelection() {
         </>
       )}
 
-      {/* Vehicle Type Selection — ungated from packageId so a vehicle-only
-          fleet arrival can show its pre-ticked chip before a package is chosen */}
+      {/* Date + Vehicle Type Selection — ungated from packageId so a
+          vehicle-only fleet arrival can show its pre-ticked chip before a
+          package is chosen */}
       {(packageId || routeId || vehicleType) && (
         <div className="space-y-6">
+          {/* Date Selection — collected here (rather than Step 2) so every
+              vehicle card below can show its own real, date-specific price */}
+          <div>
+            <label className="block text-sm font-bold text-[#2D3436] mb-2">
+              Select Date <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                type="date"
+                value={tripDate || ''}
+                onChange={(e) => setTripDate(e.target.value)}
+                min={getMinBookingDate()}
+                className="pl-12"
+                required
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-[#2D3436] mb-3">
               Choose Your Vehicle
             </label>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {vehicleTypes.map((vehicle) => (
-                <button
-                  key={vehicle.type}
-                  onClick={() => setVehicleType(vehicle.type)}
-                  className={`
-                    p-6 rounded-2xl border-4 transition-all duration-200 text-left
-                    ${
-                      vehicleType === vehicle.type
-                        ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
-                        : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                    }
-                  `}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="text-3xl">{vehicle.emoji}</div>
-                    {vehicle.badge && (
-                      <Badge variant="secondary" size="sm">
-                        {vehicle.badge}
-                      </Badge>
+            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible">
+              {vehicleTypes.map((vehicle) => {
+                const priceResult = pricesByVehicle[vehicle.type];
+                return (
+                  <button
+                    key={vehicle.type}
+                    onClick={() => setVehicleType(vehicle.type)}
+                    className={`
+                      min-w-[260px] snap-start sm:min-w-0
+                      p-6 rounded-2xl border-4 transition-all duration-200 text-left
+                      ${
+                        vehicleType === vehicle.type
+                          ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
+                          : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                      }
+                    `}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="text-3xl">{vehicle.emoji}</div>
+                      {vehicle.badge && (
+                        <Badge variant="secondary" size="sm">
+                          {vehicle.badge}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="font-bold text-[#2D3436] mb-0.5 truncate">
+                      {vehicleLabels[vehicle.type] ?? getVehicleTypeName(vehicle.type)}
+                    </div>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {getVehicleModelExamples(vehicle.type)}
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Users className="w-4 h-4" />
+                      <span>Up to {getVehicleCapacity(vehicle.type)} passengers</span>
+                    </div>
+
+                    {tripDate && (
+                      <div className="mt-3 pt-3 border-t-2 border-dashed border-gray-200">
+                        {pricingLoading ? (
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-gray-500" />
+                            Checking price...
+                          </div>
+                        ) : priceResult ? (
+                          <>
+                            <div className="text-xs text-gray-500">Total price</div>
+                            <div className="text-xl font-bold text-[#2D3436]">
+                              {formatPrice(priceResult.price)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-red-500">Price unavailable for this date</div>
+                        )}
+                      </div>
                     )}
-                  </div>
-                  <div className="font-bold text-[#2D3436] mb-1 truncate">
-                    {vehicleLabels[vehicle.type] ?? getVehicleTypeName(vehicle.type)}
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Users className="w-4 h-4" />
-                    <span>Up to {getVehicleCapacity(vehicle.type)} passengers</span>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -314,7 +399,7 @@ export default function Step1PackageSelection() {
           <div className="flex justify-end pt-6 border-t-2 border-gray-200">
             <Button
               onClick={handleNext}
-              disabled={(!packageId && !routeId) || !vehicleType}
+              disabled={(!packageId && !routeId) || !vehicleType || !tripDate}
               size="lg"
               className="group"
             >

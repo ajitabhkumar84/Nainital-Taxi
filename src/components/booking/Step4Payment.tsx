@@ -18,7 +18,7 @@ import {
   Heart,
 } from 'lucide-react';
 import Image from 'next/image';
-import { calculateAdvanceAmount, formatPrice } from '@/lib/booking';
+import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
 
 const UPI_ID = 'gokumaon@ptyes';
@@ -45,11 +45,21 @@ export default function Step4Payment() {
   const totalAmount = (booking.calculatedPrice || 0) + booking.addonsTotal;
   const advanceAmount = calculateAdvanceAmount(totalAmount);
   const remainingAmount = totalAmount - advanceAmount;
+  const advanceLabelKind = getAdvanceLabelKind(totalAmount);
 
   // Authoritative figures for the success screen, once known.
   const confirmedTotal = createdTotalAmount ?? totalAmount;
   const confirmedAdvance = createdAdvanceAmount ?? advanceAmount;
   const confirmedRemaining = confirmedTotal - confirmedAdvance;
+  const confirmedAdvanceLabelKind = getAdvanceLabelKind(confirmedTotal);
+
+  // Whether this trip actually incurs Nainital entry/parking charges — true
+  // for every local tour package, and for any transfer that touches Nainital
+  // on either end (not just transfers *out of* Nainital, which don't).
+  const involvesNainitalEntry =
+    booking.bookingType === 'tour' ||
+    booking.pickupLocation.toLowerCase().includes('nainital') ||
+    (booking.dropoffLocation || '').toLowerCase().includes('nainital');
 
   // Check if booking was already created (from store)
   useEffect(() => {
@@ -141,7 +151,7 @@ export default function Step4Payment() {
 *Booking Details:*
 - Package: ${booking.packageTitle || 'Custom Booking'}
 - Vehicle: ${booking.vehicleType}
-- Date: ${booking.tripDate}
+- Date: ${formatDate(booking.tripDate || '')}
 - Time: ${booking.tripTime}
 - Pickup: ${booking.pickupLocation}
 - Passengers: ${booking.passengerCount}
@@ -189,7 +199,12 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
           <h2 className="text-3xl font-bold text-[#2D3436] mb-2">Booking Created!</h2>
-          <p className="text-gray-600">Please complete the payment to confirm your booking</p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border-4 border-amber-400 bg-amber-50 px-4 py-3 shadow-[0_0_18px_rgba(251,191,36,0.55)]">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <p className="font-extrabold text-amber-800 text-base sm:text-lg">
+              Please complete the payment to confirm your booking
+            </p>
+          </div>
         </div>
 
         {/* Booking ID */}
@@ -210,7 +225,11 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             <div className="flex justify-between items-center py-3 bg-green-50 -mx-6 px-6 border-y-2 border-green-200">
               <div>
                 <span className="font-bold text-green-700">Advance Payment</span>
-                <span className="text-sm text-green-600 ml-2">(25%)</span>
+                {confirmedAdvanceLabelKind !== 'minimum' && (
+                  <span className="text-sm text-green-600 ml-2">
+                    {confirmedAdvanceLabelKind === 'exact' ? '(25%)' : '(Approx. 25%)'}
+                  </span>
+                )}
               </div>
               <span className="font-bold text-2xl text-green-700">
                 {formatPrice(confirmedAdvance)}
@@ -376,8 +395,8 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-gray-700">
-                <p className="font-bold mb-1">Your booking will be confirmed once we verify your payment.</p>
-                <p>You&apos;ll receive confirmation within 15 minutes.</p>
+                <p className="font-bold mb-1">Your booking will be confirmed once we verify &amp; confirm your payment.</p>
+                <p>You&apos;ll receive confirmation within 6 working hours after you have sent your advance payment message.</p>
               </div>
             </div>
           </div>
@@ -452,7 +471,7 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-gray-600">Date:</span>
-            <span className="font-bold text-[#2D3436]">{booking.tripDate}</span>
+            <span className="font-bold text-[#2D3436]">{formatDate(booking.tripDate || '')}</span>
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-gray-600">Time:</span>
@@ -507,15 +526,28 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             )}
           </div>
 
-          <div className="flex justify-between items-center pb-4 border-b-2 border-yellow-300">
-            <span className="text-gray-700 font-bold">Total Trip Cost</span>
-            <span className="text-2xl font-bold text-[#2D3436]">{formatPrice(totalAmount)}</span>
+          <div className="pb-4 border-b-2 border-yellow-300">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-700 font-bold">Total Trip Cost</span>
+              <span className="text-2xl font-bold text-[#2D3436]">{formatPrice(totalAmount)}</span>
+            </div>
+            {involvesNainitalEntry && (
+              <div className="text-xs text-gray-500 mt-1 text-right">
+                Nainital entry and car parking charges extra (approx. Rs. 300 in total)
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-center py-4 bg-green-100 -mx-6 px-6 border-y-2 border-green-300">
             <div>
               <span className="font-bold text-green-800">Advance Payment</span>
-              <span className="text-sm text-green-600 block">25% of total (min. Rs 500)</span>
+              <span className="text-sm text-green-600 block">
+                {advanceLabelKind === 'minimum'
+                  ? 'Rs 500 minimum applied'
+                  : advanceLabelKind === 'exact'
+                    ? '25% of total'
+                    : 'Approx. 25% of total'}
+              </span>
             </div>
             <span className="text-3xl font-bold text-green-700">{formatPrice(advanceAmount)}</span>
           </div>

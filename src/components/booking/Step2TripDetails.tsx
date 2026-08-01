@@ -6,7 +6,7 @@ import { Button, Input, Select } from '@/components/ui';
 import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
 import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
 import { getPackageById } from '@/lib/supabase';
-import { formatTime } from '@/lib/booking';
+import { formatTime, formatDate, getMinBookingDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import AddonSelector from './AddonSelector';
 
@@ -56,7 +56,6 @@ export default function Step2TripDetails() {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(tripDate || '');
   const [hasAddons, setHasAddons] = useState(false);
 
   // Tours don't start until the park/gate opens; transfers can be picked up
@@ -113,23 +112,11 @@ export default function Step2TripDetails() {
     };
   }, [packageId, packageSlug, bookingType]);
 
-  // Get tomorrow's date as minimum
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
-
-  // tripDate can change out from under this component (e.g. an entry-contract
-  // arrival applying a URL-supplied date) — resync rather than only reading
-  // tripDate once into local state.
   useEffect(() => {
-    setSelectedDate(tripDate || '');
-  }, [tripDate]);
-
-  useEffect(() => {
-    if (selectedDate && (packageId || routeId) && vehicleType) {
-      checkAvailabilityAndPrice(selectedDate);
+    if (tripDate && (packageId || routeId) && vehicleType) {
+      checkAvailabilityAndPrice(tripDate);
     }
-  }, [selectedDate, packageId, routeId, vehicleType]);
+  }, [tripDate, packageId, routeId, vehicleType]);
 
   async function checkAvailabilityAndPrice(date: string) {
     if ((!packageId && !routeId) || !vehicleType) return;
@@ -163,11 +150,6 @@ export default function Step2TripDetails() {
     }
   }
 
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setTripDate(date);
-  };
-
   const capacityExceeded = Boolean(
     vehicleType && passengerCount > getVehicleCapacity(vehicleType)
   );
@@ -177,6 +159,14 @@ export default function Step2TripDetails() {
   // pickups are free-typed hotel addresses (e.g. "Manu Maharani Hotel,
   // Nainital") that should still surface this note.
   const isNainitalPickup = pickupLocation.toLowerCase().includes('nainital');
+
+  // Whether this trip actually incurs Nainital entry/parking charges — true
+  // for every local tour package, and for any transfer that touches Nainital
+  // on either end (not just transfers *out of* Nainital, which don't).
+  const involvesNainitalEntry =
+    bookingType === 'tour' ||
+    isNainitalPickup ||
+    (dropoffLocation || '').toLowerCase().includes('nainital');
 
   const handleNext = () => {
     if (!tripDate || !tripTime || !pickupLocation) {
@@ -280,22 +270,48 @@ export default function Step2TripDetails() {
         </div>
       )}
 
-      {/* Date Selection */}
+      {/* Date — normally already picked in Step 1 (needed there to show
+          per-vehicle pricing), so this is a read-only summary with a way
+          back to change it. The editable input is only a fallback for a
+          direct/URL entry that lands on Step 2 without a date. */}
       <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Select Date <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => handleDateChange(e.target.value)}
-            min={minDate}
-            className="pl-12"
-            required
-          />
-        </div>
+        {tripDate ? (
+          <div>
+            <label className="block text-sm font-bold text-[#2D3436] mb-2">
+              Travel Date
+            </label>
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                <span className="font-bold text-[#2D3436]">{formatDate(tripDate)}</span>
+              </div>
+              <button
+                onClick={prevStep}
+                className="flex items-center gap-1 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label className="block text-sm font-bold text-[#2D3436] mb-2">
+              Select Date <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                type="date"
+                value={tripDate || ''}
+                onChange={(e) => setTripDate(e.target.value)}
+                min={getMinBookingDate()}
+                className="pl-12"
+                required
+              />
+            </div>
+          </>
+        )}
 
         {/* Availability Status */}
         {checkingAvailability && tripDate && (
@@ -357,6 +373,11 @@ export default function Step2TripDetails() {
               <div className="text-2xl font-bold text-[#2D3436]">
                 {formatPrice(calculatedPrice)}
               </div>
+              {involvesNainitalEntry && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Nainital entry and car parking charges extra (approx. Rs. 300 in total)
+                </div>
+              )}
               {seasonName && (
                 <div className="text-xs text-gray-600 mt-0.5">
                   {seasonName} pricing

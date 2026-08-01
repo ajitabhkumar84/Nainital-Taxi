@@ -20,6 +20,38 @@ interface PricingRow {
 }
 
 /**
+ * Resolve the pricing season for a given date, defaulting to Off-Season when
+ * no season row covers it. Shared by every pricing lookup below so the
+ * season-detection rule only lives in one place.
+ */
+async function resolveSeason(date: string): Promise<SeasonResult> {
+  const { data: seasonData, error: seasonError } = await supabase
+    .from('seasons')
+    .select('id, name')
+    .eq('is_active', true)
+    .lte('start_date', date)
+    .gte('end_date', date)
+    .order('name', { ascending: false }) // 'Season' comes before 'Off-Season'
+    .limit(1)
+    .single();
+
+  if (!seasonError && seasonData) {
+    return seasonData as SeasonResult;
+  }
+
+  // Default to Off-Season if no season found for date
+  const { data: offSeasonData } = await supabase
+    .from('seasons')
+    .select('id, name')
+    .eq('is_active', true)
+    .eq('name', 'Off-Season')
+    .limit(1)
+    .single();
+
+  return offSeasonData ? (offSeasonData as SeasonResult) : { id: '', name: 'Off-Season' };
+}
+
+/**
  * Get the price for a specific package, vehicle type, and date
  * Automatically detects the season based on the date
  */
@@ -29,40 +61,9 @@ export async function getPackagePrice(
   date: string // ISO date string
 ): Promise<PriceResult | null> {
   try {
-    // 1. Get the season for the given date by querying seasons table directly
-    const { data: seasonData, error: seasonError } = await supabase
-      .from('seasons')
-      .select('id, name')
-      .eq('is_active', true)
-      .lte('start_date', date)
-      .gte('end_date', date)
-      .order('name', { ascending: false }) // 'Season' comes before 'Off-Season'
-      .limit(1)
-      .single();
+    const season = await resolveSeason(date);
 
-    let season: SeasonResult;
-
-    if (seasonError || !seasonData) {
-      // Default to Off-Season if no season found for date
-      const { data: offSeasonData } = await supabase
-        .from('seasons')
-        .select('id, name')
-        .eq('is_active', true)
-        .eq('name', 'Off-Season')
-        .limit(1)
-        .single();
-
-      if (offSeasonData) {
-        season = offSeasonData as SeasonResult;
-      } else {
-        // Fallback - use 'Off-Season' as default name
-        season = { id: '', name: 'Off-Season' };
-      }
-    } else {
-      season = seasonData as SeasonResult;
-    }
-
-    // 2. Get the price for the package, vehicle type, and season_name
+    // Get the price for the package, vehicle type, and season_name
     const { data, error: pricingError } = await supabase
       .from('pricing')
       .select(`
@@ -118,35 +119,7 @@ export async function getRoutePrice(
   date: string // ISO date string
 ): Promise<PriceResult | null> {
   try {
-    const { data: seasonData, error: seasonError } = await supabase
-      .from('seasons')
-      .select('id, name')
-      .eq('is_active', true)
-      .lte('start_date', date)
-      .gte('end_date', date)
-      .order('name', { ascending: false })
-      .limit(1)
-      .single();
-
-    let season: SeasonResult;
-
-    if (seasonError || !seasonData) {
-      const { data: offSeasonData } = await supabase
-        .from('seasons')
-        .select('id, name')
-        .eq('is_active', true)
-        .eq('name', 'Off-Season')
-        .limit(1)
-        .single();
-
-      if (offSeasonData) {
-        season = offSeasonData as SeasonResult;
-      } else {
-        season = { id: '', name: 'Off-Season' };
-      }
-    } else {
-      season = seasonData as SeasonResult;
-    }
+    const season = await resolveSeason(date);
 
     const { data, error: pricingError } = await supabase
       .from('route_pricing')
@@ -186,6 +159,103 @@ export async function getRoutePrice(
   } catch (error) {
     console.error('Error in getRoutePrice:', error);
     return null;
+  }
+}
+
+interface PricingRowWithVehicle {
+  price: number;
+  vehicle_type: VehicleType;
+  packages: { title: string } | null;
+}
+
+/**
+ * Get the price for every vehicle type on a package/date in one query —
+ * used by the vehicle-selection step so each vehicle card can show its own
+ * price up front instead of only revealing it after a vehicle is chosen.
+ */
+export async function getAllPackagePrices(
+  packageId: string,
+  date: string
+): Promise<Partial<Record<VehicleType, PriceResult>>> {
+  try {
+    const season = await resolveSeason(date);
+
+    const { data, error } = await supabase
+      .from('pricing')
+      .select(`
+        price,
+        vehicle_type,
+        packages (
+          title
+        )
+      `)
+      .eq('package_id', packageId)
+      .eq('season_name', season.name)
+      .eq('is_active', true);
+
+    if (error || !data) {
+      console.error('Error fetching all package prices:', error);
+      return {};
+    }
+
+    const result: Partial<Record<VehicleType, PriceResult>> = {};
+    for (const row of data as unknown as PricingRowWithVehicle[]) {
+      result[row.vehicle_type] = {
+        price: row.price,
+        seasonId: season.id,
+        seasonName: season.name,
+        vehicleType: row.vehicle_type,
+        packageTitle: row.packages?.title || 'Package',
+      };
+    }
+    return result;
+  } catch (error) {
+    console.error('Error in getAllPackagePrices:', error);
+    return {};
+  }
+}
+
+interface RoutePricingRowWithVehicle {
+  price: number;
+  vehicle_type: VehicleType;
+}
+
+/**
+ * Mirrors getAllPackagePrices() for transfer routes.
+ */
+export async function getAllRoutePrices(
+  routeId: string,
+  date: string
+): Promise<Partial<Record<VehicleType, PriceResult>>> {
+  try {
+    const season = await resolveSeason(date);
+
+    const { data, error } = await supabase
+      .from('route_pricing')
+      .select('price, vehicle_type')
+      .eq('route_id', routeId)
+      .eq('season_name', season.name)
+      .eq('is_active', true);
+
+    if (error || !data) {
+      console.error('Error fetching all route prices:', error);
+      return {};
+    }
+
+    const result: Partial<Record<VehicleType, PriceResult>> = {};
+    for (const row of data as unknown as RoutePricingRowWithVehicle[]) {
+      result[row.vehicle_type] = {
+        price: row.price,
+        seasonId: season.id,
+        seasonName: season.name,
+        vehicleType: row.vehicle_type,
+        packageTitle: 'Transfer',
+      };
+    }
+    return result;
+  } catch (error) {
+    console.error('Error in getAllRoutePrices:', error);
+    return {};
   }
 }
 
@@ -309,4 +379,20 @@ export function getVehicleCapacity(vehicleType: VehicleType): number {
     suv_luxury: 7
   };
   return capacities[vehicleType];
+}
+
+/**
+ * Example car models for a vehicle category, shown as a subtitle on the
+ * vehicle-selection cards so customers know what they're actually getting.
+ * Deliberately separate from the admin-configurable category label
+ * (see useVehicleLabels) rather than folded into it.
+ */
+export function getVehicleModelExamples(vehicleType: VehicleType): string {
+  const models: Record<VehicleType, string> = {
+    sedan: 'Dzire, Etios',
+    suv_normal: 'Ertiga, Marazzo',
+    suv_deluxe: 'Innova',
+    suv_luxury: 'Innova Crysta',
+  };
+  return models[vehicleType];
 }
