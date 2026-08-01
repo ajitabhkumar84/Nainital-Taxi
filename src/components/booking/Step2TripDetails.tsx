@@ -2,18 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, Select } from '@/components/ui';
 import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
 import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
 import { getPackageById } from '@/lib/supabase';
+import { formatTime } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import AddonSelector from './AddonSelector';
 
-const allTimeSlots = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00'
-];
+// Hourly pickup-time options within our staffed window. Both flows cut off
+// at 3 PM (15:00) so the trip has daylight to complete; tours additionally
+// can't start before the park/gate opens, so they start two hours later
+// than transfers.
+function generateHourlyTimeSlots(startHour: number, endHour: number): string[] {
+  const slots: string[] = [];
+  for (let hour = startHour; hour <= endHour; hour++) {
+    slots.push(`${hour.toString().padStart(2, '0')}:00`);
+  }
+  return slots;
+}
 
 export default function Step2TripDetails() {
   const {
@@ -53,9 +60,10 @@ export default function Step2TripDetails() {
   const [hasAddons, setHasAddons] = useState(false);
 
   // Tours don't start until the park/gate opens; transfers can be picked up
-  // earlier for airport/rail connections.
-  const earliestSlot = bookingType === 'tour' ? '09:00' : '07:00';
-  const timeSlots = allTimeSlots.filter((time) => time >= earliestSlot);
+  // earlier for airport/rail connections. Both cut off at 3 PM.
+  const timeSlots = bookingType === 'tour'
+    ? generateHourlyTimeSlots(9, 15)  // 9:00 AM – 3:00 PM
+    : generateHourlyTimeSlots(7, 15); // 7:00 AM – 3:00 PM
 
   // Passenger count needs to allow a temporarily-empty field while the user
   // is backspacing to retype a value — clamping to 1 on every keystroke traps
@@ -164,6 +172,12 @@ export default function Step2TripDetails() {
     vehicleType && passengerCount > getVehicleCapacity(vehicleType)
   );
 
+  // Case-insensitive substring match rather than a strict canonical-value
+  // check: transfers always carry an exact "Nainital" pickup, but tour
+  // pickups are free-typed hotel addresses (e.g. "Manu Maharani Hotel,
+  // Nainital") that should still surface this note.
+  const isNainitalPickup = pickupLocation.toLowerCase().includes('nainital');
+
   const handleNext = () => {
     if (!tripDate || !tripTime || !pickupLocation) {
       alert('Please fill in all required fields');
@@ -233,15 +247,15 @@ export default function Step2TripDetails() {
 
       {/* Booking Summary */}
       {(packageId || routeId) && vehicleType && (
-        <div className="p-6 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
+        <div className="p-3 sm:p-4 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7] flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-0.5">
               Your Trip
             </div>
-            <div className="font-bold text-lg text-[#2D3436] truncate">
+            <div className="font-bold text-sm sm:text-base text-[#2D3436] leading-snug break-words">
               {packageTitle}
             </div>
-            <div className="text-sm text-gray-600 mt-1">
+            <div className="text-xs text-gray-600 mt-1">
               {vehicleLabels[vehicleType] ?? getVehicleTypeName(vehicleType)}
             </div>
             {resolvedSlug && bookingType === 'tour' && (
@@ -249,18 +263,18 @@ export default function Step2TripDetails() {
                 href={`/tour/${resolvedSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors mt-2"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors mt-1"
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="w-3.5 h-3.5" />
                 View Package Details
               </a>
             )}
           </div>
           <button
             onClick={prevStep}
-            className="flex items-center gap-1 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
+            className="flex items-center gap-1 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
           >
-            <Pencil className="w-4 h-4" />
+            <Pencil className="w-3.5 h-3.5" />
             Change
           </button>
         </div>
@@ -334,31 +348,31 @@ export default function Step2TripDetails() {
 
       {/* Price Display */}
       {tripDate && calculatedPrice !== null && (
-        <div className="p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
+        <div className="p-4 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <div className="text-sm text-gray-600 mb-1">
+              <div className="text-xs text-gray-600 mb-0.5">
                 {addonsTotal > 0 ? 'Base Package Price' : 'Estimated Price'}
               </div>
-              <div className="text-3xl font-bold text-[#2D3436]">
+              <div className="text-2xl font-bold text-[#2D3436]">
                 {formatPrice(calculatedPrice)}
               </div>
               {seasonName && (
-                <div className="text-sm text-gray-600 mt-1">
+                <div className="text-xs text-gray-600 mt-0.5">
                   {seasonName} pricing
                 </div>
               )}
 
               {/* Addons Breakdown */}
               {addonsTotal > 0 && (
-                <div className="mt-4 pt-4 border-t-2 border-yellow-300">
+                <div className="mt-2.5 pt-2.5 border-t-2 border-yellow-300">
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-gray-600">Selected Addons</span>
                     <span className="text-sm font-bold text-gray-900">+{formatPrice(addonsTotal)}</span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-yellow-300">
+                  <div className="flex justify-between pt-1.5 border-t border-yellow-300">
                     <span className="font-bold text-gray-900">Total Amount</span>
-                    <span className="text-2xl font-bold text-[#2D3436]">
+                    <span className="text-xl font-bold text-[#2D3436]">
                       {formatPrice(calculatedPrice + addonsTotal)}
                     </span>
                   </div>
@@ -366,7 +380,7 @@ export default function Step2TripDetails() {
               )}
             </div>
             {fetchingPrice && (
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-[#FFD93D]" />
+              <div className="animate-spin rounded-full h-6 w-6 border-4 border-gray-300 border-t-[#FFD93D]" />
             )}
           </div>
         </div>
@@ -374,29 +388,22 @@ export default function Step2TripDetails() {
 
       {/* Time Selection */}
       <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-3">
+        <label htmlFor="pickup-time" className="block text-sm font-bold text-[#2D3436] mb-2">
           Pickup Time <span className="text-red-500">*</span>
         </label>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <Select
+          id="pickup-time"
+          value={tripTime ?? ''}
+          onChange={(e) => setTripTime(e.target.value)}
+          required
+        >
+          <option value="" disabled>Select a pickup time</option>
           {timeSlots.map((time) => (
-            <button
-              key={time}
-              onClick={() => setTripTime(time)}
-              className={`
-                p-3 rounded-xl border-3 font-medium transition-all duration-200
-                ${
-                  tripTime === time
-                    ? 'border-[#4D96FF] bg-[#E8F4F8] text-[#2D3436] shadow-[2px_2px_0px_#4D96FF]'
-                    : 'border-[#2D3436] bg-white hover:shadow-[2px_2px_0px_#2D3436]'
-                }
-              `}
-            >
-              {time}
-            </button>
+            <option key={time} value={time}>{formatTime(time)}</option>
           ))}
-        </div>
-        <p className="text-sm text-gray-500 mt-2">
-          Time slot not listed? Please contact us and we will arrange it for you.
+        </Select>
+        <p className="text-xs text-gray-500 mt-1.5">
+          For any other time, please contact us on WhatsApp or call us.
         </p>
       </div>
 
@@ -457,10 +464,12 @@ export default function Step2TripDetails() {
             required
           />
         </div>
-        <p className="text-sm text-gray-500 mt-2">
-          Note: Pickups from Zoo Road, Birla Road, or Snow View Point are not possible.
-          We can easily pick you up from Mall Road, High Court, Ayarpatta, or your specific hotel.
-        </p>
+        {isNainitalPickup && (
+          <p className="text-xs text-gray-500 mt-2">
+            Note: Pickups from Zoo Road, Birla Road, or Snow View Point are not possible.
+            We can easily pick you up from Mall Road, High Court, Ayarpatta, or your specific hotel.
+          </p>
+        )}
       </div>
 
       {/* Drop-off Location (Optional) */}

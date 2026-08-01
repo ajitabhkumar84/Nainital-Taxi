@@ -102,22 +102,22 @@ function BookingPageContent() {
             </div>
           </div>
         ) : (
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-[#2D3436]">
+          <div className="text-center mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#2D3436]">
               {steps[currentStep - 1].title}
             </h2>
-            <p className="text-sm text-[#636E72] mb-2">
+            <p className="text-xs sm:text-sm text-[#636E72] mt-0.5 mb-1">
               {steps[currentStep - 1].description}
             </p>
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-              <Lock className="w-3.5 h-3.5" />
+              <Lock className="w-3 h-3" />
               Secure Checkout
             </div>
           </div>
         )}
 
         {/* Step Indicator */}
-        <div className="mb-12">
+        <div className="mb-6 sm:mb-8">
           <div className="max-w-4xl mx-auto">
             {/* Desktop Step Indicator */}
             <div className="hidden md:flex items-center justify-between relative">
@@ -134,8 +134,8 @@ function BookingPageContent() {
                 <div key={step.number} className="flex flex-col items-center">
                   <div
                     className={`
-                      w-12 h-12 rounded-full flex items-center justify-center
-                      font-bold text-lg transition-all duration-300
+                      w-10 h-10 rounded-full flex items-center justify-center
+                      font-bold text-base transition-all duration-300
                       border-4 border-white shadow-lg
                       ${
                         step.number < currentStep
@@ -147,12 +147,12 @@ function BookingPageContent() {
                     `}
                   >
                     {step.number < currentStep ? (
-                      <CheckCircle2 className="w-6 h-6" />
+                      <CheckCircle2 className="w-5 h-5" />
                     ) : (
                       step.number
                     )}
                   </div>
-                  <div className="mt-3 text-center">
+                  <div className="mt-2 text-center">
                     <div
                       className={`
                         font-bold text-sm
@@ -171,12 +171,12 @@ function BookingPageContent() {
 
             {/* Mobile Step Indicator */}
             <div className="md:hidden">
-              <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="flex items-center justify-center gap-2 mb-2.5">
                 {steps.map((step) => (
                   <div
                     key={step.number}
                     className={`
-                      flex-1 h-2 rounded-full transition-all duration-300
+                      flex-1 h-1.5 rounded-full transition-all duration-300
                       ${
                         step.number <= currentStep
                           ? step.number === currentStep
@@ -188,14 +188,20 @@ function BookingPageContent() {
                   />
                 ))}
               </div>
-              <div className="text-center">
-                <div className="text-sm font-bold text-[#2D3436]">
+              {currentStep === 1 ? (
+                <div className="text-center">
+                  <div className="text-sm font-bold text-[#2D3436]">
+                    Step {currentStep} of {steps.length}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {steps[currentStep - 1].title}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-xs font-semibold text-gray-500">
                   Step {currentStep} of {steps.length}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {steps[currentStep - 1].title}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

@@ -91,48 +91,62 @@ export default function ItineraryTimeline({ days }: ItineraryTimelineProps) {
                   {/* Day Content */}
                   <div
                     className={cn(
-                      "overflow-hidden transition-all duration-300",
-                      expandedDay === index ? "max-h-[500px]" : "max-h-0"
+                      "grid transition-[grid-template-rows] duration-300 ease-in-out",
+                      expandedDay === index ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                     )}
                   >
-                    <div className="px-4 md:px-6 pb-6 space-y-4 border-t-2 border-ink/10 pt-4">
-                      {/* Description */}
-                      {day.description && (
-                        <p className="font-body text-ink/80 leading-relaxed">
-                          {day.description}
-                        </p>
-                      )}
-
-                      {/* Highlights */}
-                      {day.highlights && day.highlights.length > 0 && (
-                        <div>
-                          <h4 className="font-body font-semibold text-ink mb-2 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-teal" />
-                            Highlights
-                          </h4>
-                          <div className="grid gap-2">
-                            {day.highlights.map((highlight, i) => (
-                              <div
-                                key={i}
-                                className="flex items-start gap-2 font-body text-ink/70"
-                              >
-                                <CheckCircle2 className="w-4 h-4 text-whatsapp flex-shrink-0 mt-0.5" />
-                                {highlight}
-                              </div>
-                            ))}
+                    <div className="overflow-hidden">
+                      <div className="px-4 md:px-6 pb-6 space-y-4 border-t-2 border-ink/10 pt-4">
+                        {/* Description */}
+                        {day.description && (
+                          <div className="space-y-3">
+                            {day.description.split("\n").map((line, i) => {
+                              const text = line.trim();
+                              return text ? (
+                                <p
+                                  key={i}
+                                  className="font-body text-ink/80 leading-relaxed"
+                                >
+                                  {text}
+                                </p>
+                              ) : (
+                                <div key={i} aria-hidden="true" className="h-2" />
+                              );
+                            })}
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Meals */}
-                      {day.meals_included && day.meals_included.length > 0 && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-ink/10">
-                          <Utensils className="w-4 h-4 text-coral" />
-                          <span className="font-body text-sm text-ink/60">
-                            Meals: {day.meals_included.join(", ")}
-                          </span>
-                        </div>
-                      )}
+                        {/* Highlights */}
+                        {day.highlights && day.highlights.length > 0 && (
+                          <div>
+                            <h4 className="font-body font-semibold text-ink mb-2 flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-teal" />
+                              Highlights
+                            </h4>
+                            <div className="grid gap-2">
+                              {day.highlights.map((highlight, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-start gap-2 font-body text-ink/70"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 text-whatsapp flex-shrink-0 mt-0.5" />
+                                  {highlight}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Meals */}
+                        {day.meals_included && day.meals_included.length > 0 && (
+                          <div className="flex items-center gap-2 pt-2 border-t border-ink/10">
+                            <Utensils className="w-4 h-4 text-coral" />
+                            <span className="font-body text-sm text-ink/60">
+                              Meals: {day.meals_included.join(", ")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -14,6 +14,7 @@ import {
   FolderTree,
 } from "lucide-react";
 import { Route, RoutePricing, VehicleType, RouteCategory } from "@/lib/supabase/types";
+import { PICKUP_LOCATIONS, toCanonicalPickupLocation } from "@/lib/pickupLocations";
 
 interface RouteFormProps {
   initialData?: (Route & { pricing?: RoutePricing[] }) | null;
@@ -39,7 +40,9 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const [loadingCategories, setLoadingCategories] = useState(true);
 
   // Basic Info
-  const [pickupLocation, setPickupLocation] = useState(initialData?.pickup_location || "");
+  const [pickupLocation, setPickupLocation] = useState(
+    toCanonicalPickupLocation(initialData?.pickup_location || "")
+  );
   const [dropLocation, setDropLocation] = useState(initialData?.drop_location || "");
   const [slug, setSlug] = useState(initialData?.slug || "");
   const [distance, setDistance] = useState(initialData?.distance?.toString() || "");
@@ -123,6 +126,16 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
     }
   };
 
+  // Normalizes on blur (not onChange) so it doesn't fight the admin mid-keystroke —
+  // typing "Kathgodam Railway Station" won't flip to "Kathgodam Station" until they
+  // tab/click away.
+  const handleDropBlur = () => {
+    const canonical = toCanonicalPickupLocation(dropLocation);
+    if (canonical !== dropLocation) {
+      handleDropChange(canonical);
+    }
+  };
+
   const handlePriceChange = (vehicleType: VehicleType, seasonName: string, value: string) => {
     setPricing((prev) =>
       prev.map((p) =>
@@ -175,14 +188,19 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
             <label className="block font-body text-sm text-ink/60 mb-2">
               Pickup Location *
             </label>
-            <input
-              type="text"
+            <select
               value={pickupLocation}
               onChange={(e) => handlePickupChange(e.target.value)}
-              placeholder="e.g., Delhi, Kathgodam Railway Station"
               className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
               required
-            />
+            >
+              <option value="">Choose pickup location</option>
+              {PICKUP_LOCATIONS.map((location) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -193,6 +211,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
               type="text"
               value={dropLocation}
               onChange={(e) => handleDropChange(e.target.value)}
+              onBlur={handleDropBlur}
               placeholder="e.g., Nainital"
               className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
               required

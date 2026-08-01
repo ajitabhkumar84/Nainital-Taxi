@@ -176,13 +176,13 @@ function AdminSidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full w-64 bg-white border-r-3 border-ink z-50 transition-transform duration-300",
+          "fixed top-0 left-0 h-[100dvh] w-64 bg-white border-r-3 border-ink z-50 transition-transform duration-300 flex flex-col",
           "lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Header */}
-        <div className="p-4 border-b-3 border-ink">
+        <div className="p-4 border-b-3 border-ink flex-shrink-0">
           <div className="flex items-center justify-between">
             <Link href="/admin" className="flex items-center space-x-2">
               <span className="text-2xl">🚕</span>
@@ -195,7 +195,7 @@ function AdminSidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2 [scrollbar-width:thin] [scrollbar-color:#0F172A33_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-ink/20 [&::-webkit-scrollbar-thumb]:rounded-full">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -215,7 +215,7 @@ function AdminSidebar({
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t-3 border-ink">
+        <div className="flex-shrink-0 p-4 border-t-3 border-ink">
           <Link
             href="/"
             className="flex items-center space-x-3 px-4 py-3 rounded-xl font-body text-ink/70 hover:bg-lake/20 transition-all mb-2"

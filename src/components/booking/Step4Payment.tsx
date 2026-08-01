@@ -439,35 +439,35 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
       </div>
 
       {/* Booking Summary */}
-      <div className="p-6 rounded-2xl border-4 border-[#2D3436] bg-white">
-        <h3 className="font-bold text-lg text-[#2D3436] mb-4">Booking Summary</h3>
-        <div className="space-y-3">
-          <div className="flex justify-between">
+      <div className="p-4 rounded-2xl border-4 border-[#2D3436] bg-white">
+        <h3 className="font-bold text-sm text-[#2D3436] mb-2.5">Booking Summary</h3>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Package:</span>
-            <span className="font-bold text-[#2D3436]">{booking.packageTitle || 'Custom'}</span>
+            <span className="font-bold text-[#2D3436] text-right">{booking.packageTitle || 'Custom'}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Vehicle:</span>
             <span className="font-bold text-[#2D3436]">{booking.vehicleType}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Date:</span>
             <span className="font-bold text-[#2D3436]">{booking.tripDate}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Time:</span>
             <span className="font-bold text-[#2D3436]">{booking.tripTime}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Passengers:</span>
             <span className="font-bold text-[#2D3436]">{booking.passengerCount}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-600">Pickup:</span>
             <span className="font-bold text-[#2D3436] text-right">{booking.pickupLocation}</span>
           </div>
           {booking.seasonName && (
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <span className="text-gray-600">Season:</span>
               <span className="font-bold text-[#2D3436]">{booking.seasonName}</span>
             </div>
@@ -475,10 +475,10 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
 
           {/* Show selected addons */}
           {booking.selectedAddons.length > 0 && (
-            <div className="pt-3 border-t-2 border-gray-200 mt-3">
-              <p className="text-xs text-gray-500 mb-2">ADDONS</p>
+            <div className="pt-2 border-t-2 border-gray-200 mt-2">
+              <p className="text-xs text-gray-500 mb-1">ADDONS</p>
               {booking.selectedAddons.map(addon => (
-                <div key={addon.id} className="flex justify-between text-sm mb-1">
+                <div key={addon.id} className="flex justify-between text-xs mb-0.5">
                   <span className="text-gray-600">
                     {addon.icon_emoji} {addon.name}
                   </span>

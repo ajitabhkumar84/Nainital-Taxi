@@ -12,6 +12,11 @@ import { buildBookingUrl } from "@/lib/bookingLink";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useVehicleLabels } from "@/hooks/useVehicleLabels";
 import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
+import {
+  PICKUP_LOCATIONS,
+  resolvePickupAliases,
+  toCanonicalPickupLocation,
+} from "@/lib/pickupLocations";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
@@ -78,30 +83,21 @@ export default function BookingWidget() {
   // Filter packages by type
   const tourPackages = packages.filter((p) => p.type === "tour");
 
-  // Get unique pickup locations from routes
-  const pickupLocations = Array.from(
-    new Set(
-      routes.flatMap((r) => [
-        r.pickup_location,
-        r.drop_location, // For bidirectional
-      ])
-    )
-  ).sort();
-
   // Get drop locations based on selected pickup
   const getDropLocations = () => {
     if (!transferFrom) return [];
 
+    const fromAliases = resolvePickupAliases(transferFrom);
     const validDrops = new Set<string>();
 
     routes.forEach((route) => {
       // Forward route
-      if (route.pickup_location === transferFrom) {
-        validDrops.add(route.drop_location);
+      if (fromAliases.includes(route.pickup_location)) {
+        validDrops.add(toCanonicalPickupLocation(route.drop_location));
       }
       // Bidirectional route
-      if (route.drop_location === transferFrom) {
-        validDrops.add(route.pickup_location);
+      if (fromAliases.includes(route.drop_location)) {
+        validDrops.add(toCanonicalPickupLocation(route.pickup_location));
       }
     });
 
@@ -173,11 +169,13 @@ export default function BookingWidget() {
       return;
     }
 
+    const pickupAliases = resolvePickupAliases(transferFrom);
+    const dropAliases = resolvePickupAliases(transferTo);
     const route =
       routes.find(
         (r) =>
-          (r.pickup_location === transferFrom && r.drop_location === transferTo) ||
-          (r.pickup_location === transferTo && r.drop_location === transferFrom)
+          (pickupAliases.includes(r.pickup_location) && dropAliases.includes(r.drop_location)) ||
+          (pickupAliases.includes(r.drop_location) && dropAliases.includes(r.pickup_location))
       ) || null;
 
     setSelectedRoute(route);
@@ -466,7 +464,7 @@ export default function BookingWidget() {
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver, fuel, tolls
+                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver and fuel
               </div>
               {!priceInfo.bookingAllowed && priceInfo.message && (
                 <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
@@ -510,7 +508,7 @@ export default function BookingWidget() {
                 onChange={(e) => handlePickupChange(e.target.value)}
               >
                 <option value="">Choose pick-up point</option>
-                {pickupLocations.map((location) => (
+                {PICKUP_LOCATIONS.map((location) => (
                   <option key={location} value={location}>
                     {location}
                   </option>
@@ -621,7 +619,8 @@ export default function BookingWidget() {
           {selectedRoute && (
             <div className="border border-slate-200 bg-slate-50 rounded-md p-4">
               <div className="font-medium text-ink">
-                {selectedRoute.pickup_location} → {selectedRoute.drop_location}
+                {toCanonicalPickupLocation(selectedRoute.pickup_location)} →{" "}
+                {toCanonicalPickupLocation(selectedRoute.drop_location)}
               </div>
               {(selectedRoute.distance || selectedRoute.duration) && (
                 <div className="text-sm text-slate-500 mt-1">
@@ -643,7 +642,7 @@ export default function BookingWidget() {
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver, fuel, tolls
+                {priceInfo.season === "Season" ? "Peak season rate" : "Off-season rate"} · includes driver and fuel
               </div>
               {!priceInfo.bookingAllowed && priceInfo.message && (
                 <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">

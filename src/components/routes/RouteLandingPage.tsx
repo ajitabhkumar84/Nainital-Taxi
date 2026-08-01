@@ -147,7 +147,7 @@ export default function RouteLandingPage({
                 </div>
                 <div className="p-6 bg-lake/10 border-t-3 border-ink">
                   <p className="text-sm text-ink/70 font-body text-center">
-                    * Prices include driver allowance, fuel, and all tolls. GST extra.
+                    * Prices include driver allowance and fuel. GST extra.
                   </p>
                 </div>
               </div>

@@ -448,9 +448,9 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
             <Card>
               <CardContent className="pt-6">
-                <h3 className="font-display text-xl text-ink mb-2">Are tolls and fuel included?</h3>
+                <h3 className="font-display text-xl text-ink mb-2">What&apos;s included in the fare?</h3>
                 <p className="font-body text-ink/70">
-                  Yes, our prices include fuel charges, tolls, and driver allowance. The quoted price is what you pay.
+                  Our fares include driver allowance and fuel. Tolls, parking, and any state permits are charged extra.
                 </p>
               </CardContent>
             </Card>

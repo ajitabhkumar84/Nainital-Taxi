@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildBookingUrl } from "@/lib/bookingLink";
 import { Header, Footer } from "@/components/ui";
 import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin } from "lucide-react";
 import DestinationCard from "@/components/home/DestinationCard";
@@ -59,7 +60,7 @@ export default async function Home() {
                 Day tours and packages
               </h2>
               <p className="text-base text-slate-500">
-                Fixed itineraries with fixed prices.
+                Great Itineraries & Best Prices
               </p>
             </div>
             <Link
@@ -150,64 +151,70 @@ export default async function Home() {
           {transferRoutes.length > 0 ? (
             <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
               {/* Table header - desktop only */}
-              <div className="hidden md:grid grid-cols-[2fr_0.8fr_0.8fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <div className="hidden md:grid grid-cols-[2fr_0.8fr_0.8fr_1fr_auto] gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-medium uppercase tracking-wide text-slate-500">
                 <span>Route</span>
                 <span>Distance</span>
                 <span>Time</span>
-                <span>Sedan</span>
-                <span>SUV</span>
+                <span>Starts from</span>
                 <span></span>
               </div>
 
-              {transferRoutes.map((route) => (
-                <div
-                  key={route.id}
-                  className="flex flex-col gap-3 px-6 py-5 border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors md:grid md:grid-cols-[2fr_0.8fr_0.8fr_1fr_1fr_auto] md:items-center md:gap-4"
-                >
-                  <div className="text-[15px] font-semibold text-ink">
-                    {route.pickup_location} → {route.drop_location}
-                  </div>
-                  <div className="text-sm text-slate-500 tabular-nums">
-                    {route.distance ? `${route.distance} km` : "—"}
-                  </div>
-                  <div className="text-sm text-slate-500 tabular-nums">
-                    {route.duration || "—"}
-                  </div>
-                  <div className="text-sm text-ink tabular-nums">
-                    {route.sedanPrice ? (
-                      <>
-                        <span className="md:hidden text-slate-500">Sedan </span>
-                        ₹{route.sedanPrice.toLocaleString("en-IN")}
-                      </>
-                    ) : (
-                      <span className="text-slate-400">On request</span>
-                    )}
-                  </div>
-                  <div className="text-sm text-ink tabular-nums">
-                    {route.suvPrice ? (
-                      <>
-                        <span className="md:hidden text-slate-500">SUV </span>
-                        ₹{route.suvPrice.toLocaleString("en-IN")}
-                      </>
-                    ) : (
-                      <span className="text-slate-400">On request</span>
-                    )}
-                  </div>
-                  <Link
-                    href="#booking"
-                    className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50 md:w-auto w-full"
+              {transferRoutes.map((route) => {
+                const vehicleOptions = [
+                  route.sedanPrice != null ? { price: route.sedanPrice, vehicle: "sedan" as const } : null,
+                  route.suvPrice != null ? { price: route.suvPrice, vehicle: "suv_normal" as const } : null,
+                ].filter((o): o is { price: number; vehicle: "sedan" | "suv_normal" } => o !== null);
+                const cheapest = vehicleOptions.length > 0
+                  ? vehicleOptions.reduce((a, b) => (b.price < a.price ? b : a))
+                  : null;
+
+                return (
+                  <div
+                    key={route.id}
+                    className="flex flex-col gap-3 px-6 py-5 border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors md:grid md:grid-cols-[2fr_0.8fr_0.8fr_1fr_auto] md:items-center md:gap-4"
                   >
-                    Book
-                  </Link>
-                </div>
-              ))}
+                    <div className="text-[15px] font-semibold text-ink">
+                      {route.pickup_location} → {route.drop_location}
+                    </div>
+                    <div className="text-sm text-slate-500 tabular-nums">
+                      {route.distance ? `${route.distance} km` : "—"}
+                    </div>
+                    <div className="text-sm text-slate-500 tabular-nums">
+                      {route.duration || "—"}
+                    </div>
+                    <div className="text-sm text-ink tabular-nums">
+                      {cheapest ? (
+                        <>
+                          <span className="text-slate-500">Starts from </span>
+                          ₹{cheapest.price.toLocaleString("en-IN")}
+                        </>
+                      ) : (
+                        <span className="text-slate-400">On request</span>
+                      )}
+                    </div>
+                    <Link
+                      href={buildBookingUrl({
+                        routeId: route.id,
+                        packageType: "transfer",
+                        packageTitle: `${route.pickup_location} to ${route.drop_location}`,
+                        ...(cheapest ? { vehicle: cheapest.vehicle } : {}),
+                        pickup: route.pickup_location,
+                        dropoff: route.drop_location,
+                      })}
+                      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50 md:w-auto w-full"
+                    >
+                      Book
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-center text-slate-500">Loading routes...</p>
           )}
 
           <p className="mt-4 text-sm text-slate-500">
-            Fares include driver, fuel, tolls and parking. No night charges.
+            Fares include driver, fuel and parking. No night charges.
           </p>
         </div>
       </section>
