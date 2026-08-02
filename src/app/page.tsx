@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Metadata } from "next";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { Header, Footer } from "@/components/ui";
 import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin } from "lucide-react";
@@ -14,6 +15,8 @@ import {
   getTransferRoutes,
   getFeaturedReviews,
   getTrustSection,
+  getPageContent,
+  PageSection,
 } from "@/lib/supabase";
 
 const TRUST_PILLAR_ICONS: Record<string, typeof UserCheck> = {
@@ -27,26 +30,56 @@ const TRUST_PILLAR_ICONS: Record<string, typeof UserCheck> = {
   "map-pin": MapPin,
 };
 
+// Matches the root layout's default title/description (src/app/layout.tsx) —
+// used whenever the admin hasn't set a custom SEO title/description for 'home'.
+const DEFAULT_SEO_TITLE = "Nainital Taxi - Premium Taxi & Tour Services in Nainital";
+const DEFAULT_SEO_DESCRIPTION =
+  "Book premium taxi services in Nainital. Reliable transfers from Kathgodam, Delhi, Pantnagar. Tour packages to Bhimtal, Naukuchiatal, Kainchi Dham & more. Best rates guaranteed.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  // Deduped with the getPageContent('home') call in Home() below via React.cache.
+  const content = await getPageContent("home");
+  const title = content.seo_title?.trim() || DEFAULT_SEO_TITLE;
+  const description = content.seo_description?.trim() || DEFAULT_SEO_DESCRIPTION;
+
+  return {
+    // `absolute` bypasses the root layout's "%s | Nainital Taxi" template —
+    // seo_title is already the complete, brand-inclusive title for '/'.
+    title: { absolute: title },
+    description,
+  };
+}
+
 export default async function Home() {
   // Fetch homepage content from Supabase in parallel
-  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection] = await Promise.all([
+  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection, pageContent] = await Promise.all([
     getDestinations(),
     getPackages("tour"),
     getMinPricePerPackage(),
     getTransferRoutes(),
     getFeaturedReviews(3),
     getTrustSection(),
+    getPageContent("home"),
   ]);
 
   const trustPillars = (trustSection.trust_pillars || [])
     .filter((p) => p.is_active)
     .sort((a, b) => a.display_order - b.display_order);
+
+  const sectionsMap: Record<string, PageSection> = Object.fromEntries(
+    (pageContent.sections || []).map((s) => [s.key, s])
+  );
+
   return (
     <>
       <Header />
 
       {/* Seasonal Hero Section */}
-      <SeasonalHero />
+      <SeasonalHero
+        overrideImage={pageContent.hero_image_url}
+        overrideTitle={pageContent.hero_title}
+        overrideSubtitle={pageContent.hero_subtitle}
+      />
 
       {/* Trust Figures Bar */}
       <TrustFiguresBar />
@@ -57,10 +90,10 @@ export default async function Home() {
           <div className="flex items-end justify-between mb-10">
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-2">
-                Day tours and packages
+                {sectionsMap.tours?.heading || "Day tours and packages"}
               </h2>
               <p className="text-base text-slate-500">
-                Great Itineraries & Best Prices
+                {sectionsMap.tours?.subheading || "Great Itineraries & Best Prices"}
               </p>
             </div>
             <Link
@@ -106,7 +139,7 @@ export default async function Home() {
 
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-3">
-                Multi-day rentals
+                {sectionsMap.rentals?.heading || "Multi-day rentals"}
               </h2>
               <p className="text-base text-slate-600 mb-4">
                 Keep the same car and driver for your whole trip. Ideal for
@@ -134,10 +167,10 @@ export default async function Home() {
           <div className="flex items-end justify-between mb-10">
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-2">
-                Fixed-fare transfers
+                {sectionsMap.transfers?.heading || "Fixed-fare transfers"}
               </h2>
               <p className="text-base text-slate-500">
-                Transparent pricing for our most-booked routes. No surge, no haggling.
+                {sectionsMap.transfers?.subheading || "Transparent pricing for our most-booked routes. No surge, no haggling."}
               </p>
             </div>
             <Link
@@ -225,10 +258,10 @@ export default async function Home() {
           <div className="flex items-end justify-between mb-10">
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-2">
-                Where we go
+                {sectionsMap.destinations?.heading || "Where we go"}
               </h2>
               <p className="text-base text-slate-500">
-                Popular destinations across Nainital and Kumaon.
+                {sectionsMap.destinations?.subheading || "Popular destinations across Nainital and Kumaon."}
               </p>
             </div>
             <Link
@@ -266,10 +299,10 @@ export default async function Home() {
         <div className="container mx-auto max-w-[1200px]">
           <div className="text-center mb-10">
             <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-2">
-              What guests say
+              {sectionsMap.testimonials?.heading || "What guests say"}
             </h2>
             <p className="text-base text-slate-500">
-              Real experiences from travelers like you.
+              {sectionsMap.testimonials?.subheading || "Real experiences from travelers like you."}
             </p>
           </div>
 

@@ -683,6 +683,35 @@ export const DEFAULT_TRUST_SECTION: Omit<TrustSection, "id" | "created_at" | "up
   is_published: true,
 };
 
+export interface PageSection {
+  key: string; // matches a section key rendered in the page component, e.g. 'tours'
+  heading: string;
+  subheading: string;
+}
+
+export interface PageContent {
+  page_slug: string; // 'home', 'about', 'contact', ...
+  seo_title: string;
+  seo_description: string;
+  hero_image_url: string | null; // null = keep existing seasonal rotation
+  hero_title: string | null; // null = keep existing seasonal rotation
+  hero_subtitle: string | null; // null = keep existing seasonal rotation
+  sections: PageSection[];
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DEFAULT_PAGE_CONTENT: Omit<PageContent, "page_slug" | "created_at" | "updated_at"> = {
+  seo_title: "",
+  seo_description: "",
+  hero_image_url: null,
+  hero_title: null,
+  hero_subtitle: null,
+  sections: [],
+  is_published: true,
+};
+
 export interface AdminSetting {
   key: string;
   value: any; // JSONB - can be any JSON value

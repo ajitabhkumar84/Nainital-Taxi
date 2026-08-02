@@ -40,6 +40,8 @@ export type {
   TrustSection,
   TrustPillar,
   TickerBooking,
+  PageContent,
+  PageSection,
 
   // View types
   ActiveVehiclesSummary,
@@ -101,6 +103,9 @@ export {
 
   // Trust & Safety section
   getTrustSection,
+
+  // Page content (CMS)
+  getPageContent,
 
   // Destinations
   getDestinations,

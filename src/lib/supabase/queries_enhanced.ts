@@ -7,9 +7,10 @@
  * - Priority-based season selection
  */
 
+import { cache } from 'react';
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection } from './types';
-import { DEFAULT_TRUST_SECTION } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, PageContent } from './types';
+import { DEFAULT_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 
 // ============================================================================
 // SEASON & PRICING HELPERS
@@ -536,6 +537,33 @@ export async function getTrustSection(): Promise<TrustSection> {
 
   return data;
 }
+
+// ============================================================================
+// PAGE CONTENT (CMS)
+// ============================================================================
+
+// Wrapped in React.cache so that calling this once from generateMetadata and
+// once from the page component in the same server render dedupes to a
+// single Supabase round-trip (the Supabase client, unlike fetch, has no
+// automatic request memoization). This cache is per-request only.
+export const getPageContent = cache(async (slug: string): Promise<PageContent> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('page_content') as any)
+    .select('*')
+    .eq('page_slug', slug)
+    .single();
+
+  if (error || !data) {
+    return {
+      ...DEFAULT_PAGE_CONTENT,
+      page_slug: slug,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return data as PageContent;
+});
 
 // ============================================================================
 // ADMIN HELPERS (for managing seasons and blackouts)

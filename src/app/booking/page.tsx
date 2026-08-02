@@ -71,7 +71,7 @@ function BookingPageContent() {
                 </div>
                 <div className="text-left">
                   <div className="font-bold">4.8/5 Rating</div>
-                  <div className="text-xs text-gray-500">Google Reviews</div>
+                  <div className="text-xs text-gray-500">Best Service</div>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
@@ -79,7 +79,7 @@ function BookingPageContent() {
                   <Users className="w-5 h-5 text-whatsapp" />
                 </div>
                 <div className="text-left">
-                  <div className="font-bold">500+ Happy</div>
+                  <div className="font-bold">1500+ Happy</div>
                   <div className="text-xs text-gray-500">Customers</div>
                 </div>
               </div>

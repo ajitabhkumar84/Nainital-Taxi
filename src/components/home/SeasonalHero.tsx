@@ -9,6 +9,14 @@ interface SeasonConfig {
   subtitle: string;
 }
 
+interface SeasonalHeroProps {
+  // Optional admin-set overrides (from the "Home Page" CMS form). Any field
+  // left null/empty keeps the automatic seasonal rotation for that field.
+  overrideImage?: string | null;
+  overrideTitle?: string | null;
+  overrideSubtitle?: string | null;
+}
+
 const TRUST_FIGURES = [
   '15+ years operating',
   '10,000+ safe trips',
@@ -16,7 +24,11 @@ const TRUST_FIGURES = [
   '24/7 support',
 ];
 
-export default function SeasonalHero() {
+export default function SeasonalHero({
+  overrideImage,
+  overrideTitle,
+  overrideSubtitle,
+}: SeasonalHeroProps = {}) {
   const seasonConfig = useMemo<SeasonConfig>(() => {
     const month = new Date().getMonth(); // 0-11
 
@@ -55,12 +67,16 @@ export default function SeasonalHero() {
     };
   }, []);
 
+  const backgroundImage = overrideImage || seasonConfig.backgroundImage;
+  const title = overrideTitle || seasonConfig.title;
+  const subtitle = overrideSubtitle || seasonConfig.subtitle;
+
   return (
     <section id="booking" className="relative overflow-hidden">
       {/* Background photo */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('${seasonConfig.backgroundImage}')` }}
+        style={{ backgroundImage: `url('${backgroundImage}')` }}
       />
       {/* Scrim: darker on the left where the headline sits, lighter toward the widget */}
       <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/55 to-ink/25" />
@@ -71,10 +87,10 @@ export default function SeasonalHero() {
           {/* Copy */}
           <div>
             <h1 className="text-[34px] leading-[1.1] md:text-5xl md:leading-[1.08] font-display font-semibold text-white tracking-tight mb-4 max-w-xl">
-              {seasonConfig.title}
+              {title}
             </h1>
             <p className="text-base md:text-lg text-white/85 mb-6 max-w-lg">
-              {seasonConfig.subtitle}
+              {subtitle}
             </p>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-white/75">
               {TRUST_FIGURES.map((figure, i) => (

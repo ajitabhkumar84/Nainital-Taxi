@@ -18,6 +18,7 @@ import {
   Heart,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
 
@@ -417,6 +418,12 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             Create New Booking
           </Button>
         </div>
+
+        <div className="text-center">
+          <Link href="/" className="text-sm text-gray-500 underline hover:text-gray-700">
+            Return to homepage
+          </Link>
+        </div>
       </div>
     );
   }
@@ -446,7 +453,7 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             <div className="w-8 h-8 rounded-full bg-coral/10 flex items-center justify-center">
               <Shield className="w-4 h-4 text-coral" />
             </div>
-            <span className="text-gray-600">Zero Alcohol</span>
+            <span className="text-gray-600">Well Maintained Cars</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <div className="w-8 h-8 rounded-full bg-sunshine/30 flex items-center justify-center">
@@ -619,6 +626,12 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
             </>
           )}
         </Button>
+      </div>
+
+      <div className="text-center">
+        <Link href="/" className="text-sm text-gray-500 underline hover:text-gray-700">
+          Return to homepage
+        </Link>
       </div>
     </div>
   );

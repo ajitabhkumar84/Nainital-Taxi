@@ -27,6 +27,9 @@ import {
   Radio,
   ShieldCheck,
   Megaphone,
+  FileText,
+  Home,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,27 +39,44 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const navItems: NavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
-  { href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
-  { href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
-  { href: "/admin/addons", label: "Revenue Addons", icon: <Gift className="w-5 h-5" /> },
-  { href: "/admin/testimonials", label: "Testimonials", icon: <MessageSquareQuote className="w-5 h-5" /> },
-  { href: "/admin/ticker", label: "Booking Ticker", icon: <Radio className="w-5 h-5" /> },
-  { href: "/admin/trust-section", label: "Trust & Safety", icon: <ShieldCheck className="w-5 h-5" /> },
-  { href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
-  { href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
-  { href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },
-  { href: "/admin/temple-categories", label: "Temple Categories", icon: <FolderTree className="w-5 h-5" /> },
-  { href: "/admin/fleet", label: "Fleet", icon: <Car className="w-5 h-5" /> },
-  { href: "/admin/multi-day-rental", label: "Multi-Day Rental", icon: <CalendarDays className="w-5 h-5" /> },
-  { href: "/admin/availability", label: "Availability", icon: <Calendar className="w-5 h-5" /> },
-  { href: "/admin/bookings", label: "Bookings", icon: <BookOpen className="w-5 h-5" /> },
-  { href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },
-  { href: "/admin/seasons", label: "Seasons", icon: <Sun className="w-5 h-5" /> },
-  { href: "/admin/site-config", label: "Site Config", icon: <Globe className="w-5 h-5" /> },
-  { href: "/admin/landing-page", label: "PPC Landing Page", icon: <Megaphone className="w-5 h-5" /> },
-  { href: "/admin/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
+interface NavGroup {
+  label: string;
+  icon: React.ReactNode;
+  children: NavItem[];
+}
+
+type NavEntry = ({ type: "item" } & NavItem) | ({ type: "group" } & NavGroup);
+
+const navEntries: NavEntry[] = [
+  { type: "item", href: "/admin", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+  {
+    type: "group",
+    label: "Pages",
+    icon: <FileText className="w-5 h-5" />,
+    children: [
+      { href: "/admin/pages/home", label: "Home Page", icon: <Home className="w-5 h-5" /> },
+      // Add future static pages here, e.g. About Us, Contact, ...
+    ],
+  },
+  { type: "item", href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
+  { type: "item", href: "/admin/packages", label: "Packages", icon: <Package className="w-5 h-5" /> },
+  { type: "item", href: "/admin/addons", label: "Revenue Addons", icon: <Gift className="w-5 h-5" /> },
+  { type: "item", href: "/admin/testimonials", label: "Testimonials", icon: <MessageSquareQuote className="w-5 h-5" /> },
+  { type: "item", href: "/admin/ticker", label: "Booking Ticker", icon: <Radio className="w-5 h-5" /> },
+  { type: "item", href: "/admin/trust-section", label: "Trust & Safety", icon: <ShieldCheck className="w-5 h-5" /> },
+  { type: "item", href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
+  { type: "item", href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
+  { type: "item", href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },
+  { type: "item", href: "/admin/temple-categories", label: "Temple Categories", icon: <FolderTree className="w-5 h-5" /> },
+  { type: "item", href: "/admin/fleet", label: "Fleet", icon: <Car className="w-5 h-5" /> },
+  { type: "item", href: "/admin/multi-day-rental", label: "Multi-Day Rental", icon: <CalendarDays className="w-5 h-5" /> },
+  { type: "item", href: "/admin/availability", label: "Availability", icon: <Calendar className="w-5 h-5" /> },
+  { type: "item", href: "/admin/bookings", label: "Bookings", icon: <BookOpen className="w-5 h-5" /> },
+  { type: "item", href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },
+  { type: "item", href: "/admin/seasons", label: "Seasons", icon: <Sun className="w-5 h-5" /> },
+  { type: "item", href: "/admin/site-config", label: "Site Config", icon: <Globe className="w-5 h-5" /> },
+  { type: "item", href: "/admin/landing-page", label: "PPC Landing Page", icon: <Megaphone className="w-5 h-5" /> },
+  { type: "item", href: "/admin/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
 function PasswordGate({ onAuthenticated }: { onAuthenticated: () => void }) {
@@ -151,6 +171,22 @@ function AdminSidebar({
 }) {
   const pathname = usePathname();
 
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(navEntries.filter((e) => e.type === "group" && e.children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"))).map((e) => (e as { label: string }).label))
+  );
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
+
   const handleLogout = async () => {
     try {
       await fetch('/api/admin/auth/logout', {
@@ -196,22 +232,73 @@ function AdminSidebar({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2 [scrollbar-width:thin] [scrollbar-color:#0F172A33_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-ink/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center space-x-3 px-4 py-3 rounded-xl font-body transition-all",
-                pathname === item.href
-                  ? "bg-sunshine border-3 border-ink shadow-retro-sm text-ink font-semibold"
-                  : "text-ink/70 hover:bg-sunrise/50 hover:text-ink"
-              )}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {navEntries.map((entry) => {
+            if (entry.type === "item") {
+              return (
+                <Link
+                  key={entry.href}
+                  href={entry.href}
+                  onClick={onClose}
+                  className={cn(
+                    "flex items-center space-x-3 px-4 py-3 rounded-xl font-body transition-all",
+                    pathname === entry.href
+                      ? "bg-sunshine border-3 border-ink shadow-retro-sm text-ink font-semibold"
+                      : "text-ink/70 hover:bg-sunrise/50 hover:text-ink"
+                  )}
+                >
+                  {entry.icon}
+                  <span>{entry.label}</span>
+                </Link>
+              );
+            }
+
+            const isOpen = openGroups.has(entry.label);
+            const isChildActive = entry.children.some(
+              (c) => pathname === c.href || pathname.startsWith(c.href + "/")
+            );
+
+            return (
+              <div key={entry.label}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(entry.label)}
+                  className={cn(
+                    "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-body transition-all",
+                    isChildActive
+                      ? "text-ink font-semibold"
+                      : "text-ink/70 hover:bg-sunrise/50 hover:text-ink"
+                  )}
+                >
+                  {entry.icon}
+                  <span className="flex-1 text-left">{entry.label}</span>
+                  <ChevronDown
+                    className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")}
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="mt-1 ml-4 pl-3 border-l-2 border-ink/10 space-y-1">
+                    {entry.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center space-x-3 px-4 py-2.5 rounded-xl font-body transition-all text-sm",
+                          pathname === child.href
+                            ? "bg-sunshine border-3 border-ink shadow-retro-sm text-ink font-semibold"
+                            : "text-ink/70 hover:bg-sunrise/50 hover:text-ink"
+                        )}
+                      >
+                        {child.icon}
+                        <span>{child.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}
