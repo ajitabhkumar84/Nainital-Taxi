@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useBookingStore, VehicleType } from '@/store/bookingStore';
 import { Button, Badge, Input } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil, Calendar } from 'lucide-react';
+import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil, Calendar, MessageCircle } from 'lucide-react';
 import {
   getVehicleTypeName,
   getVehicleCapacity,
@@ -14,8 +14,9 @@ import {
   formatPrice,
   PriceResult,
 } from '@/lib/pricing';
-import { getMinBookingDate } from '@/lib/booking';
+import { getMinBookingDate, formatDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
 
 interface Package {
   id: string;
@@ -51,6 +52,8 @@ export default function Step1PackageSelection() {
     nextStep,
   } = useBookingStore();
   const { labels: vehicleLabels } = useVehicleLabels();
+  const { config: siteConfig } = useSiteConfig();
+  const whatsappNumber = siteConfig.contact.whatsapp.replace(/\D/g, '');
 
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,9 +137,12 @@ export default function Step1PackageSelection() {
     setError('');
   };
 
+  const selectedVehiclePriceMissing =
+    !!vehicleType && !!tripDate && !pricingLoading && !pricesByVehicle[vehicleType];
+
   const handleNext = () => {
-    if ((!packageId && !routeId) || !vehicleType || !tripDate) {
-      setError('Please select a package, a date, and a vehicle type');
+    if ((!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing) {
+      setError('Please select a package, a date, and a vehicle type with an available price');
       return;
     }
     setError('');
@@ -329,17 +335,36 @@ export default function Step1PackageSelection() {
             </label>
             <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible">
               {vehicleTypes.map((vehicle) => {
+                const routeName = packageTitle || 'your trip';
+                const formattedTripDate = tripDate ? formatDate(tripDate) : '';
                 const priceResult = pricesByVehicle[vehicle.type];
+                const isPriceUnavailable = Boolean(tripDate) && !pricingLoading && !priceResult;
+                const selectVehicle = () => {
+                  if (isPriceUnavailable) return;
+                  setVehicleType(vehicle.type);
+                };
                 return (
-                  <button
+                  <div
                     key={vehicle.type}
-                    onClick={() => setVehicleType(vehicle.type)}
+                    role="button"
+                    tabIndex={0}
+                    aria-disabled={isPriceUnavailable}
+                    onClick={selectVehicle}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectVehicle();
+                      }
+                    }}
                     className={`
                       min-w-[260px] snap-start sm:min-w-0
                       p-6 rounded-2xl border-4 transition-all duration-200 text-left
+                      ${isPriceUnavailable ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}
                       ${
                         vehicleType === vehicle.type
                           ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
+                          : isPriceUnavailable
+                          ? 'border-[#2D3436] bg-white'
                           : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
                       }
                     `}
@@ -378,11 +403,22 @@ export default function Step1PackageSelection() {
                             </div>
                           </>
                         ) : (
-                          <div className="text-xs text-red-500">Price unavailable for this date</div>
+                          <a
+                            href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                              `Hi! 👋 Need a quick quote for ${routeName} on ${formattedTripDate}. 🚕`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20BA59] px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                            Price unavailable. 💬 Tap for a live quote via WhatsApp
+                          </a>
                         )}
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -399,7 +435,7 @@ export default function Step1PackageSelection() {
           <div className="flex justify-end pt-6 border-t-2 border-gray-200">
             <Button
               onClick={handleNext}
-              disabled={(!packageId && !routeId) || !vehicleType || !tripDate}
+              disabled={(!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing}
               size="lg"
               className="group"
             >

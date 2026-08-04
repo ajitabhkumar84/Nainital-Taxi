@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 
 interface PackageCardProps {
   slug: string;
@@ -92,12 +93,11 @@ export default function PackageCard({
           )}
         </div>
 
-        <Link
-          href={`/tour/${slug}`}
-          className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
-        >
-          View details
-        </Link>
+        <Button variant="primary" size="sm" asChild className="mt-4 w-full min-h-[44px]">
+          <Link href={`/tour/${slug}`}>
+            View details
+          </Link>
+        </Button>
       </div>
     </div>
   );

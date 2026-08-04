@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Save, Loader2, Plus, X, Eye, EyeOff, GripVertical } from "lucide-react";
 import { TrustSection, TrustPillar } from "@/lib/supabase/types";
+import ImageUploader from "./ImageUploader";
 
 const ICON_OPTIONS = [
   { value: "user-check", label: "Verified / Checkmark" },
@@ -146,6 +147,14 @@ export default function TrustSectionForm() {
         <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
           Core Thesis
         </h2>
+        <ImageUploader
+          value={data?.image_url || ""}
+          onChange={(url) => setData({ ...data, image_url: url || null })}
+          folder="trust-section"
+          label="Section Photo"
+          recommendedSize="1000 x 1250"
+          aspectRatio="4:5"
+        />
         <div>
           <label className="block font-body text-sm text-ink/70 mb-1">Heading *</label>
           <input

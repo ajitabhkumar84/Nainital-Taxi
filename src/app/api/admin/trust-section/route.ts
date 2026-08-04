@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       id: FIXED_ID,
       heading: body.heading,
       description: body.description,
+      image_url: body.image_url ?? null,
       trust_pillars: body.trust_pillars,
       is_published: body.is_published ?? true,
       updated_at: new Date().toISOString(),

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { buildBookingUrl } from "@/lib/bookingLink";
-import { Header, Footer } from "@/components/ui";
-import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin } from "lucide-react";
+import { Header, Footer, Button } from "@/components/ui";
+import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin, ArrowRight } from "lucide-react";
 import DestinationCard from "@/components/home/DestinationCard";
 import PackageCard from "@/components/home/PackageCard";
 import SeasonalHero from "@/components/home/SeasonalHero";
@@ -150,12 +150,12 @@ export default async function Home() {
                 Rates depend on your itinerary and number of days. Includes
                 driver, fuel and state taxes.
               </p>
-              <Link
-                href="/multi-day-rental"
-                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
-              >
-                See rental options →
-              </Link>
+              <Button variant="primary" size="sm" asChild className="min-h-[44px]">
+                <Link href="/multi-day-rental">
+                  See rental options
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -225,19 +225,20 @@ export default async function Home() {
                         <span className="text-slate-400">On request</span>
                       )}
                     </div>
-                    <Link
-                      href={buildBookingUrl({
-                        routeId: route.id,
-                        packageType: "transfer",
-                        packageTitle: `${route.pickup_location} to ${route.drop_location}`,
-                        ...(cheapest ? { vehicle: cheapest.vehicle } : {}),
-                        pickup: route.pickup_location,
-                        dropoff: route.drop_location,
-                      })}
-                      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50 md:w-auto w-full"
-                    >
-                      Book
-                    </Link>
+                    <Button variant="primary" size="sm" asChild className="min-h-[44px] md:w-auto w-full">
+                      <Link
+                        href={buildBookingUrl({
+                          routeId: route.id,
+                          packageType: "transfer",
+                          packageTitle: `${route.pickup_location} to ${route.drop_location}`,
+                          ...(cheapest ? { vehicle: cheapest.vehicle } : {}),
+                          pickup: route.pickup_location,
+                          dropoff: route.drop_location,
+                        })}
+                      >
+                        Book
+                      </Link>
+                    </Button>
                   </div>
                 );
               })}
@@ -354,10 +355,20 @@ export default async function Home() {
       <section className="py-16 md:py-24 px-4 border-t border-slate-200">
         <div className="container mx-auto max-w-[1200px]">
           <div className="grid gap-10 md:grid-cols-[0.85fr_1fr] md:items-start">
-            {/* Photo slot — awaiting real driver/vehicle photography */}
-            <div className="aspect-[4/5] rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-              <span className="text-sm text-slate-500 px-6 text-center">Our drivers</span>
-            </div>
+            {trustSection.image_url ? (
+              <div className="aspect-[4/5] rounded-lg overflow-hidden border border-slate-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={trustSection.image_url}
+                  alt={trustSection.heading}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="aspect-[4/5] rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <span className="text-sm text-slate-500 px-6 text-center">Our drivers</span>
+              </div>
+            )}
 
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-4">

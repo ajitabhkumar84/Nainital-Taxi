@@ -662,6 +662,7 @@ export interface TrustSection {
   id: string; // UUID, fixed singleton
   heading: string;
   description: string;
+  image_url: string | null; // photo shown beside the section; null = show placeholder
   trust_pillars: TrustPillar[];
   is_published: boolean;
   created_at: string;
@@ -671,14 +672,14 @@ export interface TrustSection {
 export const DEFAULT_TRUST_SECTION: Omit<TrustSection, "id" | "created_at" | "updated_at"> = {
   heading: "Why families trust us",
   description:
-    "Every driver is background-verified, trained, and held to a zero-alcohol policy. Your safety is not an afterthought — it is how we operate.",
+    "Every driver is background-verified and professionally trained. Your safety is not an afterthought — it is the foundation of how we operate.",
+  image_url: null,
   trust_pillars: [
-    { icon_name: "user-check", title: "Verified drivers", description: "Background verification, license validation and character reference checks before joining our team.", display_order: 1, is_active: true },
-    { icon_name: "shield", title: "Zero alcohol policy", description: "Our drivers pledge complete sobriety. No exceptions, with random checks to enforce it.", display_order: 2, is_active: true },
-    { icon_name: "award", title: "Professional training", description: "Defensive driving, first-aid certification and customer service training.", display_order: 3, is_active: true },
-    { icon_name: "heart", title: "Family values", description: "Drivers trained to treat every passenger like their own family.", display_order: 4, is_active: true },
-    { icon_name: "car", title: "Spotless vehicles", description: "Daily sanitized, regularly serviced and thoroughly inspected.", display_order: 5, is_active: true },
-    { icon_name: "phone", title: "24/7 support", description: "Round-the-clock assistance, a call away whenever you need us.", display_order: 6, is_active: true },
+    { icon_name: "heart", title: "Family values", description: "Drivers are trained to treat every passenger with the care and respect they would give their own family.", display_order: 1, is_active: true },
+    { icon_name: "car", title: "Well-maintained vehicles", description: "Our cars are regularly checked and serviced to ensure a comfortable, reliable, and safe journey.", display_order: 2, is_active: true },
+    { icon_name: "user-check", title: "Verified drivers", description: "Comprehensive background verification, license validation, and character reference checks are mandatory before anyone joins our team.", display_order: 3, is_active: true },
+    { icon_name: "award", title: "Professional training", description: "Our team undergoes strict defensive driving and customer service training to provide the best possible experience.", display_order: 4, is_active: true },
+    { icon_name: "phone", title: "Reliable on-road assistance", description: "A dedicated support team is always just a call away to help you out during your trip.", display_order: 5, is_active: true },
   ],
   is_published: true,
 };
