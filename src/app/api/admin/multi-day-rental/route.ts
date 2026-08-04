@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { MultiDayRentalPage, DEFAULT_MULTI_DAY_RENTAL_PAGE } from '@/lib/supabase/types';
+import { slugify, validatePageSlug } from '@/lib/slug';
 
 const FIXED_ID = '00000000-0000-0000-0000-000000000001';
+
+// Purges the cached public route(s) so edits/publish-toggles/slug changes
+// show up immediately, now that the public page no longer fetches with
+// `cache: 'no-store'`. `oldSlug`/`newSlug` may be the same value — always
+// revalidating the legacy `/multi-day-rental` path covers its redirect
+// logic too.
+function revalidateMultiDayRentalPaths(oldSlug: string | null, newSlug: string | null) {
+  revalidatePath('/multi-day-rental');
+  if (oldSlug && oldSlug !== 'multi-day-rental') revalidatePath(`/${oldSlug}`);
+  if (newSlug && newSlug !== 'multi-day-rental' && newSlug !== oldSlug) revalidatePath(`/${newSlug}`);
+}
 
 // GET - Fetch multi-day rental page configuration
 export async function GET() {
@@ -49,10 +62,33 @@ export async function POST(request: NextRequest) {
     const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
 
+    // Normalize + validate page_slug if the client sent one. Client-side
+    // validation in the form is best-effort UX only — this is the
+    // authoritative check.
+    let normalizedSlug: string | undefined;
+    if (typeof body.page_slug === 'string') {
+      normalizedSlug = slugify(body.page_slug);
+      const validationError = validatePageSlug(normalizedSlug);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+    }
+
+    // Capture the pre-write slug so we know what old path to revalidate if
+    // it's about to change.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (adminSupabase
+      .from('multi_day_rental_page') as any)
+      .select('page_slug')
+      .eq('id', FIXED_ID)
+      .single();
+    const oldSlug: string | null = existing?.page_slug ?? null;
+
     // Prepare update data
     const updateData: Partial<MultiDayRentalPage> = {
       id: FIXED_ID,
       ...body,
+      ...(normalizedSlug !== undefined ? { page_slug: normalizedSlug } : {}),
       updated_at: new Date().toISOString(),
     };
 
@@ -68,12 +104,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { error: 'That page URL is already in use. Choose a different one.' },
+          { status: 409 }
+        );
+      }
       console.error('Error updating multi-day rental page:', error);
       return NextResponse.json(
         { error: 'Failed to update page configuration', details: error.message },
         { status: 500 }
       );
     }
+
+    revalidateMultiDayRentalPaths(oldSlug, data?.page_slug ?? null);
 
     return NextResponse.json(data);
   } catch (error) {
@@ -171,6 +215,8 @@ export async function PATCH(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    revalidateMultiDayRentalPaths(data?.page_slug ?? null, data?.page_slug ?? null);
 
     return NextResponse.json(data);
   } catch (error) {

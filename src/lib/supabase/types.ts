@@ -1721,7 +1721,30 @@ export interface MultiDayCarCategory {
   off_season_price: number;  // Off season price per day in ₹
   is_popular: boolean;       // Show "POPULAR" badge
   order: number;             // Display order (lower numbers first)
+  capacity?: string;         // e.g., "4+1 Seater"
+  tagline?: string;          // e.g., "Comfortable & Reliable"
+  whatsapp_message?: string; // Per-category pre-filled WhatsApp template; "{category}" is replaced with `name` at render time
 }
+
+/**
+ * A single safety-pillar entry in the Multi-Day Rental "Safety Promise" section
+ */
+export interface SafetyPillar {
+  icon: string;        // lucide icon name, see src/lib/pillarIcons.ts
+  title: string;
+  description: string;
+}
+
+/**
+ * A recurring annual month/day window, e.g. { start: "04-15", end: "07-10" }.
+ * May wrap the year boundary (start > end, e.g. "12-20" -> "01-15").
+ */
+export interface MonthDayRange {
+  start: string; // "MM-DD"
+  end: string;   // "MM-DD"
+}
+
+export type SeasonOverride = 'auto' | 'force_season' | 'force_mid_season' | 'force_off_season';
 
 /**
  * Inclusion or exclusion item
@@ -1774,6 +1797,9 @@ export interface CTAFeature {
 export interface MultiDayRentalPage {
   id: string;
 
+  // Routing
+  page_slug: string; // public URL path segment, e.g. "multi-day-rental"
+
   // SEO & Meta Data
   seo_title: string;
   seo_description: string;
@@ -1787,21 +1813,41 @@ export interface MultiDayRentalPage {
   hero_subheadline: string;
   hero_image_url?: string | null;
   hero_trust_indicators: TrustIndicator[];
+  hero_trust_badges: string[]; // qualitative chips, e.g. "Verified Drivers"
+
+  // Safety Promise Section (inlined content — see SafetyPillar)
+  safety_heading: string;
+  safety_subheading: string;
+  safety_pillars: SafetyPillar[]; // up to 4
 
   // Pricing Section
   pricing_heading: string;
   pricing_subheading: string;
   pricing_season_label: string;
-  pricing_season_date_ranges: string[];
+  // Deprecated free-text ranges, preserved only so the admin can see what
+  // was previously entered while migrating to pricing_season_ranges.
+  legacy_pricing_season_date_ranges?: string[];
   pricing_season_description: string;
   pricing_mid_season_label: string;
-  pricing_mid_season_date_ranges: string[];
+  legacy_pricing_mid_season_date_ranges?: string[];
   pricing_mid_season_description: string;
   pricing_off_season_label: string;
-  pricing_off_season_date_ranges: string[];
+  legacy_pricing_off_season_date_ranges?: string[];
   pricing_off_season_description: string;
   pricing_note_text: string;
   car_categories: MultiDayCarCategory[];
+
+  // Structured, machine-comparable seasonality (recurring annual month/day
+  // windows) plus an admin override for which tier is treated as "active".
+  pricing_season_ranges: MonthDayRange[];
+  pricing_mid_season_ranges: MonthDayRange[];
+  pricing_off_season_ranges: MonthDayRange[];
+  season_override: SeasonOverride;
+
+  // SEO Content Block (2-column: rich-text body + bullet highlights)
+  seo_content_heading?: string;
+  seo_content_body?: string; // admin-authored HTML from the rich text editor
+  seo_content_highlights: string[];
 
   // Inclusion/Exclusion Section
   inclusion_exclusion_heading: string;
@@ -1845,6 +1891,8 @@ export interface MultiDayRentalPage {
  * Default multi-day rental page configuration
  */
 export const DEFAULT_MULTI_DAY_RENTAL_PAGE: Partial<MultiDayRentalPage> = {
+  page_slug: 'multi-day-rental',
+
   // SEO
   seo_title: 'Multi-Day Car Rental in Uttarakhand | Nainital Taxi',
   seo_description: 'Book multi-day car rentals for complete Uttarakhand tours. Transparent seasonal pricing, flexible packages, and professional drivers.',
@@ -1861,21 +1909,40 @@ export const DEFAULT_MULTI_DAY_RENTAL_PAGE: Partial<MultiDayRentalPage> = {
     { number: '15+', label: 'Years Experience' },
     { number: '24/7', label: 'Support' },
   ],
+  hero_trust_badges: ['Verified Drivers', 'Zero Alcohol Policy', '24/7 Support'],
+
+  // Safety Promise
+  safety_heading: 'Your Safety, Our Promise',
+  safety_subheading: 'Every trip is backed by these commitments to you',
+  safety_pillars: [
+    { icon: 'user-check', title: 'Verified Drivers', description: 'Background-checked, experienced hill drivers' },
+    { icon: 'shield', title: 'Zero Alcohol Policy', description: 'Strictly enforced for every trip, every driver' },
+    { icon: 'car', title: 'Well-Maintained Fleet', description: 'Regularly serviced and safety-inspected vehicles' },
+    { icon: 'phone', title: '24/7 Support', description: 'A number to call any time, day or night' },
+  ],
 
   // Pricing
   pricing_heading: 'Choose Your Ride',
   pricing_subheading: 'Per day rates for various car categories - transparent pricing for every season',
   pricing_season_label: 'Season Rates',
-  pricing_season_date_ranges: ['15 Apr - 10 Jul', '20 Dec - 15 Jan'],
   pricing_season_description: 'Peak tourist season',
   pricing_mid_season_label: 'Mid Season',
-  pricing_mid_season_date_ranges: ['11 Jul - 30 Sep', '16 Jan - 14 Apr'],
   pricing_mid_season_description: 'Moderate season',
   pricing_off_season_label: 'Off-Season Rates',
-  pricing_off_season_date_ranges: ['1 Oct - 19 Dec'],
   pricing_off_season_description: 'Off-peak season',
   pricing_note_text: 'Above charges are general rates. Exact charges depend on itinerary and number of days.',
   car_categories: [],
+
+  // Structured seasonality (mirrors the copy above, in comparable MM-DD form)
+  pricing_season_ranges: [{ start: '04-15', end: '07-10' }, { start: '12-20', end: '01-15' }],
+  pricing_mid_season_ranges: [{ start: '07-11', end: '09-30' }, { start: '01-16', end: '04-14' }],
+  pricing_off_season_ranges: [{ start: '10-01', end: '12-19' }],
+  season_override: 'auto',
+
+  // SEO Content Block
+  seo_content_heading: 'Why Choose Our Multi-Day Rentals',
+  seo_content_body: '',
+  seo_content_highlights: [],
 
   // Inclusion/Exclusion
   inclusion_exclusion_heading: "What's Included & Excluded",

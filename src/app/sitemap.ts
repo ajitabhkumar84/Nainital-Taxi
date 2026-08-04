@@ -55,12 +55,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.7,
     },
-    {
-      url: `${baseUrl}/multi-day-rental`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
   ];
 
   // Fetch dynamic destinations
@@ -102,5 +96,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticRoutes, ...destinationRoutes, ...packageRoutes, ...tourRoutes];
+  // Multi-day rental page's URL is admin-configurable (page_slug) —
+  // pull the live value instead of hardcoding "/multi-day-rental".
+  const { data: multiDayRentalPage } = await supabase
+    .from('multi_day_rental_page')
+    .select('page_slug, updated_at')
+    .eq('id', '00000000-0000-0000-0000-000000000001')
+    .eq('is_published', true)
+    .maybeSingle();
+
+  const multiDayRentalRoutes: MetadataRoute.Sitemap = multiDayRentalPage
+    ? [
+        {
+          url: `${baseUrl}/${multiDayRentalPage.page_slug}`,
+          lastModified: multiDayRentalPage.updated_at ? new Date(multiDayRentalPage.updated_at) : new Date(),
+          changeFrequency: 'monthly',
+          priority: 0.7,
+        },
+      ]
+    : [];
+
+  return [...staticRoutes, ...destinationRoutes, ...packageRoutes, ...tourRoutes, ...multiDayRentalRoutes];
 }
