@@ -7,6 +7,8 @@ import {
   MultiDayRentalPage,
   MultiDayCarCategory,
   TourDurationPackage,
+  PackageFeature,
+  TrustIndicator,
   InclusionExclusionItem,
   MultiDayRentalFAQ,
   CTAFeature,
@@ -41,6 +43,20 @@ const SEASON_TIER_LABELS: Record<string, string> = {
   season: "Peak Season",
   mid_season: "Mid Season",
   off_season: "Off-Season",
+};
+
+type PackageKey = "package_1" | "package_2" | "package_3" | "package_4";
+
+const PACKAGE_KEYS: PackageKey[] = ["package_1", "package_2", "package_3", "package_4"];
+
+const EMPTY_PACKAGE: TourDurationPackage = {
+  badge: "",
+  duration: "",
+  subtitle: "",
+  features: [],
+  whatsapp_message: "",
+  is_popular: false,
+  is_custom_package: false,
 };
 
 export default function MultiDayRentalForm() {
@@ -231,6 +247,60 @@ export default function MultiDayRentalForm() {
       ...pageData,
       cta_features: pageData?.cta_features?.filter((_, i) => i !== index) || [],
     });
+  };
+
+  const addTrustIndicator = () => {
+    setPageData({
+      ...pageData,
+      hero_trust_indicators: [...(pageData?.hero_trust_indicators || []), { number: "", label: "" }],
+    });
+  };
+
+  const updateTrustIndicator = (index: number, field: keyof TrustIndicator, value: string) => {
+    const updated = [...(pageData?.hero_trust_indicators || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setPageData({ ...pageData, hero_trust_indicators: updated });
+  };
+
+  const removeTrustIndicator = (index: number) => {
+    setPageData({
+      ...pageData,
+      hero_trust_indicators: pageData?.hero_trust_indicators?.filter((_, i) => i !== index) || [],
+    });
+  };
+
+  const updatePackage = (
+    key: PackageKey,
+    field: keyof TourDurationPackage,
+    value: string | boolean | PackageFeature[]
+  ) => {
+    const current = pageData?.[key] as TourDurationPackage | undefined;
+    setPageData({
+      ...pageData,
+      [key]: { ...(current || EMPTY_PACKAGE), [field]: value },
+    });
+  };
+
+  const updatePackageFeature = (
+    key: PackageKey,
+    featureIndex: number,
+    field: keyof PackageFeature,
+    value: string | boolean
+  ) => {
+    const current = pageData?.[key] as TourDurationPackage | undefined;
+    const features = [...(current?.features || [])];
+    features[featureIndex] = { ...features[featureIndex], [field]: value };
+    updatePackage(key, "features", features);
+  };
+
+  const addPackageFeature = (key: PackageKey) => {
+    const current = pageData?.[key] as TourDurationPackage | undefined;
+    updatePackage(key, "features", [...(current?.features || []), { text: "", is_bold: false }]);
+  };
+
+  const removePackageFeature = (key: PackageKey, featureIndex: number) => {
+    const current = pageData?.[key] as TourDurationPackage | undefined;
+    updatePackage(key, "features", (current?.features || []).filter((_, i) => i !== featureIndex));
   };
 
   const MAX_SAFETY_PILLARS = 4;
@@ -461,6 +531,51 @@ export default function MultiDayRentalForm() {
           onChange={(tags) => setPageData({ ...pageData, hero_trust_badges: tags })}
           placeholder="e.g., Verified Drivers"
         />
+
+        <div className="pt-2 border-t-2 border-ink/10">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block font-body text-sm text-ink/70">
+              Trust Indicators (the big stat numbers in the hero)
+            </label>
+            <button
+              type="button"
+              onClick={addTrustIndicator}
+              className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
+            >
+              <Plus className="w-3 h-3" /> Add Indicator
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {pageData?.hero_trust_indicators?.map((indicator, index) => (
+              <div key={index} className="p-3 border-2 border-ink/10 rounded-lg space-y-2 relative">
+                <button
+                  type="button"
+                  onClick={() => removeTrustIndicator(index)}
+                  className="absolute top-1 right-1 p-1 text-coral hover:bg-coral/10 rounded"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <input
+                  type="text"
+                  value={indicator.number}
+                  onChange={(e) => updateTrustIndicator(index, "number", e.target.value)}
+                  placeholder="e.g., 500+"
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm font-semibold"
+                />
+                <input
+                  type="text"
+                  value={indicator.label}
+                  onChange={(e) => updateTrustIndicator(index, "label", e.target.value)}
+                  placeholder="e.g., Happy Travelers"
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                />
+              </div>
+            ))}
+            {(!pageData?.hero_trust_indicators || pageData.hero_trust_indicators.length === 0) && (
+              <p className="text-xs text-ink/40 font-body">No trust indicators yet.</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Safety Promise Section */}
@@ -545,6 +660,39 @@ export default function MultiDayRentalForm() {
       <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-5">
         <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">Seasonality & Pricing Engine</h2>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Peak Season Label</label>
+            <input
+              type="text"
+              value={pageData?.pricing_season_label || ""}
+              onChange={(e) => setPageData({ ...pageData, pricing_season_label: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Peak Season"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Mid Season Label</label>
+            <input
+              type="text"
+              value={pageData?.pricing_mid_season_label || ""}
+              onChange={(e) => setPageData({ ...pageData, pricing_mid_season_label: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Mid Season"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Off-Season Label</label>
+            <input
+              type="text"
+              value={pageData?.pricing_off_season_label || ""}
+              onChange={(e) => setPageData({ ...pageData, pricing_off_season_label: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Off-Season"
+            />
+          </div>
+        </div>
+
         <MonthDayRangeInput
           label="Peak Season Dates"
           ranges={pageData?.pricing_season_ranges || []}
@@ -595,6 +743,41 @@ export default function MultiDayRentalForm() {
             <Plus className="w-4 h-4" />
             Add Category
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Heading</label>
+            <input
+              type="text"
+              value={pageData?.pricing_heading || ""}
+              onChange={(e) => setPageData({ ...pageData, pricing_heading: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Transparent Seasonal Pricing"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Subheading</label>
+            <input
+              type="text"
+              value={pageData?.pricing_subheading || ""}
+              onChange={(e) => setPageData({ ...pageData, pricing_subheading: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">
+            Note below pricing cards
+          </label>
+          <textarea
+            value={pageData?.pricing_note_text || ""}
+            onChange={(e) => setPageData({ ...pageData, pricing_note_text: e.target.value })}
+            rows={2}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            placeholder="e.g., Prices vary by season. Contact us for exact quotes."
+          />
         </div>
 
         {pageData?.car_categories?.map((category, index) => (
@@ -754,6 +937,27 @@ export default function MultiDayRentalForm() {
         />
 
         <div className="pt-2 border-t-2 border-ink/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block font-body text-sm text-ink/70 mb-1">FAQ Section Heading</label>
+              <input
+                type="text"
+                value={pageData?.faq_heading || ""}
+                onChange={(e) => setPageData({ ...pageData, faq_heading: e.target.value })}
+                className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+                placeholder="e.g., Frequently Asked Questions"
+              />
+            </div>
+            <div>
+              <label className="block font-body text-sm text-ink/70 mb-1">FAQ Section Subheading</label>
+              <input
+                type="text"
+                value={pageData?.faq_subheading || ""}
+                onChange={(e) => setPageData({ ...pageData, faq_subheading: e.target.value })}
+                className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              />
+            </div>
+          </div>
           <div className="flex items-center justify-between mb-2">
             <label className="block font-body text-sm text-ink/70">FAQs</label>
             <button
@@ -797,9 +1001,358 @@ export default function MultiDayRentalForm() {
         </div>
       </div>
 
-      {/* Note: Inclusion/Exclusion items, tour duration packages, and CTA
-          features are still admin-edited via defaults/DB only — out of
-          scope for this pass. */}
+      {/* Inclusion / Exclusion Section */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
+        <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
+          What&apos;s Included / Not Included
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Heading</label>
+            <input
+              type="text"
+              value={pageData?.inclusion_exclusion_heading || ""}
+              onChange={(e) =>
+                setPageData({ ...pageData, inclusion_exclusion_heading: e.target.value })
+              }
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., What's Included in Your Rental"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Subheading</label>
+            <input
+              type="text"
+              value={pageData?.inclusion_exclusion_subheading || ""}
+              onChange={(e) =>
+                setPageData({ ...pageData, inclusion_exclusion_subheading: e.target.value })
+              }
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Included */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-body text-sm font-semibold text-green-700">
+                Included Items
+              </label>
+              <button
+                type="button"
+                onClick={addIncludedItem}
+                className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
+              >
+                <Plus className="w-3 h-3" /> Add Item
+              </button>
+            </div>
+            {pageData?.items_included?.map((item, index) => (
+              <div
+                key={index}
+                className="p-3 border-2 border-green-200 rounded-lg space-y-2 relative bg-green-50/40"
+              >
+                <button
+                  type="button"
+                  onClick={() => removeIncludedItem(index)}
+                  className="absolute top-1 right-1 p-1 text-coral hover:bg-coral/10 rounded"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <input
+                  type="text"
+                  value={item.title}
+                  onChange={(e) => updateIncludedItem(index, "title", e.target.value)}
+                  placeholder="Title, e.g. Driver Allowance"
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm font-semibold"
+                />
+                <textarea
+                  value={item.description}
+                  onChange={(e) => updateIncludedItem(index, "description", e.target.value)}
+                  placeholder="Short description"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                />
+              </div>
+            ))}
+            {(!pageData?.items_included || pageData.items_included.length === 0) && (
+              <p className="text-xs text-ink/40 font-body">No included items yet.</p>
+            )}
+          </div>
+
+          {/* Excluded */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-body text-sm font-semibold text-coral">
+                Excluded Items
+              </label>
+              <button
+                type="button"
+                onClick={addExcludedItem}
+                className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
+              >
+                <Plus className="w-3 h-3" /> Add Item
+              </button>
+            </div>
+            {pageData?.items_excluded?.map((item, index) => (
+              <div
+                key={index}
+                className="p-3 border-2 border-coral/30 rounded-lg space-y-2 relative bg-coral/5"
+              >
+                <button
+                  type="button"
+                  onClick={() => removeExcludedItem(index)}
+                  className="absolute top-1 right-1 p-1 text-coral hover:bg-coral/10 rounded"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <input
+                  type="text"
+                  value={item.title}
+                  onChange={(e) => updateExcludedItem(index, "title", e.target.value)}
+                  placeholder="Title, e.g. Toll & Parking"
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm font-semibold"
+                />
+                <textarea
+                  value={item.description}
+                  onChange={(e) => updateExcludedItem(index, "description", e.target.value)}
+                  placeholder="Short description"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                />
+              </div>
+            ))}
+            {(!pageData?.items_excluded || pageData.items_excluded.length === 0) && (
+              <p className="text-xs text-ink/40 font-body">No excluded items yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tour Duration Packages */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
+        <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
+          Tour Duration Packages
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Heading</label>
+            <input
+              type="text"
+              value={pageData?.packages_heading || ""}
+              onChange={(e) => setPageData({ ...pageData, packages_heading: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Choose Your Tour Duration"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Section Subheading</label>
+            <input
+              type="text"
+              value={pageData?.packages_subheading || ""}
+              onChange={(e) => setPageData({ ...pageData, packages_subheading: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {PACKAGE_KEYS.map((key, packageIndex) => {
+            const pkg = (pageData?.[key] as TourDurationPackage | undefined) || EMPTY_PACKAGE;
+            return (
+              <div key={key} className="p-4 border-2 border-ink/10 rounded-lg space-y-3">
+                <h3 className="font-display text-ink text-sm">Package {packageIndex + 1}</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-body text-xs text-ink/70 mb-1">Badge</label>
+                    <input
+                      type="text"
+                      value={pkg.badge}
+                      onChange={(e) => updatePackage(key, "badge", e.target.value)}
+                      className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                      placeholder="e.g., SHORT GETAWAY"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-body text-xs text-ink/70 mb-1">Duration</label>
+                    <input
+                      type="text"
+                      value={pkg.duration}
+                      onChange={(e) => updatePackage(key, "duration", e.target.value)}
+                      className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                      placeholder="e.g., 3-4 Days"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-body text-xs text-ink/70 mb-1">Subtitle</label>
+                  <input
+                    type="text"
+                    value={pkg.subtitle}
+                    onChange={(e) => updatePackage(key, "subtitle", e.target.value)}
+                    className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                    placeholder="e.g., Perfect for weekends"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block font-body text-xs text-ink/70">Features</label>
+                    <button
+                      type="button"
+                      onClick={() => addPackageFeature(key)}
+                      className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
+                    >
+                      <Plus className="w-3 h-3" /> Add Feature
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {pkg.features?.map((feature, featureIndex) => (
+                      <div key={featureIndex} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={feature.text}
+                          onChange={(e) =>
+                            updatePackageFeature(key, featureIndex, "text", e.target.value)
+                          }
+                          placeholder="Feature text"
+                          className="flex-1 px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                        />
+                        <label
+                          className="flex items-center gap-1 text-xs font-body whitespace-nowrap"
+                          title="Show this feature in bold"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={feature.is_bold}
+                            onChange={(e) =>
+                              updatePackageFeature(key, featureIndex, "is_bold", e.target.checked)
+                            }
+                            className="w-3 h-3"
+                          />
+                          Bold
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removePackageFeature(key, featureIndex)}
+                          className="p-1 text-coral hover:bg-coral/10 rounded"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {(!pkg.features || pkg.features.length === 0) && (
+                      <p className="text-xs text-ink/40 font-body">No features yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-body text-xs text-ink/70 mb-1">
+                    WhatsApp Message
+                  </label>
+                  <textarea
+                    value={pkg.whatsapp_message}
+                    onChange={(e) => updatePackage(key, "whatsapp_message", e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                    placeholder="Pre-filled message when this package's WhatsApp button is clicked"
+                  />
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pkg.is_popular}
+                      onChange={(e) => updatePackage(key, "is_popular", e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-body">Mark as Popular</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pkg.is_custom_package}
+                      onChange={(e) => updatePackage(key, "is_custom_package", e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-body">Custom (dark style)</span>
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Final CTA Section */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
+        <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
+          Final CTA Section
+        </h2>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">CTA Heading</label>
+          <input
+            type="text"
+            value={pageData?.cta_heading || ""}
+            onChange={(e) => setPageData({ ...pageData, cta_heading: e.target.value })}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            placeholder="e.g., Ready to Plan Your Trip?"
+          />
+        </div>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">CTA Description</label>
+          <textarea
+            value={pageData?.cta_description || ""}
+            onChange={(e) => setPageData({ ...pageData, cta_description: e.target.value })}
+            rows={2}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block font-body text-sm text-ink/70">CTA Features</label>
+            <button
+              type="button"
+              onClick={addCTAFeature}
+              className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
+            >
+              <Plus className="w-3 h-3" /> Add Feature
+            </button>
+          </div>
+          <div className="space-y-2">
+            {pageData?.cta_features?.map((feature, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={feature.text}
+                  onChange={(e) => updateCTAFeature(index, e.target.value)}
+                  placeholder="e.g., Free cancellation"
+                  className="flex-1 px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCTAFeature(index)}
+                  className="p-1 text-coral hover:bg-coral/10 rounded"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {(!pageData?.cta_features || pageData.cta_features.length === 0) && (
+              <p className="text-xs text-ink/40 font-body">No CTA features yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Save Button at Bottom */}
       <div className="flex justify-end sticky bottom-4">

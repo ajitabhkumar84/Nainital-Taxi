@@ -50,7 +50,7 @@ export default function MultiDayRentalPageContent({
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
           <div className="grid lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-4">
+            <div className="space-y-4 order-1">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-semibold">
                 <Star className="w-4 h-4 text-yellow" fill="currentColor" />
@@ -115,12 +115,12 @@ export default function MultiDayRentalPageContent({
 
             {/* Hero Image */}
             {pageData.hero_image_url && (
-              <div className="hidden lg:block">
+              <div className="order-2">
                 <div className="relative">
                   <img
                     src={pageData.hero_image_url}
                     alt="Taxi for complete tour in Uttarakhand"
-                    className="rounded-2xl shadow-2xl w-full border-3 border-ink"
+                    className="rounded-2xl shadow-2xl w-full border-3 border-ink max-h-52 object-cover lg:max-h-none"
                     loading="eager"
                   />
                 </div>

@@ -1,21 +1,50 @@
+import { cache } from 'react';
 import type { Metadata } from 'next';
-import type { MultiDayRentalPage } from '@/lib/supabase/types';
+import { supabase } from '@/lib/supabase';
+import { DEFAULT_MULTI_DAY_RENTAL_PAGE, type MultiDayRentalPage } from '@/lib/supabase/types';
 
-// Deliberately no `cache: 'no-store'` — the public route is meant to be
-// cached and refreshed on demand via `revalidatePath` from the admin API
-// (see src/app/api/admin/multi-day-rental/route.ts), not re-fetched on
-// every request.
-export async function getMultiDayRentalPageData(): Promise<MultiDayRentalPage | null> {
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/multi-day-rental`
-    );
-    if (!response.ok) return null;
-    return response.json();
-  } catch (error) {
-    console.error('Error fetching multi-day rental page:', error);
-    return null;
+export const MULTI_DAY_RENTAL_FIXED_ID = '00000000-0000-0000-0000-000000000001';
+
+function defaultPage(): MultiDayRentalPage {
+  const now = new Date().toISOString();
+  return {
+    ...DEFAULT_MULTI_DAY_RENTAL_PAGE,
+    id: MULTI_DAY_RENTAL_FIXED_ID,
+    created_at: now,
+    updated_at: now,
+  } as MultiDayRentalPage;
+}
+
+// Queries Supabase directly rather than fetching this app's own /api route over
+// HTTP. The old self-fetch depended on NEXT_PUBLIC_SITE_URL matching the live
+// origin — when it didn't (localhost fallback, or a domain change), the request
+// failed and the page silently rendered as unconfigured.
+//
+// Uses the cookie-free anon client on purpose: the cookie-based server client
+// calls cookies(), which would opt the public page out of static rendering.
+export const getPublishedMultiDayRentalPage = cache(
+  async (): Promise<MultiDayRentalPage | null> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase
+      .from('multi_day_rental_page') as any)
+      .select('*')
+      .eq('id', MULTI_DAY_RENTAL_FIXED_ID)
+      .eq('is_published', true)
+      .single();
+
+    if (error) {
+      // No row yet, or unpublished — serve defaults so the page still renders.
+      if (error.code === 'PGRST116') return defaultPage();
+      console.error('Error fetching multi-day rental page:', error);
+      return null;
+    }
+
+    return data as MultiDayRentalPage;
   }
+);
+
+export async function getMultiDayRentalPageData(): Promise<MultiDayRentalPage | null> {
+  return getPublishedMultiDayRentalPage();
 }
 
 export function multiDayRentalMetadata(pageData: MultiDayRentalPage | null): Metadata {

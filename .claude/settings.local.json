@@ -24,7 +24,8 @@
       "Bash(node apply-addon-schema.js:*)",
       "Bash(node verify-schema.js:*)",
       "Bash(curl *)",
-      "Bash(taskkill //PID 10476 //F)"
+      "Bash(taskkill //PID 10476 //F)",
+      "Bash(npx vercel *)"
     ]
   }
 }
