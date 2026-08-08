@@ -38,6 +38,7 @@ export type {
   Review,
   AdminSetting,
   TrustSection,
+  TourTrustSection,
   TrustPillar,
   TickerBooking,
   PageContent,
@@ -64,6 +65,7 @@ export {
   getPackages,
   getPackageBySlug,
   getPackageById,
+  getPackagesByIds,
   getPopularPackages,
 
   // Vehicles
@@ -103,6 +105,7 @@ export {
 
   // Trust & Safety section
   getTrustSection,
+  getTourTrustSection,
 
   // Page content (CMS)
   getPageContent,

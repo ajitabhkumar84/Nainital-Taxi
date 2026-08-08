@@ -16,6 +16,9 @@ function revalidateMultiDayRentalPaths(oldSlug: string | null, newSlug: string |
   revalidatePath('/multi-day-rental');
   if (oldSlug && oldSlug !== 'multi-day-rental') revalidatePath(`/${oldSlug}`);
   if (newSlug && newSlug !== 'multi-day-rental' && newSlug !== oldSlug) revalidatePath(`/${newSlug}`);
+  // The homepage's "Multi-Day Rentals" card now reads homepage_card_image_url
+  // from this same row, so it needs to pick up edits too.
+  revalidatePath('/');
 }
 
 // GET - Fetch multi-day rental page configuration

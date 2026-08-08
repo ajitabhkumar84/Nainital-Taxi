@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { SiteConfig, DEFAULT_SITE_CONFIG } from '@/lib/supabase/types';
+import { TRACKING_CONFIG_CACHE_TAG } from '@/lib/trackingScripts';
+
+const SITE_CONFIG_KEYS = [
+  'site_config_header',
+  'site_config_footer',
+  'site_config_contact',
+  'site_config_tracking',
+];
 
 // GET - Fetch site configuration
 export async function GET() {
@@ -10,7 +19,7 @@ export async function GET() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: settings, error } = await (supabase.from('admin_settings') as any)
       .select('key, value')
-      .in('key', ['site_config_header', 'site_config_footer', 'site_config_contact']);
+      .in('key', SITE_CONFIG_KEYS);
 
     if (error) {
       console.error('Error fetching site config:', error);
@@ -26,7 +35,7 @@ export async function GET() {
       header: (configMap.get('site_config_header') as SiteConfig['header']) || DEFAULT_SITE_CONFIG.header,
       footer: (configMap.get('site_config_footer') as SiteConfig['footer']) || DEFAULT_SITE_CONFIG.footer,
       contact: (configMap.get('site_config_contact') as SiteConfig['contact']) || DEFAULT_SITE_CONFIG.contact,
-      tracking: DEFAULT_SITE_CONFIG.tracking,
+      tracking: (configMap.get('site_config_tracking') as SiteConfig['tracking']) || DEFAULT_SITE_CONFIG.tracking,
     };
 
     return NextResponse.json(siteConfig);
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     const adminSupabase = getAdminSupabaseClient();
     const body = await request.json();
-    const { header, footer, contact } = body as Partial<SiteConfig>;
+    const { header, footer, contact, tracking } = body as Partial<SiteConfig>;
 
     const updates: { key: string; value: any; description: string }[] = [];
 
@@ -66,6 +75,14 @@ export async function POST(request: NextRequest) {
         key: 'site_config_contact',
         value: contact,
         description: 'Contact information (phone, email, address)',
+      });
+    }
+
+    if (tracking) {
+      updates.push({
+        key: 'site_config_tracking',
+        value: tracking,
+        description: 'Analytics/tracking scripts (GTM, GA, Facebook Pixel, custom)',
       });
     }
 
@@ -96,7 +113,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: settings } = await (adminSupabase.from('admin_settings') as any)
       .select('key, value')
-      .in('key', ['site_config_header', 'site_config_footer', 'site_config_contact']);
+      .in('key', SITE_CONFIG_KEYS);
 
     const settingsArray = settings as { key: string; value: unknown }[] | null;
     const configMap = new Map(settingsArray?.map(s => [s.key, s.value]) || []);
@@ -105,9 +122,17 @@ export async function POST(request: NextRequest) {
       header: (configMap.get('site_config_header') as SiteConfig['header']) || DEFAULT_SITE_CONFIG.header,
       footer: (configMap.get('site_config_footer') as SiteConfig['footer']) || DEFAULT_SITE_CONFIG.footer,
       contact: (configMap.get('site_config_contact') as SiteConfig['contact']) || DEFAULT_SITE_CONFIG.contact,
-      tracking: DEFAULT_SITE_CONFIG.tracking,
+      tracking: (configMap.get('site_config_tracking') as SiteConfig['tracking']) || DEFAULT_SITE_CONFIG.tracking,
       updatedAt: new Date().toISOString(),
     };
+
+    if (tracking) {
+      // The root layout's getTrackingConfig() caches this key across requests
+      // (see src/lib/trackingScripts.ts) so tracking scripts don't hit the DB
+      // on every single page view — bust that cache now so the save takes
+      // effect on the live site immediately instead of up to 5 minutes later.
+      revalidateTag(TRACKING_CONFIG_CACHE_TAG);
+    }
 
     return NextResponse.json(updatedConfig);
   } catch (error) {
@@ -150,6 +175,11 @@ export async function PUT() {
         key: 'site_config_contact',
         value: DEFAULT_SITE_CONFIG.contact,
         description: 'Contact information (phone, email, address)',
+      },
+      {
+        key: 'site_config_tracking',
+        value: DEFAULT_SITE_CONFIG.tracking,
+        description: 'Analytics/tracking scripts (GTM, GA, Facebook Pixel, custom)',
       },
     ];
 

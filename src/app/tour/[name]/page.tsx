@@ -17,10 +17,14 @@ import {
   Award,
   UserCheck,
   Heart,
+  Car,
+  type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { Package, Pricing, TourItinerary, GalleryImage, hasHotelOption } from "@/lib/supabase/types";
+import { getTourTrustSection } from "@/lib/supabase";
+import { getSiteWhatsappNumber } from "@/lib/siteContact";
 import { Header, Footer } from "@/components/ui";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { generateTouristTripSchema } from "@/lib/structuredData";
@@ -33,6 +37,30 @@ import PackageFAQ from "@/components/packages/PackageFAQ";
 import DetailedAttractions from "@/components/packages/DetailedAttractions";
 import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
 import BookingInstructions from "@/components/packages/BookingInstructions";
+
+// Icon and accent color are both keyed by icon_name so reordering/adding/removing
+// pillars in the admin never shifts a card's color out of sync with its icon.
+const TRUST_PILLAR_ICONS: Record<string, LucideIcon> = {
+  shield: Shield,
+  "user-check": UserCheck,
+  heart: Heart,
+  award: Award,
+  car: Car,
+  phone: Phone,
+  star: Star,
+  "map-pin": MapPin,
+};
+
+const TRUST_PILLAR_COLORS: Record<string, string> = {
+  shield: "text-teal",
+  "user-check": "text-coral",
+  heart: "text-whatsapp",
+  award: "text-sunshine",
+  car: "text-teal",
+  phone: "text-coral",
+  star: "text-sunshine",
+  "map-pin": "text-whatsapp",
+};
 
 // Create Supabase client for server-side
 function getSupabaseClient() {
@@ -131,10 +159,19 @@ export default async function TourPackagePage({
     notFound();
   }
 
-  const [pricing, vehicleCategoryImages] = await Promise.all([
+  const [pricing, vehicleCategoryImages, tourTrustSection, whatsappNumber] = await Promise.all([
     getPackagePricing(pkg.id),
     getVehicleCategoryImages(),
+    getTourTrustSection(),
+    getSiteWhatsappNumber(),
   ]);
+
+  const trustPillars = (tourTrustSection.trust_pillars || [])
+    .filter((p) => p.is_active)
+    .sort((a, b) => a.display_order - b.display_order);
+
+  const whatsappMessage = `Hi! I'm interested in the ${pkg.title} tour package. Can you help me?`;
+  const whatsappHref = `https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
   const itinerary = pkg.itinerary as TourItinerary | undefined;
   const isTaxiHotel = hasHotelOption(itinerary);
 
@@ -392,47 +429,35 @@ export default async function TourPackagePage({
           <BookingInstructions instructions={itinerary.booking_instructions} />
         )}
 
-        {/* Why Choose Us */}
-        <section className="py-12 md:py-16 bg-gradient-to-b from-lake/10 to-white">
-          <div className="container mx-auto px-4 max-w-5xl">
-            <h2 className="text-3xl font-display text-ink text-center mb-3">
-              Why Families Trust Us
-            </h2>
-            <p className="text-ink/60 font-body text-center mb-8 max-w-xl mx-auto">
-              Your safety matters more than the lowest fare
-            </p>
-            <div className="grid md:grid-cols-4 gap-6">
-              <div className="text-center p-6 bg-white rounded-2xl border-3 border-ink shadow-retro-sm">
-                <Shield className="w-12 h-12 text-teal mx-auto mb-4" />
-                <h3 className="font-display text-lg text-ink mb-2">Zero Alcohol Policy</h3>
-                <p className="text-ink/60 font-body text-sm">
-                  Strict sobriety standards with no exceptions
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white rounded-2xl border-3 border-ink shadow-retro-sm">
-                <UserCheck className="w-12 h-12 text-coral mx-auto mb-4" />
-                <h3 className="font-display text-lg text-ink mb-2">Verified Drivers</h3>
-                <p className="text-ink/60 font-body text-sm">
-                  Background-checked, trained professionals
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white rounded-2xl border-3 border-ink shadow-retro-sm">
-                <Heart className="w-12 h-12 text-whatsapp mx-auto mb-4" />
-                <h3 className="font-display text-lg text-ink mb-2">Family-First Care</h3>
-                <p className="text-ink/60 font-body text-sm">
-                  Drivers who treat you like their own family
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white rounded-2xl border-3 border-ink shadow-retro-sm">
-                <Award className="w-12 h-12 text-sunshine mx-auto mb-4" />
-                <h3 className="font-display text-lg text-ink mb-2">10,000+ Safe Trips</h3>
-                <p className="text-ink/60 font-body text-sm">
-                  Trusted by families across India
-                </p>
+        {/* Why Choose Us — admin-editable via /admin/tour-trust-section */}
+        {tourTrustSection.is_published && trustPillars.length > 0 && (
+          <section className="py-12 md:py-16 bg-gradient-to-b from-lake/10 to-white">
+            <div className="container mx-auto px-4 max-w-5xl">
+              <h2 className="text-3xl font-display text-ink text-center mb-3">
+                {tourTrustSection.heading}
+              </h2>
+              <p className="text-ink/60 font-body text-center mb-8 max-w-xl mx-auto">
+                {tourTrustSection.description}
+              </p>
+              <div className="grid md:grid-cols-4 gap-6">
+                {trustPillars.map((pillar) => {
+                  const Icon = TRUST_PILLAR_ICONS[pillar.icon_name] || Shield;
+                  const colorClass = TRUST_PILLAR_COLORS[pillar.icon_name] || "text-teal";
+                  return (
+                    <div
+                      key={pillar.title}
+                      className="text-center p-6 bg-white rounded-2xl border-3 border-ink shadow-retro-sm"
+                    >
+                      <Icon className={`w-12 h-12 ${colorClass} mx-auto mb-4`} />
+                      <h3 className="font-display text-lg text-ink mb-2">{pillar.title}</h3>
+                      <p className="text-ink/60 font-body text-sm">{pillar.description}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* CTA Section */}
         <section className="py-12 md:py-16 bg-gradient-to-r from-teal to-lake">
@@ -452,7 +477,7 @@ export default async function TourPackagePage({
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <a
-                href="https://wa.me/918445206116"
+                href={whatsappHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-whatsapp text-white font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"

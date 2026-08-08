@@ -9,8 +9,8 @@
 
 import { cache } from 'react';
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, PageContent } from './types';
-import { DEFAULT_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent } from './types';
+import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 
 // ============================================================================
 // SEASON & PRICING HELPERS
@@ -245,6 +245,33 @@ export async function getPopularPackages(limit: number = 6): Promise<Package[]> 
   }
 
   return data || [];
+}
+
+/**
+ * Fetches specific packages by id, preserving the order of `ids`.
+ *
+ * Postgres does not honour the order of an IN list, so the result is re-sorted
+ * client-side — `ids` is an admin-curated display order (e.g. the multi-day
+ * rental page's featured_package_ids), not an arbitrary set. Ids that no
+ * longer resolve to an active package are simply dropped.
+ */
+export async function getPackagesByIds(ids: string[]): Promise<Package[]> {
+  if (!ids || ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('packages')
+    .select('*')
+    .in('id', ids)
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('Error fetching packages by id:', error);
+    return [];
+  }
+
+  const rows = (data || []) as Package[];
+  const byId = new Map(rows.map((pkg) => [pkg.id, pkg]));
+  return ids.map((id) => byId.get(id)).filter((pkg): pkg is Package => Boolean(pkg));
 }
 
 export async function getPackageById(id: string): Promise<Package | null> {
@@ -529,6 +556,33 @@ export async function getTrustSection(): Promise<TrustSection> {
   if (error || !data) {
     return {
       ...DEFAULT_TRUST_SECTION,
+      id: FIXED_ID,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return data;
+}
+
+// ============================================================================
+// TOUR PAGE TRUST SECTION
+// ============================================================================
+// Separate singleton from trust_section above — see the comment on
+// TourTrustSection in types.ts for why this isn't shared with the homepage.
+
+export async function getTourTrustSection(): Promise<TourTrustSection> {
+  const FIXED_ID = '00000000-0000-0000-0000-000000000003';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('tour_trust_section') as any)
+    .select('*')
+    .eq('id', FIXED_ID)
+    .single();
+
+  if (error || !data) {
+    return {
+      ...DEFAULT_TOUR_TRUST_SECTION,
       id: FIXED_ID,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

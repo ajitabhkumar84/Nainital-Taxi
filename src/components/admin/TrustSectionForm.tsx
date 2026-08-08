@@ -16,7 +16,20 @@ const ICON_OPTIONS = [
   { value: "map-pin", label: "Map Pin" },
 ];
 
-export default function TrustSectionForm() {
+interface TrustSectionFormProps {
+  /** API route this form reads from / saves to. Defaults to the homepage's. */
+  apiEndpoint?: string;
+  /** Whether to show the section-photo uploader (the tour-page card grid has no image slot). */
+  showImageUploader?: boolean;
+  /** Heading shown above the form itself, not the section content. */
+  title?: string;
+}
+
+export default function TrustSectionForm({
+  apiEndpoint = "/api/admin/trust-section",
+  showImageUploader = true,
+  title = "Trust & Safety Section",
+}: TrustSectionFormProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +39,7 @@ export default function TrustSectionForm() {
   useEffect(() => {
     (async () => {
       try {
-        const response = await fetch("/api/admin/trust-section");
+        const response = await fetch(apiEndpoint);
         if (!response.ok) throw new Error("Failed to load trust section");
         setData(await response.json());
       } catch (err) {
@@ -35,7 +48,7 @@ export default function TrustSectionForm() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [apiEndpoint]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +57,7 @@ export default function TrustSectionForm() {
     setSaving(true);
 
     try {
-      const response = await fetch("/api/admin/trust-section", {
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -108,7 +121,7 @@ export default function TrustSectionForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-display text-ink">Trust & Safety Section</h1>
+        <h1 className="text-3xl font-display text-ink">{title}</h1>
         <div className="flex gap-3">
           <button
             type="button"
@@ -147,14 +160,16 @@ export default function TrustSectionForm() {
         <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
           Core Thesis
         </h2>
-        <ImageUploader
-          value={data?.image_url || ""}
-          onChange={(url) => setData({ ...data, image_url: url || null })}
-          folder="trust-section"
-          label="Section Photo"
-          recommendedSize="1000 x 1250"
-          aspectRatio="4:5"
-        />
+        {showImageUploader && (
+          <ImageUploader
+            value={data?.image_url || ""}
+            onChange={(url) => setData({ ...data, image_url: url || null })}
+            folder="trust-section"
+            label="Section Photo"
+            recommendedSize="1000 x 1250"
+            aspectRatio="4:5"
+          />
+        )}
         <div>
           <label className="block font-body text-sm text-ink/70 mb-1">Heading *</label>
           <input

@@ -1,18 +1,54 @@
+import type { Metadata } from 'next';
 import { Header, Footer, Button } from '@/components/ui';
 import { ContactHero, ContactForm, ContactInfo, ContactFAQ } from '@/components/contact';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
-import { ArrowRight, Shield, Award, Heart } from 'lucide-react';
+import { Shield, Award, Heart, Star, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { getContactPageContent, buildMapEmbedUrl, buildMapLinkUrl } from '@/lib/contactPage';
+import { getSiteContactConfig } from '@/lib/siteContact';
 
-export const metadata = {
-  title: 'Contact Us - Nainital Taxi Services',
-  description:
-    'Get in touch with Nainital Taxi for bookings, inquiries, and quotes. Available 24/7 via phone, WhatsApp, or email. Book your reliable taxi service in Nainital today.',
-  keywords:
-    'contact Nainital taxi, book taxi Nainital, Kathgodam taxi contact, Uttarakhand taxi booking, taxi inquiry, 24/7 taxi service',
+// Icon vocabulary offered by the trust-badge editor in
+// src/components/admin/ContactPageForm.tsx — keep the two in sync.
+const TRUST_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  shield: Shield,
+  heart: Heart,
+  award: Award,
+  star: Star,
+  clock: Clock,
 };
 
-export default function ContactPage() {
+const TRUST_ACCENTS = ['sunshine', 'teal', 'coral'] as const;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getContactPageContent();
+  return {
+    title: content.seo_title || 'Contact Us - Nainital Taxi Services',
+    description:
+      content.seo_description ||
+      'Get in touch with Nainital Taxi for bookings, inquiries, and quotes. Available 24/7 via phone, WhatsApp, or email.',
+    keywords:
+      'contact Nainital taxi, book taxi Nainital, Kathgodam taxi contact, Uttarakhand taxi booking, taxi inquiry, 24/7 taxi service',
+  };
+}
+
+export default async function ContactPage() {
+  // Page copy is admin-editable at /admin/pages/contact; the phone/WhatsApp/
+  // email/address values come from site config so they can't drift from the
+  // header and footer.
+  const [content, siteContact] = await Promise.all([
+    getContactPageContent(),
+    getSiteContactConfig(),
+  ]);
+
+  // wa.me rejects '+' and spaces — it wants bare digits.
+  const whatsappDigits = siteContact.whatsapp.replace(/\D/g, '');
+  const mapUrl = buildMapEmbedUrl(
+    content.google_business_name,
+    content.map_embed_url,
+    siteContact.address
+  );
+  const mapLinkUrl = buildMapLinkUrl(content.google_business_name, siteContact.address);
+
   return (
     <>
       <Header />
@@ -21,27 +57,45 @@ export default function ContactPage() {
       <main className="mt-20">
         {/* Hero Section */}
         <ContactHero
-          title="Get in Touch"
-          subtitle="Book your reliable ride across the region. Request a quote below for our best rates."
+          title={content.hero_title}
+          subtitle={content.hero_subtitle}
+          badges={content.hero_badges}
         />
 
         {/* Contact Form Section */}
         <ContactForm
-          formTitle="Request a Free Quote"
-          formDescription="Fill out the form below and our team will get back to you shortly to confirm your booking."
+          formTitle={content.form_title}
+          formDescription={content.form_description}
+          whatsappNumber={whatsappDigits}
         />
 
         {/* Contact Information & Map */}
         <ContactInfo
-          whatsappNumber="918445206116"
-          phoneNumber="+918445206116"
-          email="taxinainital@gmail.com"
-          address="Nainital, Uttarakhand, India"
-          mapUrl="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3468.123456789!2d79.516!3d29.266!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjnCsDE1JzU3LjYiTiA3OcKwMzAnNTcuNiJF!5e0!3m2!1sen!2sin!4v1234567890"
+          heading={content.info_heading}
+          subheading={content.info_subheading}
+          whatsappNumber={whatsappDigits}
+          phoneNumber={siteContact.phone}
+          email={siteContact.email}
+          address={siteContact.address}
+          cards={content.contact_cards}
+          mapHeading={content.map_heading}
+          mapUrl={mapUrl}
+          mapLinkUrl={mapLinkUrl}
+          mapButtonLabel={content.map_button_label}
+          hoursHeading={content.hours_heading}
+          hoursItems={content.hours_items}
         />
 
         {/* FAQs Section */}
-        <ContactFAQ />
+        <ContactFAQ
+          heading={content.faq_heading}
+          subheading={content.faq_subheading}
+          faqs={content.faqs}
+          ctaHeading={content.faq_cta_heading}
+          ctaDescription={content.faq_cta_description}
+          whatsappNumber={whatsappDigits}
+          phoneNumber={siteContact.phone}
+        />
 
         {/* Bottom CTA Section */}
         <section className="py-16 px-4 bg-gradient-to-r from-ink via-ink/95 to-ink text-white relative overflow-hidden">
@@ -53,11 +107,9 @@ export default function ContactPage() {
 
           <div className="relative max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-display text-white mb-4">
-              Ready to Book Your Journey?
+              {content.cta_heading}
             </h2>
-            <p className="text-xl text-white/80 font-body mb-8">
-              Experience safe, comfortable, and reliable taxi services in Nainital
-            </p>
+            <p className="text-xl text-white/80 font-body mb-8">{content.cta_subheading}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/fleet">
                 <Button variant="primary" size="lg">
@@ -98,26 +150,38 @@ export default function ContactPage() {
             </div>
 
             {/* Trust Badges */}
-            <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-sunshine/20 rounded-full flex items-center justify-center mr-2 border-2 border-sunshine">
-                  <Shield className="w-4 h-4 text-sunshine" />
-                </div>
-                <span className="font-body">Verified Drivers</span>
+            {content.trust_badges.length > 0 && (
+              <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm text-white/70">
+                {content.trust_badges.map((badge, index) => {
+                  const Icon = TRUST_ICONS[badge.icon_name] || Shield;
+                  const accent = TRUST_ACCENTS[index % TRUST_ACCENTS.length];
+                  return (
+                    <div key={index} className="flex items-center">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 border-2 ${
+                          accent === 'sunshine'
+                            ? 'bg-sunshine/20 border-sunshine'
+                            : accent === 'teal'
+                            ? 'bg-teal/20 border-teal'
+                            : 'bg-coral/20 border-coral'
+                        }`}
+                      >
+                        <Icon
+                          className={`w-4 h-4 ${
+                            accent === 'sunshine'
+                              ? 'text-sunshine'
+                              : accent === 'teal'
+                              ? 'text-teal'
+                              : 'text-coral'
+                          }`}
+                        />
+                      </div>
+                      <span className="font-body">{badge.label}</span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-teal/20 rounded-full flex items-center justify-center mr-2 border-2 border-teal">
-                  <Heart className="w-4 h-4 text-teal" />
-                </div>
-                <span className="font-body">Zero Alcohol Policy</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-coral/20 rounded-full flex items-center justify-center mr-2 border-2 border-coral">
-                  <Award className="w-4 h-4 text-coral" />
-                </div>
-                <span className="font-body">10,000+ Safe Trips</span>
-              </div>
-            </div>
+            )}
           </div>
         </section>
       </main>

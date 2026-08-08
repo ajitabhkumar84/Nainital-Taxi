@@ -4,6 +4,14 @@ import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { generateLocalBusinessSchema } from "@/lib/structuredData";
 import GlobalContactWidgets from "@/components/GlobalContactWidgets";
+import { getTrackingConfig } from "@/lib/trackingScripts";
+import {
+  TrackingBodyEnd,
+  TrackingBodyStart,
+  TrackingGa,
+  TrackingGtm,
+  TrackingHeadScripts,
+} from "@/components/TrackingScripts";
 
 const interTight = Inter_Tight({
   weight: ["500", "600", "700"],
@@ -55,6 +63,7 @@ export default async function RootLayout({
   const localBusinessSchema = generateLocalBusinessSchema();
   const headersList = await headers();
   const nonce = headersList.get("x-nonce") ?? undefined;
+  const trackingConfig = await getTrackingConfig();
 
   return (
     <html lang="en">
@@ -64,11 +73,19 @@ export default async function RootLayout({
           nonce={nonce}
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
         />
+        <TrackingHeadScripts tracking={trackingConfig} nonce={nonce} />
       </head>
+      {/* GoogleTagManager must be a direct sibling of <body>, not nested inside
+          <head>/<body> — see src/components/TrackingScripts.tsx. */}
+      <TrackingGtm tracking={trackingConfig} nonce={nonce} />
       <body className={`${interTight.variable} ${nunito.variable}`}>
+        <TrackingBodyStart tracking={trackingConfig} />
         {children}
         <GlobalContactWidgets />
+        <TrackingBodyEnd tracking={trackingConfig} nonce={nonce} />
       </body>
+      {/* GoogleAnalytics must likewise be a direct sibling of <body>. */}
+      <TrackingGa tracking={trackingConfig} nonce={nonce} />
     </html>
   );
 }

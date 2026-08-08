@@ -684,6 +684,33 @@ export const DEFAULT_TRUST_SECTION: Omit<TrustSection, "id" | "created_at" | "up
   is_published: true,
 };
 
+// Singleton config for the "Why Families Trust Us" section shown on individual
+// tour package pages (/tour/[name]). Deliberately a separate table from
+// trust_section (the homepage's version) rather than a shared one — same
+// isolation rationale as src/lib/pillarIcons.ts's SAFETY_ICON_MAP. No image_url:
+// the tour-page card grid design doesn't use one.
+export interface TourTrustSection {
+  id: string; // UUID, fixed singleton
+  heading: string;
+  description: string;
+  trust_pillars: TrustPillar[];
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DEFAULT_TOUR_TRUST_SECTION: Omit<TourTrustSection, "id" | "created_at" | "updated_at"> = {
+  heading: "Why Families Trust Us",
+  description: "Your safety matters more than the lowest fare",
+  trust_pillars: [
+    { icon_name: "shield", title: "Zero Alcohol Policy", description: "Strict sobriety standards with no exceptions", display_order: 1, is_active: true },
+    { icon_name: "user-check", title: "Verified Drivers", description: "Background-checked, trained professionals", display_order: 2, is_active: true },
+    { icon_name: "heart", title: "Family-First Care", description: "Drivers who treat you like their own family", display_order: 3, is_active: true },
+    { icon_name: "award", title: "10,000+ Safe Trips", description: "Trusted by families across India", display_order: 4, is_active: true },
+  ],
+  is_published: true,
+};
+
 export interface PageSection {
   key: string; // matches a section key rendered in the page component, e.g. 'tours'
   heading: string;
@@ -710,6 +737,199 @@ export const DEFAULT_PAGE_CONTENT: Omit<PageContent, "page_slug" | "created_at" 
   hero_title: null,
   hero_subtitle: null,
   sections: [],
+  is_published: true,
+};
+
+// ============================================================================
+// CONTACT PAGE CONTENT (singleton, backs /contact — see
+// supabase/create_contact_page_schema.sql)
+// ============================================================================
+
+export interface ContactBadge {
+  label: string;
+}
+
+/** One of the four cards in the Contact Information block. Labels only — the
+ *  phone/email/address values themselves come from SiteConfig['contact']. */
+export interface ContactCardLabels {
+  title: string;
+  description: string;
+  footnote: string;
+}
+
+export type ContactCardKey = "whatsapp" | "phone" | "email" | "address";
+
+export interface ContactHourItem {
+  icon_name: string;
+  strong: string; // emphasised part, e.g. "24/7"
+  rest: string; // remainder, e.g. "Available"
+}
+
+export interface ContactFaqItem {
+  question: string;
+  answer: string;
+}
+
+export interface ContactTrustBadge {
+  icon_name: string;
+  label: string;
+}
+
+export interface ContactPageContent {
+  id: string;
+
+  seo_title: string;
+  seo_description: string;
+
+  hero_title: string;
+  hero_subtitle: string;
+  hero_badges: ContactBadge[];
+
+  form_title: string;
+  form_description: string;
+  /** Where enquiries are emailed. Blank falls back to the ADMIN_EMAIL env var. */
+  enquiry_recipient_email: string | null;
+
+  info_heading: string;
+  info_subheading: string;
+  contact_cards: Record<ContactCardKey, ContactCardLabels>;
+
+  map_heading: string;
+  /** Google Business Profile listing name — drives the embed and the map link. */
+  google_business_name: string;
+  /** Optional exact-pin override (Google Maps → Share → Embed a map). */
+  map_embed_url: string | null;
+  map_button_label: string;
+
+  hours_heading: string;
+  hours_items: ContactHourItem[];
+
+  faq_heading: string;
+  faq_subheading: string;
+  faqs: ContactFaqItem[];
+  faq_cta_heading: string;
+  faq_cta_description: string;
+
+  cta_heading: string;
+  cta_subheading: string;
+  trust_badges: ContactTrustBadge[];
+
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Mirrors the seed row in supabase/create_contact_page_schema.sql, so a
+ *  missing/unreachable row renders the same page the migration seeds. */
+export const DEFAULT_CONTACT_PAGE_CONTENT: Omit<
+  ContactPageContent,
+  "id" | "created_at" | "updated_at"
+> = {
+  seo_title: "Contact Us - Nainital Taxi Services",
+  seo_description:
+    "Get in touch with Nainital Taxi for bookings, inquiries, and quotes. Available 24/7 via phone, WhatsApp, or email. Book your reliable taxi service in Nainital today.",
+
+  hero_title: "Get in Touch",
+  hero_subtitle:
+    "Book your reliable ride across the region. Request a quote below for our best rates.",
+  hero_badges: [
+    { label: "Experienced Drivers" },
+    { label: "Transparent Pricing" },
+    { label: "Free Quote" },
+  ],
+
+  form_title: "Request a Free Quote",
+  form_description:
+    "Fill out the form below and our team will get back to you shortly to confirm your booking.",
+  enquiry_recipient_email: "taxinainital@gmail.com",
+
+  info_heading: "Contact Information",
+  info_subheading: "Reach out to us anytime - we're always here to assist you",
+  contact_cards: {
+    whatsapp: { title: "WhatsApp", description: "Chat with us instantly", footnote: "Click to start chat" },
+    phone: { title: "Call Us", description: "Available 24/7 for bookings", footnote: "Tap to call now" },
+    email: { title: "Email", description: "Send us a message", footnote: "Click to compose email" },
+    address: { title: "Office Address", description: "Visit us for in-person bookings", footnote: "" },
+  },
+
+  map_heading: "Find Us on Map",
+  google_business_name: "Nainital Taxi",
+  map_embed_url: null,
+  map_button_label: "Open in Google Maps",
+
+  hours_heading: "Operating Hours",
+  hours_items: [
+    { icon_name: "clock", strong: "24/7", rest: "Available" },
+    { icon_name: "calendar", strong: "365 Days", rest: "a Year" },
+    { icon_name: "award", strong: "Instant", rest: "Booking" },
+  ],
+
+  faq_heading: "Frequently Asked Questions",
+  faq_subheading: "Everything you need to know about booking with Nainital Taxi",
+  faqs: [
+    {
+      question: "How can I book a taxi with Nainital Taxi?",
+      answer:
+        "You can book a taxi by filling out our online form above, calling us directly, or sending us a message on WhatsApp. We respond instantly to all booking requests.",
+    },
+    {
+      question: "What are your operating hours?",
+      answer:
+        "We operate 24/7, 365 days a year. You can book a taxi or contact us anytime, day or night, including weekends and holidays.",
+    },
+    {
+      question: "Do you charge for cancellations?",
+      answer:
+        "We understand that plans change. Free cancellation is available up to 2 hours before your scheduled pickup time. Cancellations within 2 hours may incur a minimal charge.",
+    },
+    {
+      question: "What payment methods do you accept?",
+      answer:
+        "We accept multiple payment methods including cash, UPI (Google Pay, PhonePe, Paytm), credit/debit cards, and bank transfers. Payment can be made before or after your journey.",
+    },
+    {
+      question: "Are your drivers experienced and verified?",
+      answer:
+        "Yes, all our drivers are highly experienced, licensed, and background-verified. They have extensive knowledge of the Nainital region and prioritize your safety and comfort. We maintain a strict zero-alcohol policy.",
+    },
+    {
+      question: "Do you provide airport and railway station pickup services?",
+      answer:
+        "Absolutely! We provide reliable pickup and drop services from Pantnagar Airport, Kathgodam Railway Station, and all major locations in Uttarakhand.",
+    },
+    {
+      question: "Can I request a specific vehicle type?",
+      answer:
+        "Yes, we have a diverse fleet including Sedans, SUVs, Innova Crysta, and Tempo Travellers. You can specify your preferred vehicle type when booking, and we'll do our best to accommodate your request.",
+    },
+    {
+      question: "What if I have extra luggage or special requirements?",
+      answer:
+        "Please inform us about extra luggage, child seats, wheelchair accessibility, or any special requirements when booking. We'll ensure your vehicle is equipped accordingly at no extra charge.",
+    },
+    {
+      question: "How do you calculate the taxi fare?",
+      answer:
+        "Our fares are transparent and competitive, based on distance, vehicle type, and route. You'll receive a clear quote before booking with no hidden charges. Check our rates page for detailed pricing.",
+    },
+    {
+      question: "Do you offer multi-day tour packages?",
+      answer:
+        "Yes, we offer customized multi-day tour packages covering popular destinations like Nainital, Kainchi Dham, Ranikhet, Almora, Jim Corbett, and more. Contact us to plan your perfect Kumaon Hills tour.",
+    },
+  ],
+  faq_cta_heading: "Still Have Questions?",
+  faq_cta_description:
+    "Our team is here to help! Contact us anytime for personalized assistance.",
+
+  cta_heading: "Ready to Book Your Journey?",
+  cta_subheading: "Experience safe, comfortable, and reliable taxi services in Nainital",
+  trust_badges: [
+    { icon_name: "shield", label: "Verified Drivers" },
+    { icon_name: "heart", label: "Zero Alcohol Policy" },
+    { icon_name: "award", label: "10,000+ Safe Trips" },
+  ],
+
   is_published: true,
 };
 
@@ -1764,6 +1984,10 @@ export interface PackageFeature {
 
 /**
  * Tour duration package (3-4 days, 5-7 days, etc.)
+ *
+ * @deprecated Backed the "Choose Your Duration" section, which was removed
+ * from the public page in favour of the admin-picked Featured Packages block.
+ * Kept so existing copy in package_1..package_4 is preserved; nothing renders it.
  */
 export interface TourDurationPackage {
   badge: string;                    // e.g., "SHORT GETAWAY", "CLASSIC TOUR"
@@ -1815,6 +2039,10 @@ export interface MultiDayRentalPage {
   hero_trust_indicators: TrustIndicator[];
   hero_trust_badges: string[]; // qualitative chips, e.g. "Verified Drivers"
 
+  // Photo used in the "Multi-Day Rentals" card on the site homepage (/) —
+  // distinct from hero_image_url above, which is this page's own hero.
+  homepage_card_image_url?: string | null;
+
   // Safety Promise Section (inlined content — see SafetyPillar)
   safety_heading: string;
   safety_subheading: string;
@@ -1855,7 +2083,21 @@ export interface MultiDayRentalPage {
   items_included: InclusionExclusionItem[];
   items_excluded: InclusionExclusionItem[];
 
+  // Enquiry CTA Section — sits directly under the inclusions/exclusions block,
+  // which is where visitors previously hit a dead end with nothing to act on.
+  enquiry_cta_enabled: boolean;
+  enquiry_cta_heading: string;
+  enquiry_cta_description: string;
+  enquiry_cta_whatsapp_label: string;
+  enquiry_cta_whatsapp_message: string;
+  enquiry_cta_secondary_label: string;
+  enquiry_cta_secondary_href: string; // internal path (e.g. "/contact") or full URL
+  enquiry_cta_reassurance: string;    // small print under the buttons
+
   // Tour Duration Packages Section
+  // @deprecated — the "Choose Your Duration" section was removed from the
+  // public page and from the admin form. These columns are retained so the
+  // copy already entered is not destroyed; nothing reads them.
   packages_heading: string;
   packages_subheading: string;
   package_1: TourDurationPackage;
@@ -1863,10 +2105,10 @@ export interface MultiDayRentalPage {
   package_3: TourDurationPackage;
   package_4: TourDurationPackage;
 
-  // Popular Itineraries Section
+  // Featured Packages Section — real `packages` rows, hand-picked by the admin
   popular_itineraries_heading: string;
   popular_itineraries_subheading: string;
-  featured_package_ids: string[];  // Array of package UUIDs
+  featured_package_ids: string[];  // packages.id values, stored in display order
 
   // Safety Section Reference
   safety_section_reference?: string | null;
@@ -1962,7 +2204,17 @@ export const DEFAULT_MULTI_DAY_RENTAL_PAGE: Partial<MultiDayRentalPage> = {
     { title: 'Parking Fees', description: 'Parking charges at destinations' },
   ],
 
-  // Packages
+  // Enquiry CTA
+  enquiry_cta_enabled: true,
+  enquiry_cta_heading: 'Not sure which plan fits your trip?',
+  enquiry_cta_description: 'Send us your dates and the places you want to cover. We reply with an exact, all-inclusive quote — no obligation.',
+  enquiry_cta_whatsapp_label: 'Send Your Enquiry on WhatsApp',
+  enquiry_cta_whatsapp_message: 'Hi! I would like a quote for a multi-day taxi rental. My travel dates are ______ and I want to cover ______.',
+  enquiry_cta_secondary_label: 'Use the Enquiry Form',
+  enquiry_cta_secondary_href: '/contact',
+  enquiry_cta_reassurance: 'Usually replies within 10 minutes · 8 AM – 10 PM',
+
+  // Packages (deprecated — no longer rendered, retained to preserve copy)
   packages_heading: 'Choose Your Duration',
   packages_subheading: 'Flexible packages tailored to your journey. The longer you travel, the more you save!',
   package_1: {
@@ -2022,7 +2274,7 @@ export const DEFAULT_MULTI_DAY_RENTAL_PAGE: Partial<MultiDayRentalPage> = {
     is_custom_package: true,
   },
 
-  // Popular Itineraries
+  // Featured Packages
   popular_itineraries_heading: 'Popular Tour Itineraries',
   popular_itineraries_subheading: 'Handpicked routes designed by local experts. Pick one or customize your own adventure.',
   featured_package_ids: [],

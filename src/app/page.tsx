@@ -18,6 +18,7 @@ import {
   getPageContent,
   PageSection,
 } from "@/lib/supabase";
+import { getMultiDayRentalPageData } from "@/lib/multiDayRental";
 
 const TRUST_PILLAR_ICONS: Record<string, typeof UserCheck> = {
   "user-check": UserCheck,
@@ -52,7 +53,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   // Fetch homepage content from Supabase in parallel
-  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection, pageContent] = await Promise.all([
+  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection, pageContent, multiDayRentalPage] = await Promise.all([
     getDestinations(),
     getPackages("tour"),
     getMinPricePerPackage(),
@@ -60,6 +61,7 @@ export default async function Home() {
     getFeaturedReviews(3),
     getTrustSection(),
     getPageContent("home"),
+    getMultiDayRentalPageData(),
   ]);
 
   const trustPillars = (trustSection.trust_pillars || [])
@@ -131,11 +133,22 @@ export default async function Home() {
       <section className="py-16 md:py-24 px-4">
         <div className="container mx-auto max-w-[1200px]">
           <div className="grid gap-8 md:grid-cols-2 md:items-center">
-            {/* Photo slot — awaiting real photography (vehicle on an open
-                Kumaon road). Neutral placeholder keeps the gap visible. */}
-            <div className="aspect-video rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-              <span className="text-sm text-slate-500">Multi-day rentals</span>
-            </div>
+            {/* Photo set via /admin/multi-day-rental → "Homepage Card Image".
+                Falls back to a neutral placeholder until one is uploaded. */}
+            {multiDayRentalPage?.homepage_card_image_url ? (
+              <div className="aspect-video rounded-lg overflow-hidden border border-slate-200">
+                <img
+                  src={multiDayRentalPage.homepage_card_image_url}
+                  alt="Multi-day car rental in Kumaon"
+                  loading="lazy"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="aspect-video rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <span className="text-sm text-slate-500">Multi-day rentals</span>
+              </div>
+            )}
 
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-3">

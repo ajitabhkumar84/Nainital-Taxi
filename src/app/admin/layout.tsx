@@ -29,6 +29,7 @@ import {
   Megaphone,
   FileText,
   Home,
+  Mail,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -55,7 +56,8 @@ const navEntries: NavEntry[] = [
     icon: <FileText className="w-5 h-5" />,
     children: [
       { href: "/admin/pages/home", label: "Home Page", icon: <Home className="w-5 h-5" /> },
-      // Add future static pages here, e.g. About Us, Contact, ...
+      { href: "/admin/pages/contact", label: "Contact Us Page", icon: <Mail className="w-5 h-5" /> },
+      // Add future static pages here, e.g. About Us, ...
     ],
   },
   { type: "item", href: "/admin/destinations", label: "Destinations", icon: <MapPin className="w-5 h-5" /> },
@@ -64,6 +66,7 @@ const navEntries: NavEntry[] = [
   { type: "item", href: "/admin/testimonials", label: "Testimonials", icon: <MessageSquareQuote className="w-5 h-5" /> },
   { type: "item", href: "/admin/ticker", label: "Booking Ticker", icon: <Radio className="w-5 h-5" /> },
   { type: "item", href: "/admin/trust-section", label: "Trust & Safety", icon: <ShieldCheck className="w-5 h-5" /> },
+  { type: "item", href: "/admin/tour-trust-section", label: "Tour Page Trust Section", icon: <ShieldCheck className="w-5 h-5" /> },
   { type: "item", href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
   { type: "item", href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
   { type: "item", href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },

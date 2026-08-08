@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { RESERVED_PAGE_SLUGS, isValidSlugFormat } from "@/lib/slug";
-import { getMultiDayRentalPageData, multiDayRentalMetadata } from "@/lib/multiDayRental";
+import {
+  getMultiDayRentalPageData,
+  getMultiDayRentalFeaturedPackages,
+  multiDayRentalMetadata,
+} from "@/lib/multiDayRental";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
 import MultiDayRentalPageContent from "@/components/multi-day-rental/MultiDayRentalPageContent";
 
@@ -43,5 +47,13 @@ export default async function DynamicSlugPage({
     notFound();
   }
 
-  return <MultiDayRentalPageContent pageData={pageData} whatsappNumber={whatsappNumber} />;
+  const featuredPackages = await getMultiDayRentalFeaturedPackages(pageData);
+
+  return (
+    <MultiDayRentalPageContent
+      pageData={pageData}
+      whatsappNumber={whatsappNumber}
+      featuredPackages={featuredPackages}
+    />
+  );
 }

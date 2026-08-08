@@ -1,7 +1,8 @@
 import { cache } from 'react';
 import type { Metadata } from 'next';
 import { supabase } from '@/lib/supabase';
-import { DEFAULT_MULTI_DAY_RENTAL_PAGE, type MultiDayRentalPage } from '@/lib/supabase/types';
+import { getPackagesByIds, getMinPricePerPackage } from '@/lib/supabase/queries_enhanced';
+import { DEFAULT_MULTI_DAY_RENTAL_PAGE, type MultiDayRentalPage, type Package } from '@/lib/supabase/types';
 
 export const MULTI_DAY_RENTAL_FIXED_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -45,6 +46,27 @@ export const getPublishedMultiDayRentalPage = cache(
 
 export async function getMultiDayRentalPageData(): Promise<MultiDayRentalPage | null> {
   return getPublishedMultiDayRentalPage();
+}
+
+export interface FeaturedPackagesData {
+  packages: Package[];
+  minPrices: Record<string, number>;
+}
+
+const NO_FEATURED_PACKAGES: FeaturedPackagesData = { packages: [], minPrices: {} };
+
+// Lives here rather than in each route so the two entry points that render
+// this page (/multi-day-rental and the custom-slug /[slug]) can't drift.
+export async function getMultiDayRentalFeaturedPackages(
+  pageData: MultiDayRentalPage | null
+): Promise<FeaturedPackagesData> {
+  const ids = pageData?.featured_package_ids;
+  if (!ids || ids.length === 0) return NO_FEATURED_PACKAGES;
+
+  const packages = await getPackagesByIds(ids);
+  if (packages.length === 0) return NO_FEATURED_PACKAGES;
+
+  return { packages, minPrices: await getMinPricePerPackage() };
 }
 
 export function multiDayRentalMetadata(pageData: MultiDayRentalPage | null): Metadata {

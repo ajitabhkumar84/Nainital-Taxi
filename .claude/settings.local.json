@@ -25,7 +25,15 @@
       "Bash(node verify-schema.js:*)",
       "Bash(curl *)",
       "Bash(taskkill //PID 10476 //F)",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "Bash(git checkout *)",
+      "Bash(node -e ' *)",
+      "Bash(npx next *)",
+      "Bash(git stash *)",
+      "Bash(python -c ' *)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 4399 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } ; \"killed\" } else { \"no listener\" })",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 4399 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; \"stopped\" } else { \"no listener\" })",
+      "Bash(break)"
     ]
   }
 }

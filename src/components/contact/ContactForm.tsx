@@ -7,24 +7,28 @@ import { Button } from '@/components/ui';
 interface ContactFormProps {
   formTitle?: string;
   formDescription?: string;
+  whatsappNumber?: string;
 }
 
 export default function ContactForm({
   formTitle = "Request a Free Quote",
-  formDescription = "Fill out the form below and our team will get back to you shortly to confirm your booking."
+  formDescription = "Fill out the form below and our team will get back to you shortly to confirm your booking.",
+  whatsappNumber = '918445206116',
 }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // React pools the event across the await below, so grab the form node now.
+    const form = e.currentTarget;
     setIsSubmitting(true);
-    setShowError(false);
+    setErrorMessage('');
     setShowSuccess(false);
 
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
       const data = {
         name: formData.get('name'),
         phone: formData.get('phone'),
@@ -32,6 +36,7 @@ export default function ContactForm({
         pickup: formData.get('pickup'),
         drop: formData.get('drop'),
         date: formData.get('date'),
+        time: formData.get('time'),
         passengers: formData.get('passengers'),
         vehicle: formData.get('vehicle'),
         message: formData.get('message'),
@@ -49,7 +54,7 @@ export default function ContactForm({
       const result = await response.json();
 
       if (response.ok && result.success) {
-        e.currentTarget.reset();
+        form.reset();
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 5000);
       } else {
@@ -57,7 +62,14 @@ export default function ContactForm({
       }
     } catch (error) {
       console.error('Contact form error:', error);
-      setShowError(true);
+      // Surface the server's own wording where there is one — it distinguishes
+      // "rate limited", "invalid phone" and "we could not deliver this" from
+      // each other, which a single generic string cannot.
+      setErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Something went wrong. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -88,7 +100,7 @@ export default function ContactForm({
     whatsappMessage += `Vehicle: ${vehicle}\n`;
     if (message) whatsappMessage += `\nAdditional Info: ${message}`;
 
-    const whatsappUrl = `https://wa.me/918445206116?text=${encodeURIComponent(whatsappMessage)}`;
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -334,17 +346,17 @@ export default function ContactForm({
           )}
 
           {/* Error Message */}
-          {showError && (
+          {errorMessage && (
             <div className="mt-6 p-4 bg-coral/10 border-3 border-coral rounded-xl">
               <div className="flex items-center">
-                <svg className="w-6 h-6 text-coral mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-6 h-6 text-coral mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                     clipRule="evenodd"
                   />
                 </svg>
-                <p className="text-coral font-body font-semibold">Something went wrong. Please try again.</p>
+                <p className="text-coral font-body font-semibold">{errorMessage}</p>
               </div>
             </div>
           )}

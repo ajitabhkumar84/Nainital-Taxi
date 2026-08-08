@@ -1,6 +1,10 @@
 import { permanentRedirect } from "next/navigation";
 import { Metadata } from "next";
-import { getMultiDayRentalPageData, multiDayRentalMetadata } from "@/lib/multiDayRental";
+import {
+  getMultiDayRentalPageData,
+  getMultiDayRentalFeaturedPackages,
+  multiDayRentalMetadata,
+} from "@/lib/multiDayRental";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
 import MultiDayRentalPageContent from "@/components/multi-day-rental/MultiDayRentalPageContent";
 
@@ -22,5 +26,13 @@ export default async function MultiDayRentalLegacyPage() {
     permanentRedirect(`/${pageData.page_slug}`);
   }
 
-  return <MultiDayRentalPageContent pageData={pageData} whatsappNumber={whatsappNumber} />;
+  const featuredPackages = await getMultiDayRentalFeaturedPackages(pageData);
+
+  return (
+    <MultiDayRentalPageContent
+      pageData={pageData}
+      whatsappNumber={whatsappNumber}
+      featuredPackages={featuredPackages}
+    />
+  );
 }

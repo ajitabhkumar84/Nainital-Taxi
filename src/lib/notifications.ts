@@ -531,6 +531,7 @@ interface ContactData {
   pickup?: string;
   drop?: string;
   date?: string;
+  time?: string;
   passengers?: string;
   vehicle?: string;
 }
@@ -590,7 +591,7 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
       </table>
     </div>
 
-    ${(data.pickup || data.drop || data.date || data.passengers || data.vehicle) ? `
+    ${(data.pickup || data.drop || data.date || data.time || data.passengers || data.vehicle) ? `
     <!-- Trip Details -->
     <div style="padding: 0 24px 24px;">
       <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px;">
@@ -613,6 +614,12 @@ function generateContactEnquiryAdminEmail(data: ContactData): string {
         <tr>
           <td style="padding: 8px 0; color: #666;">Date</td>
           <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.date)}</td>
+        </tr>
+        ` : ''}
+        ${data.time ? `
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Preferred Time</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(data.time)}</td>
         </tr>
         ` : ''}
         ${data.passengers ? `
@@ -714,6 +721,12 @@ function generateContactAutoReplyEmail(data: ContactData): string {
           <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.date)}</td>
         </tr>
         ` : ''}
+        ${data.time ? `
+        <tr>
+          <td style="padding: 6px 0; color: #666;">Preferred Time</td>
+          <td style="padding: 6px 0; color: #2D3436; font-weight: 600; text-align: right;">${escapeHtml(data.time)}</td>
+        </tr>
+        ` : ''}
       </table>
     </div>
 
@@ -748,13 +761,24 @@ function generateContactAutoReplyEmail(data: ContactData): string {
 }
 
 /**
- * Send contact enquiry emails (admin notification + customer auto-reply)
+ * Send contact enquiry emails (admin notification + customer auto-reply).
+ *
+ * `recipient` comes from the contact page's admin settings
+ * (contact_page_content.enquiry_recipient_email) so the business can redirect
+ * enquiries without an env change or redeploy; it falls back to the
+ * ADMIN_EMAIL env var when unset.
+ *
+ * The boolean reflects the *admin* notification only — the auto-reply is a
+ * courtesy and its failure must not make a received enquiry look lost.
  */
-export async function sendContactEnquiry(data: ContactData): Promise<boolean> {
+export async function sendContactEnquiry(
+  data: ContactData,
+  recipient?: string | null
+): Promise<boolean> {
   try {
     // Always send admin notification
     const adminEmailSent = await sendEmail({
-      to: ADMIN_EMAIL,
+      to: recipient?.trim() || ADMIN_EMAIL,
       subject: `New Contact Enquiry - ${data.name}`,
       html: generateContactEnquiryAdminEmail(data),
     });

@@ -4,10 +4,9 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Save, Loader2, Plus, X, Eye, EyeOff } from "lucide-react";
 import {
+  DEFAULT_MULTI_DAY_RENTAL_PAGE,
   MultiDayRentalPage,
   MultiDayCarCategory,
-  TourDurationPackage,
-  PackageFeature,
   TrustIndicator,
   InclusionExclusionItem,
   MultiDayRentalFAQ,
@@ -19,6 +18,7 @@ import {
 import ImageUploader from "@/components/admin/ImageUploader";
 import TagListInput from "@/components/admin/TagListInput";
 import MonthDayRangeInput from "@/components/admin/MonthDayRangeInput";
+import FeaturedPackagePicker from "@/components/admin/FeaturedPackagePicker";
 import { slugify, validatePageSlug } from "@/lib/slug";
 import { SAFETY_ICON_OPTIONS } from "@/lib/pillarIcons";
 import { detectActiveSeasonTier } from "@/lib/seasonality";
@@ -45,20 +45,6 @@ const SEASON_TIER_LABELS: Record<string, string> = {
   off_season: "Off-Season",
 };
 
-type PackageKey = "package_1" | "package_2" | "package_3" | "package_4";
-
-const PACKAGE_KEYS: PackageKey[] = ["package_1", "package_2", "package_3", "package_4"];
-
-const EMPTY_PACKAGE: TourDurationPackage = {
-  badge: "",
-  duration: "",
-  subtitle: "",
-  features: [],
-  whatsapp_message: "",
-  is_popular: false,
-  is_custom_package: false,
-};
-
 export default function MultiDayRentalForm() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -77,7 +63,12 @@ export default function MultiDayRentalForm() {
       const response = await fetch("/api/admin/multi-day-rental");
       if (!response.ok) throw new Error("Failed to load page data");
       const data = await response.json();
-      setPageData(data);
+      // Defaults fill only the keys the saved row doesn't have — anything the
+      // row does define (including a deliberately blank field) wins. Without
+      // this, a section added after the row was last saved would load with
+      // empty inputs and the next save would write those blanks over the
+      // column defaults.
+      setPageData({ ...DEFAULT_MULTI_DAY_RENTAL_PAGE, ...data });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load page data");
     } finally {
@@ -267,40 +258,6 @@ export default function MultiDayRentalForm() {
       ...pageData,
       hero_trust_indicators: pageData?.hero_trust_indicators?.filter((_, i) => i !== index) || [],
     });
-  };
-
-  const updatePackage = (
-    key: PackageKey,
-    field: keyof TourDurationPackage,
-    value: string | boolean | PackageFeature[]
-  ) => {
-    const current = pageData?.[key] as TourDurationPackage | undefined;
-    setPageData({
-      ...pageData,
-      [key]: { ...(current || EMPTY_PACKAGE), [field]: value },
-    });
-  };
-
-  const updatePackageFeature = (
-    key: PackageKey,
-    featureIndex: number,
-    field: keyof PackageFeature,
-    value: string | boolean
-  ) => {
-    const current = pageData?.[key] as TourDurationPackage | undefined;
-    const features = [...(current?.features || [])];
-    features[featureIndex] = { ...features[featureIndex], [field]: value };
-    updatePackage(key, "features", features);
-  };
-
-  const addPackageFeature = (key: PackageKey) => {
-    const current = pageData?.[key] as TourDurationPackage | undefined;
-    updatePackage(key, "features", [...(current?.features || []), { text: "", is_bold: false }]);
-  };
-
-  const removePackageFeature = (key: PackageKey, featureIndex: number) => {
-    const current = pageData?.[key] as TourDurationPackage | undefined;
-    updatePackage(key, "features", (current?.features || []).filter((_, i) => i !== featureIndex));
   };
 
   const MAX_SAFETY_PILLARS = 4;
@@ -524,6 +481,21 @@ export default function MultiDayRentalForm() {
           recommendedSize="1920 x 1080"
           aspectRatio="16:9"
         />
+
+        <div>
+          <ImageUploader
+            value={pageData?.homepage_card_image_url || ""}
+            onChange={(url) => setPageData({ ...pageData, homepage_card_image_url: url || null })}
+            folder="multi-day-rental"
+            label="Homepage Card Image"
+            recommendedSize="1200 x 675"
+            aspectRatio="16:9"
+          />
+          <p className="text-xs text-ink/50 font-body mt-1">
+            Shown in the &quot;Multi-Day Rentals&quot; card on the site homepage (/) — not on
+            this page. Different from the Hero Image above, which is this page&apos;s own banner.
+          </p>
+        </div>
 
         <TagListInput
           label="Trust Badges"
@@ -1130,164 +1102,146 @@ export default function MultiDayRentalForm() {
         </div>
       </div>
 
-      {/* Tour Duration Packages */}
+      {/* Enquiry CTA — renders directly under the inclusions/exclusions block */}
       <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
-        <h2 className="font-display text-xl text-ink border-b-2 border-ink/10 pb-2">
-          Tour Duration Packages
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink/10 pb-2">
+          <div>
+            <h2 className="font-display text-xl text-ink">Enquiry CTA</h2>
+            <p className="font-body text-xs text-ink/50 mt-1">
+              Shown immediately after &ldquo;What&apos;s Included &amp; Excluded&rdquo;.
+            </p>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={pageData?.enquiry_cta_enabled ?? true}
+              onChange={(e) => setPageData({ ...pageData, enquiry_cta_enabled: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm font-body">Show this section</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">Heading</label>
+          <input
+            type="text"
+            value={pageData?.enquiry_cta_heading || ""}
+            onChange={(e) => setPageData({ ...pageData, enquiry_cta_heading: e.target.value })}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            placeholder="e.g., Not sure which plan fits your trip?"
+          />
+        </div>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">Description</label>
+          <textarea
+            value={pageData?.enquiry_cta_description || ""}
+            onChange={(e) => setPageData({ ...pageData, enquiry_cta_description: e.target.value })}
+            rows={2}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">WhatsApp Button Label</label>
+            <input
+              type="text"
+              value={pageData?.enquiry_cta_whatsapp_label || ""}
+              onChange={(e) => setPageData({ ...pageData, enquiry_cta_whatsapp_label: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Send Your Enquiry on WhatsApp"
+            />
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Secondary Button Label</label>
+            <input
+              type="text"
+              value={pageData?.enquiry_cta_secondary_label || ""}
+              onChange={(e) => setPageData({ ...pageData, enquiry_cta_secondary_label: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Use the Enquiry Form"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block font-body text-sm text-ink/70 mb-1">
+            Pre-filled WhatsApp Message
+          </label>
+          <textarea
+            value={pageData?.enquiry_cta_whatsapp_message || ""}
+            onChange={(e) => setPageData({ ...pageData, enquiry_cta_whatsapp_message: e.target.value })}
+            rows={2}
+            className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+            placeholder="Text that appears in the guest's WhatsApp draft"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Secondary Button Link</label>
+            <input
+              type="text"
+              value={pageData?.enquiry_cta_secondary_href || ""}
+              onChange={(e) => setPageData({ ...pageData, enquiry_cta_secondary_href: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="/contact"
+            />
+            <p className="text-xs text-ink/40 font-body mt-1">
+              An internal path such as /contact, or a full https:// URL.
+            </p>
+          </div>
+          <div>
+            <label className="block font-body text-sm text-ink/70 mb-1">Reassurance Line</label>
+            <input
+              type="text"
+              value={pageData?.enquiry_cta_reassurance || ""}
+              onChange={(e) => setPageData({ ...pageData, enquiry_cta_reassurance: e.target.value })}
+              className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
+              placeholder="e.g., Usually replies within 10 minutes"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Featured Packages — replaces the retired "Choose Your Duration" editor */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
+        <div className="border-b-2 border-ink/10 pb-2">
+          <h2 className="font-display text-xl text-ink">Featured Packages</h2>
+          <p className="font-body text-xs text-ink/50 mt-1">
+            Tour packages cross-sold below the enquiry CTA. Pick them from your existing packages —
+            edit their content under Admin → Packages.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block font-body text-sm text-ink/70 mb-1">Section Heading</label>
             <input
               type="text"
-              value={pageData?.packages_heading || ""}
-              onChange={(e) => setPageData({ ...pageData, packages_heading: e.target.value })}
+              value={pageData?.popular_itineraries_heading || ""}
+              onChange={(e) => setPageData({ ...pageData, popular_itineraries_heading: e.target.value })}
               className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
-              placeholder="e.g., Choose Your Tour Duration"
+              placeholder="e.g., Popular Tour Itineraries"
             />
           </div>
           <div>
             <label className="block font-body text-sm text-ink/70 mb-1">Section Subheading</label>
             <input
               type="text"
-              value={pageData?.packages_subheading || ""}
-              onChange={(e) => setPageData({ ...pageData, packages_subheading: e.target.value })}
+              value={pageData?.popular_itineraries_subheading || ""}
+              onChange={(e) => setPageData({ ...pageData, popular_itineraries_subheading: e.target.value })}
               className="w-full px-4 py-2 border-2 border-ink/20 rounded-lg focus:border-teal focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {PACKAGE_KEYS.map((key, packageIndex) => {
-            const pkg = (pageData?.[key] as TourDurationPackage | undefined) || EMPTY_PACKAGE;
-            return (
-              <div key={key} className="p-4 border-2 border-ink/10 rounded-lg space-y-3">
-                <h3 className="font-display text-ink text-sm">Package {packageIndex + 1}</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-body text-xs text-ink/70 mb-1">Badge</label>
-                    <input
-                      type="text"
-                      value={pkg.badge}
-                      onChange={(e) => updatePackage(key, "badge", e.target.value)}
-                      className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
-                      placeholder="e.g., SHORT GETAWAY"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-body text-xs text-ink/70 mb-1">Duration</label>
-                    <input
-                      type="text"
-                      value={pkg.duration}
-                      onChange={(e) => updatePackage(key, "duration", e.target.value)}
-                      className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
-                      placeholder="e.g., 3-4 Days"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-body text-xs text-ink/70 mb-1">Subtitle</label>
-                  <input
-                    type="text"
-                    value={pkg.subtitle}
-                    onChange={(e) => updatePackage(key, "subtitle", e.target.value)}
-                    className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
-                    placeholder="e.g., Perfect for weekends"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block font-body text-xs text-ink/70">Features</label>
-                    <button
-                      type="button"
-                      onClick={() => addPackageFeature(key)}
-                      className="inline-flex items-center gap-1 text-xs text-teal hover:underline font-body"
-                    >
-                      <Plus className="w-3 h-3" /> Add Feature
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {pkg.features?.map((feature, featureIndex) => (
-                      <div key={featureIndex} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={feature.text}
-                          onChange={(e) =>
-                            updatePackageFeature(key, featureIndex, "text", e.target.value)
-                          }
-                          placeholder="Feature text"
-                          className="flex-1 px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
-                        />
-                        <label
-                          className="flex items-center gap-1 text-xs font-body whitespace-nowrap"
-                          title="Show this feature in bold"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={feature.is_bold}
-                            onChange={(e) =>
-                              updatePackageFeature(key, featureIndex, "is_bold", e.target.checked)
-                            }
-                            className="w-3 h-3"
-                          />
-                          Bold
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => removePackageFeature(key, featureIndex)}
-                          className="p-1 text-coral hover:bg-coral/10 rounded"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {(!pkg.features || pkg.features.length === 0) && (
-                      <p className="text-xs text-ink/40 font-body">No features yet.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-body text-xs text-ink/70 mb-1">
-                    WhatsApp Message
-                  </label>
-                  <textarea
-                    value={pkg.whatsapp_message}
-                    onChange={(e) => updatePackage(key, "whatsapp_message", e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-ink/20 rounded focus:border-teal focus:outline-none text-sm"
-                    placeholder="Pre-filled message when this package's WhatsApp button is clicked"
-                  />
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={pkg.is_popular}
-                      onChange={(e) => updatePackage(key, "is_popular", e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm font-body">Mark as Popular</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={pkg.is_custom_package}
-                      onChange={(e) => updatePackage(key, "is_custom_package", e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm font-body">Custom (dark style)</span>
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <FeaturedPackagePicker
+          selectedIds={pageData?.featured_package_ids || []}
+          onChange={(ids) => setPageData({ ...pageData, featured_package_ids: ids })}
+        />
       </div>
 
       {/* Final CTA Section */}
