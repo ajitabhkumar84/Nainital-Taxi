@@ -13,3 +13,5 @@ export type { BadgeProps } from "./Badge";
 export { default as Header } from "./Header";
 
 export { default as Footer } from "./Footer";
+
+export { default as TourTrustSection } from "./TourTrustSection";

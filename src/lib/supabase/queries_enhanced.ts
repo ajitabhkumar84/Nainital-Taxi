@@ -702,7 +702,13 @@ export async function getApprovedReviews(): Promise<Review[]> {
 /**
  * Get a single destination by slug
  */
-export async function getDestinationBySlug(slug: string): Promise<Destination | null> {
+/**
+ * Wrapped in React cache() because destination pages call this twice per
+ * request — once in generateMetadata and once in the page component. Next's
+ * fetch-level dedupe doesn't apply to supabase-js calls, so without this it
+ * is two identical round-trips.
+ */
+export const getDestinationBySlug = cache(async (slug: string): Promise<Destination | null> => {
   const { data, error } = await supabase
     .from('destinations')
     .select('*')
@@ -716,7 +722,7 @@ export async function getDestinationBySlug(slug: string): Promise<Destination | 
   }
 
   return data;
-}
+});
 
 /**
  * Get all pricing for a package (both Season and Off-Season, all vehicle types)

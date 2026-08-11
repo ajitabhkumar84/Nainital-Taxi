@@ -1,9 +1,12 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { Header, Button, Card, CardContent } from "@/components/ui";
-import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar, Shield, UserCheck, Heart, Sparkles } from "lucide-react";
+import { Header, Footer, Button, Card, CardContent, TourTrustSection } from "@/components/ui";
+import FAQAccordion, { FAQAccordionItem } from "@/components/ui/FAQAccordion";
+import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import PackageCard from "@/components/home/PackageCard";
 import PricingGridForDestination from "@/components/destinations/PricingGridForDestination";
 import DetailedAttractions from "@/components/packages/DetailedAttractions";
 import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
@@ -11,11 +14,61 @@ import BookingInstructions from "@/components/packages/BookingInstructions";
 import {
   getDestinationBySlug,
   getPackages,
+  getPackagesByIds,
+  getMinPricePerPackage,
   getAllPricingForPackage,
   getSeasonDateRanges,
+  getTourTrustSection,
   Package,
 } from "@/lib/supabase";
-import { TransferContent } from "@/lib/supabase/types";
+import { Destination, TransferContent } from "@/lib/supabase/types";
+
+// Used when a destination has no uploaded hero image. Local rather than a
+// remote stock URL so the LCP image never depends on a third-party host.
+const FALLBACK_HERO = "/images/hero/summer.jpg";
+
+/**
+ * The FAQs shown when the linked transfer package has no admin-authored ones.
+ * Same copy that used to be hardcoded in the JSX, moved into data so the
+ * package-managed and fallback sets can share one renderer.
+ */
+function buildDefaultDestinationFaqs(
+  destination: Destination,
+  transferPackage?: Package
+): FAQAccordionItem[] {
+  const duration = transferPackage?.duration || destination.duration || "N/A";
+
+  const faqs: FAQAccordionItem[] = [
+    {
+      question: `How long does the journey from Nainital to ${destination.name} take?`,
+      answer: `The journey takes approximately ${duration} depending on traffic and weather conditions.`,
+    },
+    {
+      question: "Is the price per person or per vehicle?",
+      answer:
+        "All prices are per vehicle, not per person. You can share the cost with your travel companions.",
+    },
+    {
+      question: "What's included in the fare?",
+      answer:
+        "Our fares include driver allowance and fuel. Tolls, parking, and any state permits are charged extra.",
+    },
+    {
+      question: "Can I book for the same day?",
+      answer:
+        "Yes! Subject to availability, we accept same-day bookings. Call or WhatsApp us for immediate assistance.",
+    },
+  ];
+
+  if (destination.best_time_to_visit) {
+    faqs.push({
+      question: `When is the best time to visit ${destination.name}?`,
+      answer: destination.best_time_to_visit,
+    });
+  }
+
+  return faqs;
+}
 
 // Create Supabase client for server-side
 function getSupabaseClient() {
@@ -47,14 +100,6 @@ interface DestinationPageProps {
   };
 }
 
-// Vehicle type display names and capacities
-const VEHICLE_INFO = {
-  sedan: { name: "Sedan", capacity: "4 seater", model: "Dzire/Amaze/Xcent" },
-  suv_normal: { name: "SUV Standard", capacity: "6-7 seater", model: "Ertiga/Triber" },
-  suv_deluxe: { name: "SUV Deluxe", capacity: "7 seater", model: "Innova/Marazzo" },
-  suv_luxury: { name: "SUV Luxury", capacity: "7 seater", model: "Innova Crysta" },
-} as const;
-
 // Generate metadata for SEO
 export async function generateMetadata({ params }: DestinationPageProps): Promise<Metadata> {
   const destination = await getDestinationBySlug(params.slug);
@@ -65,9 +110,28 @@ export async function generateMetadata({ params }: DestinationPageProps): Promis
     };
   }
 
+  // Relative URLs — resolved against metadataBase in src/app/layout.tsx, so
+  // the production domain lives in exactly one place.
+  const path = `/destinations/${destination.slug}`;
+
   return {
     title: destination.meta_title || `${destination.name} - Nainital Taxi Service`,
     description: destination.meta_description || destination.description || `Book taxi from Nainital to ${destination.name}. Reliable service, fixed rates, comfortable vehicles.`,
+    alternates: {
+      canonical: path,
+    },
+    openGraph: {
+      title: destination.meta_title || `${destination.name} - Nainital Taxi Service`,
+      description: destination.meta_description || destination.description || `Book taxi from Nainital to ${destination.name}.`,
+      url: path,
+      type: "website",
+      images: [
+        {
+          url: destination.hero_image_url || FALLBACK_HERO,
+          alt: `Taxi service from Nainital to ${destination.name}`,
+        },
+      ],
+    },
   };
 }
 
@@ -110,6 +174,14 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     ]);
   }
 
+  // Deliberately outside the transferPackage guard: a destination with no
+  // transfer package still gets its cross-sell row and trust banner.
+  const [linkedPackages, minPrices, tourTrustSection] = await Promise.all([
+    getPackagesByIds(destination.package_ids || []),
+    getMinPricePerPackage(),
+    getTourTrustSection(),
+  ]);
+
   // Group pricing by vehicle type
   const pricingByVehicle = pricingData.reduce((acc, item) => {
     if (!acc[item.vehicle_type]) {
@@ -140,67 +212,84 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     ? Math.min(...Object.values(pricingByVehicle).map((prices) => prices["Off-Season"] || 0))
     : 0;
 
+  // Prefer FAQs authored on the linked transfer package (editable in
+  // /admin/packages) and fall back to the generic destination set.
+  const transferContent = transferPackage?.itinerary as TransferContent | undefined;
+  const faqItems: FAQAccordionItem[] = transferContent?.faqs?.length
+    ? transferContent.faqs
+    : buildDefaultDestinationFaqs(destination, transferPackage);
+
   return (
     <>
       <Header />
       <FloatingWhatsApp destinationName={destination.name} />
 
-      {/* Hero Section */}
-      <section
-        className="relative min-h-[60vh] flex items-center justify-center px-4 pt-24 overflow-hidden"
-        style={{
-          backgroundImage: destination.hero_image_url
-            ? `url('${destination.hero_image_url}')`
-            : "url('https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=80&w=2070&auto=format&fit=crop')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* Dark Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/80 via-ink/60 to-ink/80"></div>
+      <main className="min-h-screen bg-white">
+      {/* Hero Section — image + title only. The fixed Header overlaps the top
+          of the image, which is fine because the title sits at the bottom. */}
+      <section className="relative h-[40vh] md:h-[50vh] min-h-[280px] flex items-end overflow-hidden">
+        <Image
+          src={destination.hero_image_url || FALLBACK_HERO}
+          alt={`Taxi service from Nainital to ${destination.name}`}
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
 
-        {/* Hero Content */}
-        <div className="container mx-auto text-center relative z-10">
-          <div className="max-w-4xl mx-auto">
-            {destination.emoji && (
-              <div className="text-6xl mb-4">{destination.emoji}</div>
-            )}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-display text-white mb-4">
-              {destination.name}
-            </h1>
-            {destination.tagline && (
-              <p className="text-xl sm:text-2xl font-body text-white/90 mb-6">
-                {destination.tagline}
-              </p>
-            )}
-            <p className="text-lg font-body text-white/85 mb-8 max-w-2xl mx-auto">
-              {destination.description}
-            </p>
+        {/* Bottom-anchored scrim: enough contrast for the title without
+            washing out the photo the way a full-bleed overlay did. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/20 to-transparent" />
 
-            {minPrice > 0 && (
-              <div className="inline-flex items-center bg-sunshine border-3 border-ink rounded-xl px-6 py-3 shadow-retro">
-                <span className="text-2xl font-display text-ink">₹{minPrice.toLocaleString()}</span>
-                <span className="text-sm font-body text-ink/70 ml-2">starting</span>
-              </div>
-            )}
-          </div>
+        <div className="container mx-auto relative z-10 px-4 pb-8 md:pb-12">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-display text-white drop-shadow-lg">
+            {destination.emoji && <span className="mr-3">{destination.emoji}</span>}
+            {destination.name}
+          </h1>
         </div>
+      </section>
 
-        {/* Wavy SVG Divider */}
-        <div className="absolute bottom-0 left-0 right-0 z-20">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" className="w-full h-16 md:h-24">
-            <path
-              fill="#FFF8E7"
-              fillOpacity="1"
-              d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
-            ></path>
-          </svg>
+      {/* Description — plain white section, comfortable measure. */}
+      <section className="bg-white py-12 md:py-16 px-4">
+        <div className="container mx-auto max-w-3xl">
+          {destination.tagline && (
+            <p className="text-lg md:text-xl font-body text-teal mb-3">
+              {destination.tagline}
+            </p>
+          )}
+          <h2 className="text-3xl md:text-4xl font-display text-ink mb-6">
+            {transferPackage?.title || `Nainital to ${destination.name}`}
+          </h2>
+
+          {(() => {
+            const body = transferPackage?.description || destination.description || "";
+            const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+            if (paragraphs.length === 0) return null;
+            return (
+              <div className="font-body text-base md:text-lg leading-relaxed text-ink/75 space-y-4">
+                {paragraphs.map((para, idx) => (
+                  <p key={idx}>{para}</p>
+                ))}
+              </div>
+            );
+          })()}
+
+          {destination.highlights && destination.highlights.length > 0 && (
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {destination.highlights.map((highlight, idx) => (
+                <div key={idx} className="flex items-start">
+                  <CheckCircle2 className="w-5 h-5 text-teal mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="font-body text-ink/80">{highlight}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       {/* Quick Stats */}
       {transferPackage && (
-        <section className="py-12 px-4 -mt-16 relative z-20">
+        <section className="py-12 px-4 relative z-20">
           <div className="container mx-auto">
             <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="text-center bg-white/95 backdrop-blur-sm">
@@ -237,33 +326,6 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         </section>
       )}
 
-      {/* Destination Description */}
-      <section className="py-12 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <Card>
-            <CardContent className="pt-6">
-              <h2 className="text-3xl font-display text-ink mb-4">
-                {transferPackage?.title || `Nainital to ${destination.name}`}
-              </h2>
-              <p className="font-body text-ink/80 mb-6 leading-relaxed">
-                {transferPackage?.description || destination.description}
-              </p>
-
-              {destination.highlights && destination.highlights.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {destination.highlights.map((highlight, idx) => (
-                    <div key={idx} className="flex items-start">
-                      <CheckCircle2 className="w-5 h-5 text-teal mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="font-body text-ink/80">{highlight}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
       {/* Transparent Pricing Section */}
       {transferPackage && Object.keys(pricingByVehicle).length > 0 && (
         <PricingGridForDestination
@@ -278,7 +340,42 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         />
       )}
 
-      {/* CTA Section */}
+      {/* Cross-sell: tour packages linked to this destination in the admin */}
+      {linkedPackages.length > 0 && (
+        <section className="py-12 md:py-16 px-4 bg-lake/30">
+          <div className="container mx-auto max-w-6xl">
+            <h2 className="text-3xl md:text-4xl font-display text-ink text-center mb-3">
+              Top Packages for {destination.name}
+            </h2>
+            <p className="font-body text-ink/60 text-center mb-10">
+              Make a full trip of it — curated tours covering {destination.name} and nearby.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {linkedPackages.map((pkg) => (
+                <PackageCard
+                  key={pkg.id}
+                  slug={pkg.slug}
+                  title={pkg.title}
+                  imageUrl={pkg.image_url}
+                  duration={pkg.duration}
+                  placesCovered={pkg.places_covered}
+                  minPrice={minPrices[pkg.id]}
+                  availabilityStatus={pkg.availability_status}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Why Book With Us — admin-editable via /admin/tour-trust-section */}
+      <TourTrustSection
+        data={tourTrustSection}
+        headingOverride={`Why Book ${destination.name} Taxi With Us?`}
+      />
+
+      {/* CTA Section — placed after pricing/packages/trust so it closes the
+          value pitch rather than interrupting it. */}
       <section className="py-16 px-4">
         <div className="container mx-auto max-w-4xl">
           <Card className="bg-gradient-to-r from-teal to-teal/80 border-3 border-ink">
@@ -306,60 +403,6 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
               </div>
             </CardContent>
           </Card>
-        </div>
-      </section>
-
-      {/* Why Book With Us */}
-      <section className="py-20 px-4 bg-white/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
-              Why Book {destination.name} Taxi With Us?
-            </h2>
-            <p className="text-lg font-body text-ink/70">Your safety is our top priority - not the lowest price</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-7 h-7 text-teal" />
-                </div>
-                <h3 className="font-display text-xl mb-2">Zero Alcohol Policy</h3>
-                <p className="font-body text-ink/70 text-sm">Strict sobriety standards with no exceptions for your safety</p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 bg-coral/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <UserCheck className="w-7 h-7 text-coral" />
-                </div>
-                <h3 className="font-display text-xl mb-2">Verified Drivers</h3>
-                <p className="font-body text-ink/70 text-sm">Background-checked, professionally trained drivers</p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 bg-sunshine/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Heart className="w-7 h-7 text-ink" />
-                </div>
-                <h3 className="font-display text-xl mb-2">Family-First Care</h3>
-                <p className="font-body text-ink/70 text-sm">Drivers who treat passengers like their own family</p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 bg-teal/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-7 h-7 text-teal" />
-                </div>
-                <h3 className="font-display text-xl mb-2">Spotless Vehicles</h3>
-                <p className="font-body text-ink/70 text-sm">Daily sanitized, well-maintained comfortable cars</p>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </section>
 
@@ -416,67 +459,18 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         );
       })()}
 
-      {/* FAQ Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-display text-ink mb-4">
+      {/* FAQ Section — hidden entirely when the admin unticks "Show FAQs".
+          Nullish means the row predates the show_faqs column, so default on. */}
+      {destination.show_faqs !== false && faqItems.length > 0 && (
+        <section className="py-16 md:py-20 px-4">
+          <div className="container mx-auto max-w-3xl">
+            <h2 className="text-3xl md:text-4xl font-display text-ink text-center mb-10">
               Frequently Asked Questions
             </h2>
+            <FAQAccordion items={faqItems} />
           </div>
-
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-display text-xl text-ink mb-2">
-                  How long does the journey from Nainital to {destination.name} take?
-                </h3>
-                <p className="font-body text-ink/70">
-                  The journey takes approximately {transferPackage?.duration || destination.duration || "N/A"} depending on traffic and weather conditions.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-display text-xl text-ink mb-2">Is the price per person or per vehicle?</h3>
-                <p className="font-body text-ink/70">
-                  All prices are per vehicle, not per person. You can share the cost with your travel companions.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-display text-xl text-ink mb-2">What&apos;s included in the fare?</h3>
-                <p className="font-body text-ink/70">
-                  Our fares include driver allowance and fuel. Tolls, parking, and any state permits are charged extra.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-display text-xl text-ink mb-2">Can I book for the same day?</h3>
-                <p className="font-body text-ink/70">
-                  Yes! Subject to availability, we accept same-day bookings. Call or WhatsApp us for immediate assistance.
-                </p>
-              </CardContent>
-            </Card>
-
-            {destination.best_time_to_visit && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="font-display text-xl text-ink mb-2">
-                    When is the best time to visit {destination.name}?
-                  </h3>
-                  <p className="font-body text-ink/70">{destination.best_time_to_visit}</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Booking Instructions */}
       {transferPackage?.itinerary && (() => {
@@ -485,27 +479,9 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
         return <BookingInstructions instructions={content.booking_instructions} />;
       })()}
+      </main>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 border-t-3 border-ink">
-        <div className="container mx-auto text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Shield className="w-5 h-5 text-teal" />
-            <p className="font-display text-ink">Your Safety. Our Promise.</p>
-          </div>
-          <p className="font-body text-ink/70 mb-4">
-            © 2024 Nainital Taxi. Trusted by families across India.
-          </p>
-          <div className="flex justify-center gap-4 flex-wrap">
-            <Button variant="whatsapp" size="sm">
-              WhatsApp Us
-            </Button>
-            <Button variant="outline" size="sm">
-              Call Now
-            </Button>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

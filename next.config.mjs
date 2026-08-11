@@ -24,6 +24,23 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // next/image refuses any remote host that isn't listed here. Admin-uploaded
+  // media (hero images, vehicle photos, package galleries) all live in the
+  // Supabase Storage `images` bucket, so without this every <Image> pointing
+  // at Supabase throws "hostname is not configured" at render time.
+  //
+  // Wildcard host mirrors the CSP's `img-src ... https://*.supabase.co`
+  // (src/lib/security/csp.ts) so a project-ref change doesn't break both.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+
   async headers() {
     return [
       {

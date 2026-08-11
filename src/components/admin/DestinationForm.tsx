@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Plus, X, Loader2 } from "lucide-react";
+import { Save, ArrowLeft, Plus, X, Loader2, Package as PackageIcon } from "lucide-react";
 import Link from "next/link";
 import { Destination } from "@/lib/supabase/types";
+import ImageUploader from "@/components/admin/ImageUploader";
+
+interface LinkablePackage {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  is_active: boolean;
+}
 
 interface DestinationFormProps {
   destination?: Destination;
@@ -32,6 +41,49 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
   const [metaDescription, setMetaDescription] = useState(destination?.meta_description || "");
   const [isActive, setIsActive] = useState(destination?.is_active ?? true);
   const [isPopular, setIsPopular] = useState(destination?.is_popular ?? false);
+  // Nullish means the row predates the show_faqs migration — default to showing.
+  const [showFaqs, setShowFaqs] = useState(destination?.show_faqs ?? true);
+
+  // Cross-sell packages
+  const [selectedPackages, setSelectedPackages] = useState<string[]>(
+    destination?.package_ids || []
+  );
+  const [packages, setPackages] = useState<LinkablePackage[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // Only tours are worth cross-selling — a "transfer" package is this
+    // destination's own point-to-point fare, not a trip to promote.
+    fetch("/api/admin/packages?type=tour")
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        const rows: LinkablePackage[] = json?.data || [];
+        setPackages(rows.filter((p) => p.is_active));
+      })
+      .catch(() => {
+        // Non-fatal: the rest of the form still saves. The empty-state copy
+        // below tells the admin the list didn't load.
+        if (!cancelled) setPackages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPackagesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const togglePackage = (packageId: string) => {
+    setSelectedPackages((prev) =>
+      prev.includes(packageId)
+        ? prev.filter((id) => id !== packageId)
+        : [...prev, packageId]
+    );
+  };
 
   const generateSlug = (text: string) => {
     return text
@@ -76,6 +128,8 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
       highlights,
       meta_title: metaTitle || null,
       meta_description: metaDescription || null,
+      package_ids: selectedPackages,
+      show_faqs: showFaqs,
       is_active: isActive,
       is_popular: isPopular,
     };
@@ -238,16 +292,17 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
           </div>
         </div>
 
-        <div>
-          <label className="block font-body text-sm text-ink/70 mb-1">Hero Image URL</label>
-          <input
-            type="url"
-            value={heroImageUrl}
-            onChange={(e) => setHeroImageUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full px-4 py-2 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
-          />
-        </div>
+        {/* Uploads to Supabase Storage. Still accepts a pasted URL via the
+            uploader's "Or enter image URL" toggle, so existing rows that hold
+            an external link keep working. */}
+        <ImageUploader
+          value={heroImageUrl}
+          onChange={setHeroImageUrl}
+          folder="destinations/hero"
+          label="Hero Image"
+          recommendedSize="1920 x 1080"
+          aspectRatio="16:9"
+        />
 
         <div>
           <label className="block font-body text-sm text-ink/70 mb-1">Highlights</label>
@@ -286,6 +341,46 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Linked Tour Packages */}
+      <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
+        <h2 className="font-display text-lg text-ink border-b-2 border-ink/10 pb-2 flex items-center gap-2">
+          <PackageIcon className="w-5 h-5 text-teal" />
+          Linked Tour Packages
+        </h2>
+        <p className="font-body text-sm text-ink/60">
+          Shown as &ldquo;Top Packages for {name || "this destination"}&rdquo; on the
+          destination page. Leave empty to hide that section.
+        </p>
+
+        <div className="max-h-48 overflow-y-auto border-3 border-ink rounded-xl p-3 space-y-2">
+          {packagesLoading ? (
+            <p className="text-sm font-body text-ink/60">Loading packages...</p>
+          ) : packages.length === 0 ? (
+            <p className="text-sm font-body text-ink/60">
+              No active tour packages found.
+            </p>
+          ) : (
+            packages.map((pkg) => (
+              <label
+                key={pkg.id}
+                className="flex items-center gap-2 cursor-pointer hover:bg-sunrise/20 p-2 rounded"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedPackages.includes(pkg.id)}
+                  onChange={() => togglePackage(pkg.id)}
+                  className="w-4 h-4 border-2 border-ink rounded accent-teal"
+                />
+                <span className="text-sm font-body text-ink">{pkg.title}</span>
+              </label>
+            ))
+          )}
+        </div>
+        <p className="text-xs text-ink/60">
+          {selectedPackages.length} package{selectedPackages.length === 1 ? "" : "s"} selected
+        </p>
       </div>
 
       {/* SEO */}
@@ -338,6 +433,16 @@ export default function DestinationForm({ destination, isEditing }: DestinationF
               className="w-5 h-5 rounded border-2 border-ink"
             />
             <span className="font-body text-ink">Popular (featured badge)</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showFaqs}
+              onChange={(e) => setShowFaqs(e.target.checked)}
+              className="w-5 h-5 rounded border-2 border-ink"
+            />
+            <span className="font-body text-ink">Show FAQs section</span>
           </label>
         </div>
       </div>

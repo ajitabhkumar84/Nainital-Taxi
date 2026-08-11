@@ -249,6 +249,14 @@ export interface Destination {
   meta_title?: string | null;
   meta_description?: string | null;
 
+  // Cross-sell: tour packages surfaced on this destination's page.
+  // Soft reference to packages.id — stale IDs are filtered out on read.
+  package_ids?: string[] | null;
+
+  // Admin switch for the FAQ section. Treat nullish as true (the column
+  // defaults to true, but rows read before the migration won't have it).
+  show_faqs?: boolean | null;
+
   // Metadata
   display_order: number;
   is_popular: boolean;

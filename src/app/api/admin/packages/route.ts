@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { PackageType } from '@/lib/supabase/types';
+
+/**
+ * Destination pages cross-sell package cards (destinations.package_ids), so
+ * they cache package title/image/duration/status. Without this, editing a
+ * package leaves those cards stale.
+ *
+ * Price changes are already covered from the other direction — the pricing
+ * route revalidates /destinations when the `pricing` table changes.
+ */
+function revalidatePackages() {
+  revalidatePath('/destinations', 'layout');
+}
 
 function generateSlug(title: string): string {
   return title
@@ -166,6 +179,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidatePackages();
+
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error in packages POST:', error);
@@ -206,6 +221,8 @@ export async function PATCH(request: NextRequest) {
       console.error('Error updating package:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    revalidatePackages();
 
     return NextResponse.json({ data });
   } catch (error) {
@@ -250,6 +267,8 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
+
+    revalidatePackages();
 
     return NextResponse.json({ success: true });
   } catch (error) {

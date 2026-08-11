@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { Destination } from '@/lib/supabase/types';
+
+/**
+ * Destination content is rendered by the /destinations listing and every
+ * /destinations/[slug] detail page; the homepage also shows popular
+ * destinations. 'layout' scope covers the listing and all slugs in one call.
+ */
+function revalidateDestinations() {
+  revalidatePath('/destinations', 'layout');
+  revalidatePath('/');
+}
 
 function generateSlug(name: string): string {
   return name
@@ -99,6 +110,8 @@ export async function POST(request: NextRequest) {
       emoji: body.emoji || null,
       meta_title: body.meta_title || null,
       meta_description: body.meta_description || null,
+      package_ids: body.package_ids || [],
+      show_faqs: body.show_faqs ?? true,
       display_order: displayOrder,
       is_popular: body.is_popular ?? false,
       is_active: body.is_active ?? true,
@@ -114,6 +127,8 @@ export async function POST(request: NextRequest) {
       console.error('Error creating destination:', error);
       return NextResponse.json({ error: 'Failed to create destination' }, { status: 500 });
     }
+
+    revalidateDestinations();
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
@@ -151,6 +166,8 @@ export async function PATCH(request: NextRequest) {
       console.error('Error updating destination:', error);
       return NextResponse.json({ error: 'Failed to update destination' }, { status: 500 });
     }
+
+    revalidateDestinations();
 
     return NextResponse.json(data);
   } catch (error) {
@@ -194,6 +211,8 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to deactivate destination' }, { status: 500 });
       }
     }
+
+    revalidateDestinations();
 
     return NextResponse.json({ success: true });
   } catch (error) {
