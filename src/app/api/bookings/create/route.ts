@@ -11,6 +11,7 @@ import {
   sendAdminNotification,
 } from '@/lib/notifications';
 import { SelectedAddon } from '@/lib/supabase/types';
+import { isBookingAllowed } from '@/lib/supabase';
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -217,6 +218,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Please enter a valid email address' },
         { status: 400 }
+      );
+    }
+
+    // Reject bookings for a date blocked via /admin/availability
+    // (availability.is_blocked) or an active booking_blackout range — the
+    // last line of defense if a client bypasses the wizard's own (now also
+    // fixed) availability checks, e.g. by calling this endpoint directly.
+    const bookingStatus = await isBookingAllowed(body.tripDate);
+    if (!bookingStatus.allowed) {
+      return NextResponse.json(
+        { error: bookingStatus.message || 'Bookings are currently paused for this date.' },
+        { status: 409 }
       );
     }
 

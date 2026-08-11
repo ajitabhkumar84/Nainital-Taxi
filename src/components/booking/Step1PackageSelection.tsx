@@ -11,12 +11,14 @@ import {
   getVehicleModelExamples,
   getAllPackagePrices,
   getAllRoutePrices,
+  getAvailabilityForDate,
   formatPrice,
   PriceResult,
 } from '@/lib/pricing';
 import { getMinBookingDate, formatDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
+import BlockedDateNotice from './BlockedDateNotice';
 
 interface Package {
   id: string;
@@ -61,6 +63,7 @@ export default function Step1PackageSelection() {
   const [error, setError] = useState('');
   const [pricesByVehicle, setPricesByVehicle] = useState<Partial<Record<VehicleType, PriceResult>>>({});
   const [pricingLoading, setPricingLoading] = useState(false);
+  const [blockedInfo, setBlockedInfo] = useState<{ blocked: boolean; message?: string }>({ blocked: false });
 
   // Fetch every vehicle's price in one shot once a date is picked, so the
   // vehicle cards below can show a real price instead of only revealing it
@@ -82,6 +85,33 @@ export default function Step1PackageSelection() {
       .finally(() => {
         if (!cancelled) setPricingLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripDate, packageId, routeId]);
+
+  // Separately check whether the picked date is admin-blocked (either via
+  // availability.is_blocked or a booking_blackout range) — this must hide
+  // the vehicle grid entirely rather than just annotate a missing price,
+  // since a blocked date can still have live pricing rows in the DB. The
+  // `cancelled` guard (same pattern as the pricing effect above) means a
+  // stale response for a previously-picked date can never clobber the state
+  // for whatever date the user has since selected — picking a subsequent
+  // valid date resets this cleanly back to `{ blocked: false }`.
+  useEffect(() => {
+    if (!tripDate || (!packageId && !routeId)) {
+      setBlockedInfo({ blocked: false });
+      return;
+    }
+    let cancelled = false;
+    getAvailabilityForDate(tripDate).then((availability) => {
+      if (cancelled) return;
+      setBlockedInfo(
+        availability?.status === 'blocked'
+          ? { blocked: true, message: availability.message }
+          : { blocked: false }
+      );
+    });
     return () => {
       cancelled = true;
     };
@@ -329,6 +359,14 @@ export default function Step1PackageSelection() {
             </div>
           </div>
 
+          {tripDate && blockedInfo.blocked ? (
+            <BlockedDateNotice
+              date={tripDate}
+              tripLabel={packageTitle || 'your trip'}
+              message={blockedInfo.message}
+            />
+          ) : (
+            <>
           <div>
             <label className="block text-sm font-bold text-[#2D3436] mb-3">
               Choose Your Vehicle
@@ -443,6 +481,8 @@ export default function Step1PackageSelection() {
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>
+            </>
+          )}
         </div>
       )}
     </div>

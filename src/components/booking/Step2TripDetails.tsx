@@ -8,7 +8,10 @@ import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, ge
 import { getPackageById } from '@/lib/supabase';
 import { formatTime, formatDate, getMinBookingDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
+import { generateAvailabilityInquiryWhatsAppLink } from '@/lib/messageGenerators';
 import AddonSelector from './AddonSelector';
+import BlockedDateNotice from './BlockedDateNotice';
 
 // Hourly pickup-time options within our staffed window. Both flows cut off
 // at 3 PM (15:00) so the trip has daylight to complete; tours additionally
@@ -52,11 +55,13 @@ export default function Step2TripDetails() {
     prevStep,
   } = useBookingStore();
   const { labels: vehicleLabels } = useVehicleLabels();
+  const { config: siteConfig } = useSiteConfig();
 
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState(false);
   const [hasAddons, setHasAddons] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState<string | undefined>(undefined);
 
   // Tours don't start until the park/gate opens; transfers can be picked up
   // earlier for airport/rail connections. Both cut off at 3 PM.
@@ -130,6 +135,7 @@ export default function Step2TripDetails() {
       const availabilityData = await getAvailabilityForDate(date);
       if (availabilityData) {
         setAvailability(availabilityData.status, availabilityData.carsAvailable);
+        setBlockedMessage(availabilityData.message);
       }
 
       // Get price — routeId and packageId are mutually exclusive
@@ -153,6 +159,12 @@ export default function Step2TripDetails() {
   const capacityExceeded = Boolean(
     vehicleType && passengerCount > getVehicleCapacity(vehicleType)
   );
+
+  // Blocked dates have nothing left to configure — no price to show, no
+  // pickup time/passengers/location to collect, nothing to continue to.
+  // Everything below the availability notice stays hidden until the user
+  // picks a different date.
+  const isBlocked = availabilityStatus === 'blocked';
 
   // Case-insensitive substring match rather than a strict canonical-value
   // check: transfers always carry an exact "Nainital" pickup, but tour
@@ -323,15 +335,30 @@ export default function Step2TripDetails() {
           </div>
         )}
 
-        {!checkingAvailability && tripDate && availabilityStatus && (
+        {!checkingAvailability && tripDate && availabilityStatus === 'blocked' && (
+          <BlockedDateNotice
+            date={tripDate}
+            tripLabel={packageTitle || 'your trip'}
+            pickupLocation={pickupLocation || undefined}
+            dropoffLocation={dropoffLocation || undefined}
+            message={blockedMessage}
+            className="mt-3"
+          />
+        )}
+
+        {!checkingAvailability && tripDate && availabilityStatus && availabilityStatus !== 'blocked' && (
           <div className={`mt-3 p-4 rounded-xl border-2 ${getAvailabilityColor()}`}>
             <p className="font-medium">{getAvailabilityMessage()}</p>
 
-            {/* Show contact buttons for sold out/blocked */}
-            {(availabilityStatus === 'sold_out' || availabilityStatus === 'blocked') && (
+            {/* Show contact buttons for sold out */}
+            {availabilityStatus === 'sold_out' && (
               <div className="flex flex-wrap gap-3 mt-4">
                 <a
-                  href={`https://wa.me/918445206116?text=Hi, I want to book for ${tripDate} but it shows as unavailable. Can you help?`}
+                  href={generateAvailabilityInquiryWhatsAppLink(
+                    siteConfig.contact.whatsapp,
+                    { tripLabel: packageTitle || 'your trip', pickupLocation, dropoffLocation },
+                    tripDate
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#20BA59] transition-colors"
@@ -340,7 +367,7 @@ export default function Step2TripDetails() {
                   Contact on WhatsApp
                 </a>
                 <a
-                  href="tel:+918445206116"
+                  href={`tel:${siteConfig.contact.phone.replace(/\s/g, '')}`}
                   className="flex items-center gap-2 px-4 py-2 bg-[#4D96FF] text-white rounded-xl font-bold hover:bg-[#3D86EF] transition-colors"
                 >
                   <Phone className="w-4 h-4" />
@@ -352,6 +379,8 @@ export default function Step2TripDetails() {
         )}
       </div>
 
+      {!isBlocked && (
+      <>
       {/* Price Unavailable */}
       {tripDate && !checkingAvailability && !fetchingPrice && priceError && (
         <div className="p-6 rounded-2xl border-4 border-red-400 bg-red-50">
@@ -525,9 +554,11 @@ export default function Step2TripDetails() {
           />
         </div>
       )}
+      </>
+      )}
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between pt-6 border-t-2 border-gray-200">
+      <div className={`flex pt-6 border-t-2 border-gray-200 ${isBlocked ? 'justify-start' : 'justify-between'}`}>
         <Button
           onClick={prevStep}
           variant="secondary"
@@ -537,23 +568,24 @@ export default function Step2TripDetails() {
           Back
         </Button>
 
-        <Button
-          onClick={handleNext}
-          disabled={
-            !tripDate ||
-            !tripTime ||
-            !pickupLocation ||
-            priceError ||
-            availabilityStatus === 'sold_out' ||
-            availabilityStatus === 'blocked' ||
-            capacityExceeded
-          }
-          size="lg"
-          className="group"
-        >
-          Continue to Contact Info
-          <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-        </Button>
+        {!isBlocked && (
+          <Button
+            onClick={handleNext}
+            disabled={
+              !tripDate ||
+              !tripTime ||
+              !pickupLocation ||
+              priceError ||
+              availabilityStatus === 'sold_out' ||
+              capacityExceeded
+            }
+            size="lg"
+            className="group"
+          >
+            Continue to Contact Info
+            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+          </Button>
+        )}
       </div>
     </div>
   );

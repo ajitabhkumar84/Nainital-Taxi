@@ -103,6 +103,41 @@ export function generateEmailLink(booking: BookingState): string {
   return `mailto:${businessEmail}?subject=${encodedSubject}&body=${encodedBody}`;
 }
 
+export interface AvailabilityInquiryRoute {
+  /** Package/route title — used when no pickup/dropoff pair is known
+   *  (tour bookings, or a search-time form that hasn't collected a route). */
+  tripLabel: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+}
+
+/**
+ * Build a wa.me link with a short pre-booking availability-inquiry message,
+ * for a date that's blocked/unavailable before a full BookingState exists.
+ * Search-time components (BookingWidget) have no Zustand store access at
+ * all, and even store-backed steps haven't collected enough of a
+ * BookingState yet to use generateWhatsAppLink's full booking summary —
+ * reusing it verbatim here would render "Amount: Not calculated" etc.
+ *
+ * whatsappNumber is passed in by the caller (sourced from useSiteConfig()'s
+ * config.contact.whatsapp) rather than the hardcoded WHATSAPP_BUSINESS_NUMBER
+ * above, to avoid adding another hardcoded phone-number literal.
+ */
+export function generateAvailabilityInquiryWhatsAppLink(
+  whatsappNumber: string,
+  route: AvailabilityInquiryRoute,
+  date: string | null
+): string {
+  const formattedDate = date ? formatDate(date) : 'my selected date';
+  const tripDescription =
+    route.pickupLocation && route.dropoffLocation
+      ? `from ${route.pickupLocation} to ${route.dropoffLocation}`
+      : `for ${route.tripLabel}`;
+  const message = `Hi, I am looking for a taxi on ${formattedDate} ${tripDescription}. Is anything available?`;
+  const digitsOnly = whatsappNumber.replace(/\D/g, '');
+  return `https://wa.me/${digitsOnly}?text=${encodeURIComponent(message)}`;
+}
+
 /**
  * Format date to readable format
  */

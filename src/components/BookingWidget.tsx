@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, Button, Input, Select, Label } from "@/components/ui";
 import { Calendar, MapPin, Users, Car, Loader2, MessageCircle } from "lucide-react";
 import { getPackages, getPrice } from "@/lib/supabase";
-import { getVehicleCapacity } from "@/lib/pricing";
+import { getVehicleCapacity, getAvailabilityForDate } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing } from "@/lib/supabase/types";
 import { buildBookingUrl } from "@/lib/bookingLink";
@@ -17,6 +17,7 @@ import {
   resolvePickupAliases,
   toCanonicalPickupLocation,
 } from "@/lib/pickupLocations";
+import BlockedDateNotice from "@/components/booking/BlockedDateNotice";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
@@ -59,7 +60,17 @@ export default function BookingWidget() {
     season: string;
     bookingAllowed: boolean;
     message?: string;
+    // True when bookingAllowed is false specifically because the date is
+    // admin-blocked (availability.is_blocked / booking_blackout) — distinct
+    // from e.g. a route's static enable_online_booking flag, which is a
+    // different, permanent condition that doesn't warrant the
+    // "high demand"-style BlockedDateNotice copy.
+    isBlockedDate?: boolean;
   } | null>(null);
+  // True while the Transfers tab's date-availability check is in flight —
+  // guards against a rapid double-submit before we know if the date is
+  // actually bookable.
+  const [isValidatingAvailability, setIsValidatingAvailability] = useState(false);
 
   // Load packages and routes from database
   useEffect(() => {
@@ -122,6 +133,7 @@ export default function BookingWidget() {
     return VEHICLE_OPTIONS.filter((v) => availableVehicleTypes.has(v.value));
   };
 
+  const selectedTourPackage = packages.find((p) => p.id === tourPackage);
   const tourPassengerCount = parseInt(tourPassengers, 10) || 1;
   const tourVehicleOptions = VEHICLE_OPTIONS.filter(
     (v) => getVehicleCapacity(v.value) >= tourPassengerCount
@@ -196,8 +208,11 @@ export default function BookingWidget() {
     }
   }, [transferFrom, transferTo, transferVehicle, transferDate, routes]);
 
-  // Calculate transfer price
-  const calculateTransferPrice = (route: Route & { pricing?: RoutePricing[] }) => {
+  // Calculate transfer price — async because it now also checks
+  // availability.is_blocked / booking_blackout for the picked date. Before
+  // this fix, the Transfers tab only checked the route's static
+  // enable_online_booking flag and never consulted date availability at all.
+  const calculateTransferPrice = async (route: Route & { pricing?: RoutePricing[] }) => {
     if (!route.pricing || !transferDate || !transferVehicle) return;
 
     // Determine season based on date (simple check)
@@ -209,18 +224,44 @@ export default function BookingWidget() {
       (p) => p.vehicle_type === transferVehicle && p.season_name === seasonName
     );
 
-    if (pricing) {
+    if (!pricing) {
+      // No pricing available for this vehicle type and season
+      setPriceInfo(null);
+      return;
+    }
+
+    if (!route.enable_online_booking) {
       setPriceInfo({
         price: pricing.price,
         season: seasonName,
-        bookingAllowed: route.enable_online_booking,
-        message: !route.enable_online_booking
-          ? "Online booking is currently disabled. Please contact us directly."
-          : undefined,
+        bookingAllowed: false,
+        message: "Online booking is currently disabled. Please contact us directly.",
+        isBlockedDate: false,
       });
-    } else {
-      // No pricing available for this vehicle type and season
-      setPriceInfo(null);
+      return;
+    }
+
+    setIsValidatingAvailability(true);
+    try {
+      const availability = await getAvailabilityForDate(transferDate);
+      if (availability?.status === "blocked") {
+        setPriceInfo({
+          price: pricing.price,
+          season: seasonName,
+          bookingAllowed: false,
+          message: availability.message,
+          isBlockedDate: true,
+        });
+        return;
+      }
+
+      setPriceInfo({
+        price: pricing.price,
+        season: seasonName,
+        bookingAllowed: true,
+      });
+    } finally {
+      setIsValidatingAvailability(false);
     }
   };
 
@@ -240,6 +281,11 @@ export default function BookingWidget() {
           season: pricing.season_name,
           bookingAllowed: pricing.booking_allowed,
           message: pricing.blackout_message,
+          // getPrice()'s only "not allowed" reason is isBookingAllowed()
+          // (availability.is_blocked or an active booking_blackout row) —
+          // always a blocked date on this tab, unlike Transfers which also
+          // has the route-level enable_online_booking case.
+          isBlockedDate: !pricing.booking_allowed,
         });
       } catch (error) {
         console.error("Price check failed:", error);
@@ -273,13 +319,11 @@ export default function BookingWidget() {
       return;
     }
 
-    const selectedPkg = packages.find((p) => p.id === tourPackage);
-
     router.push(
       buildBookingUrl({
         packageId: tourPackage,
-        packageTitle: selectedPkg?.title || "Tour Package",
-        packageSlug: selectedPkg?.slug,
+        packageTitle: selectedTourPackage?.title || "Tour Package",
+        packageSlug: selectedTourPackage?.slug,
         packageType: "tour",
         vehicle: tourVehicle,
         date: tourDate,
@@ -455,7 +499,18 @@ export default function BookingWidget() {
             </div>
           )}
 
-          {priceInfo && !checkingPrice && (
+          {/* Blocked date: no price to show, just the contact notice. */}
+          {priceInfo && !checkingPrice && priceInfo.isBlockedDate && (
+            <div className="border-t border-slate-200 pt-4">
+              <BlockedDateNotice
+                date={tourDate}
+                tripLabel={selectedTourPackage?.title || "your trip"}
+                message={priceInfo.message}
+              />
+            </div>
+          )}
+
+          {priceInfo && !checkingPrice && !priceInfo.isBlockedDate && (
             <div className="border-t border-slate-200 pt-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-slate-500">Estimated fare</span>
@@ -479,12 +534,24 @@ export default function BookingWidget() {
             size="lg"
             className="w-full"
             onClick={handleTourBooking}
-            disabled={loading || !tourPackage || !tourDate || !tourVehicle}
+            disabled={
+              loading ||
+              checkingPrice ||
+              !tourPackage ||
+              !tourDate ||
+              !tourVehicle ||
+              (priceInfo !== null && !priceInfo.bookingAllowed)
+            }
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
                 Processing...
+              </>
+            ) : checkingPrice ? (
+              <>
+                <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
+                Checking availability...
               </>
             ) : (
               "Check availability & book"
@@ -632,8 +699,21 @@ export default function BookingWidget() {
             </div>
           )}
 
+          {/* Blocked date: no price to show, just the contact notice. */}
+          {priceInfo && selectedRoute && priceInfo.isBlockedDate && (
+            <div className="border-t border-slate-200 pt-4">
+              <BlockedDateNotice
+                date={transferDate}
+                tripLabel={`${transferFrom} to ${transferTo}`}
+                pickupLocation={transferFrom}
+                dropoffLocation={transferTo}
+                message={priceInfo.message}
+              />
+            </div>
+          )}
+
           {/* Price Display */}
-          {priceInfo && selectedRoute && (
+          {priceInfo && selectedRoute && !priceInfo.isBlockedDate && (
             <div className="border-t border-slate-200 pt-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-slate-500">Estimated fare</span>
@@ -659,18 +739,25 @@ export default function BookingWidget() {
             onClick={handleTransferBooking}
             disabled={
               loading ||
+              isValidatingAvailability ||
               !transferFrom ||
               !transferTo ||
               !transferDate ||
               !selectedRoute ||
               !selectedRoute.enable_online_booking ||
-              !transferVehicle
+              !transferVehicle ||
+              (priceInfo !== null && !priceInfo.bookingAllowed)
             }
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
                 Processing...
+              </>
+            ) : isValidatingAvailability ? (
+              <>
+                <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
+                Checking availability...
               </>
             ) : (
               "Check availability & book"

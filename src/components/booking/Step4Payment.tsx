@@ -120,6 +120,14 @@ export default function Step4Payment() {
       const data = await response.json();
 
       if (!response.ok) {
+        // A blocked-date 409 from the availability guard is a distinct,
+        // expected condition (not a generic server failure) — surface a
+        // clearer message pointing the user back to date selection.
+        if (response.status === 409) {
+          throw new Error(
+            data.error || 'This date is no longer available for online booking. Please go back and choose a different date.'
+          );
+        }
         throw new Error(data.error || 'Failed to create booking');
       }
 

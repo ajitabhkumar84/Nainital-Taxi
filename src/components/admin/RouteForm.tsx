@@ -13,7 +13,14 @@ import {
   Package,
   FolderTree,
 } from "lucide-react";
-import { Route, RoutePricing, VehicleType, RouteCategory } from "@/lib/supabase/types";
+import {
+  Route,
+  RoutePricing,
+  RouteCategory,
+  VehicleType,
+  VEHICLE_TYPES,
+  SEASON_NAMES,
+} from "@/lib/supabase/types";
 import { PICKUP_LOCATIONS, toCanonicalPickupLocation } from "@/lib/pickupLocations";
 
 interface RouteFormProps {
@@ -21,9 +28,6 @@ interface RouteFormProps {
   onSubmit: (data: Partial<Route & { pricing: Partial<RoutePricing>[] }>) => Promise<void>;
   isSubmitting: boolean;
 }
-
-const VEHICLE_TYPES: VehicleType[] = ["sedan", "suv_normal", "suv_deluxe", "suv_luxury"];
-const SEASON_NAMES = ["Off-Season", "Season"] as const;
 
 function generateSlug(pickup: string, drop: string): string {
   return `${pickup}-to-${drop}`

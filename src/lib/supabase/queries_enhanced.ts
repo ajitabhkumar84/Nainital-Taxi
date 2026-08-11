@@ -11,6 +11,7 @@ import { cache } from 'react';
 import { supabase } from './client';
 import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent } from './types';
 import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
+import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
 
 // ============================================================================
 // SEASON & PRICING HELPERS
@@ -58,14 +59,32 @@ export async function getSeasonForDate(date: string): Promise<{
 }
 
 /**
- * Check if online booking is allowed for a date
- * Returns false if date falls within an active blackout period
+ * Check if online booking is allowed for a date.
+ * Blocks on EITHER of two independent admin mechanisms:
+ *  - the single-date `availability.is_blocked` flag, set via
+ *    /admin/availability (POST /api/availability)
+ *  - an active date-range row in the separate `booking_blackout` table
  */
 export async function isBookingAllowed(date: string): Promise<{
   allowed: boolean;
   message?: string;
 }> {
   try {
+    // Check the single-date availability.is_blocked flag first.
+    type AvailabilityBlockRow = { is_blocked: boolean; public_message: string | null };
+    const { data: availabilityRow, error: availabilityError } = await supabase
+      .from('availability')
+      .select('is_blocked, public_message')
+      .eq('date', date)
+      .maybeSingle() as { data: AvailabilityBlockRow | null; error: unknown };
+
+    if (!availabilityError && availabilityRow?.is_blocked) {
+      return {
+        allowed: false,
+        message: availabilityRow.public_message || DEFAULT_BLOCKED_MESSAGE,
+      };
+    }
+
     // Query blackout table directly - handle if table doesn't exist
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase.from as any)('booking_blackout')
@@ -388,52 +407,6 @@ export async function getPopularDestinations(limit: number = 4): Promise<Destina
 // AVAILABILITY QUERIES
 // ============================================================================
 
-export async function checkAvailability(date: string): Promise<{
-  available: boolean;
-  cars_available: number;
-  status: 'available' | 'limited' | 'sold_out' | 'blocked';
-  message?: string;
-  booking_allowed: boolean;
-  blackout_message?: string;
-}> {
-  // First check if booking is allowed (blackout dates)
-  const bookingStatus = await isBookingAllowed(date);
-
-  // Then check vehicle availability
-  type AvailabilityData = {
-    cars_available: number;
-    status: 'available' | 'limited' | 'sold_out' | 'blocked';
-    public_message: string | null;
-    is_blocked: boolean;
-  };
-
-  const { data, error } = await supabase
-    .from('availability')
-    .select('cars_available, status, public_message, is_blocked')
-    .eq('date', date)
-    .single() as { data: AvailabilityData | null; error: unknown };
-
-  if (error || !data) {
-    // No availability record - create default response
-    return {
-      available: bookingStatus.allowed,
-      cars_available: 10,
-      status: 'available',
-      booking_allowed: bookingStatus.allowed,
-      blackout_message: bookingStatus.message
-    };
-  }
-
-  return {
-    available: data.cars_available > 0 && !data.is_blocked && bookingStatus.allowed,
-    cars_available: data.cars_available,
-    status: data.status,
-    message: data.public_message || undefined,
-    booking_allowed: bookingStatus.allowed,
-    blackout_message: bookingStatus.message
-  };
-}
-
 export async function getAvailabilityRange(
   startDate: string,
   endDate: string
@@ -469,54 +442,6 @@ export async function getAvailabilityRange(
   );
 
   return results;
-}
-
-// ============================================================================
-// BOOKING CREATION
-// ============================================================================
-
-export async function createBooking(bookingData: {
-  customer_name: string;
-  customer_phone: string;
-  customer_email?: string;
-  customer_whatsapp?: string;
-  package_id: string;
-  package_name: string;
-  vehicle_type: VehicleType;
-  booking_date: string;
-  pickup_time: string;
-  pickup_location: string;
-  dropoff_location?: string;
-  passengers: number;
-  final_price: number;
-  season_name: string;
-  special_requests?: string;
-  requires_child_seat?: boolean;
-}) {
-  // First check if booking is allowed
-  const bookingStatus = await isBookingAllowed(bookingData.booking_date);
-
-  if (!bookingStatus.allowed) {
-    throw new Error(bookingStatus.message || 'Online booking not allowed for this date');
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('bookings')
-    .insert({
-      ...bookingData,
-      status: 'pending',
-      payment_status: 'pending',
-      booking_source: 'website'
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating booking:', error);
-    throw error;
-  }
-
-  return data;
 }
 
 // ============================================================================

@@ -1,241 +1,194 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  Save,
-  IndianRupee,
-  Car,
-  Package,
-  AlertCircle,
-} from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, Loader2, Package as PackageIcon, Route as RouteIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { VehicleType, VehicleTypeDisplayNames, Package as PackageType } from "@/lib/supabase/types";
+import {
+  Package as PackageType,
+  Route,
+  Pricing,
+  RoutePricing,
+  Season,
+  SeasonName,
+} from "@/lib/supabase/types";
+import PricingCard, { PendingPriceEdit } from "@/components/admin/PricingCard";
 
-interface PricingEntry {
-  id: string;
-  package_id: string;
-  vehicle_type: VehicleType;
-  season_id: string;
-  season_name: string;
-  price: number;
-  notes: string | null;
-  is_active: boolean;
+type Tab = "packages" | "transfers";
+
+interface PricingApiResponse {
+  pricing: Pricing[];
+  routePricing: RoutePricing[];
+  seasons: Season[];
 }
 
-interface Season {
-  id: string;
-  name: string;
-  description: string | null;
+function formatShortDate(date: string): string {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-const VEHICLE_TYPES: VehicleType[] = ["sedan", "suv_normal", "suv_deluxe", "suv_luxury"];
+// The two price columns are always "Off-Season" / "Season" (see SEASON_NAMES);
+// the `seasons` table only supplies helper text — the actual date range(s)
+// currently mapped to each name — since it can hold several rows per name
+// (long weekends, festival periods, etc.).
+function buildSeasonHints(seasons: Season[]): Partial<Record<SeasonName, string>> {
+  const rangesByName: Partial<Record<SeasonName, string[]>> = {};
+  for (const season of seasons) {
+    if (season.name !== "Off-Season" && season.name !== "Season") continue;
+    const name = season.name as SeasonName;
+    const range = `${formatShortDate(season.start_date)}–${formatShortDate(season.end_date)}`;
+    rangesByName[name] = [...(rangesByName[name] || []), range];
+  }
+
+  const hints: Partial<Record<SeasonName, string>> = {};
+  for (const [name, ranges] of Object.entries(rangesByName) as [SeasonName, string[]][]) {
+    const shown = ranges.slice(0, 3);
+    hints[name] = shown.join(", ") + (ranges.length > shown.length ? ` +${ranges.length - shown.length} more` : "");
+  }
+  return hints;
+}
 
 export default function PricingPage() {
+  const [tab, setTab] = useState<Tab>("packages");
   const [packages, setPackages] = useState<PackageType[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [pricing, setPricing] = useState<Pricing[]>([]);
+  const [routePricing, setRoutePricing] = useState<RoutePricing[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [pricing, setPricing] = useState<PricingEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [search, setSearch] = useState("");
+  const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const fetchData = useCallback(async () => {
-    try {
-      // Fetch packages
-      const { data: packagesData, error: packagesError } = await supabase
-        .from("packages")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order");
+  // Each of these three fetches is independent — one failing (as the old
+  // "pricing" query did, on a bad relationship name) must not blank the
+  // whole page, which is exactly what happened before.
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
 
-      if (packagesError) throw packagesError;
+    const [packagesResult, routesResult, pricingResult] = await Promise.allSettled([
+      fetch("/api/admin/packages").then((r) => {
+        if (!r.ok) throw new Error("Failed to load packages");
+        return r.json();
+      }),
+      fetch("/api/admin/routes").then((r) => {
+        if (!r.ok) throw new Error("Failed to load routes");
+        return r.json();
+      }),
+      fetch("/api/admin/pricing").then((r) => {
+        if (!r.ok) throw new Error("Failed to load pricing");
+        return r.json() as Promise<PricingApiResponse>;
+      }),
+    ]);
 
-      // Fetch seasons
-      const { data: seasonsData, error: seasonsError } = await supabase
-        .from("seasons")
-        .select("id, name, description")
-        .eq("is_active", true);
+    const failures: string[] = [];
 
-      if (seasonsError) throw seasonsError;
-
-      // Fetch all pricing
-      const { data: pricingData, error: pricingError } = await supabase
-        .from("pricing")
-        .select("*, seasons(name)")
-        .eq("is_active", true);
-
-      if (pricingError) throw pricingError;
-
-      const typedPackages = (packagesData as PackageType[]) || [];
-      const typedSeasons = (seasonsData as Season[]) || [];
-
-      setPackages(typedPackages);
-      setSeasons(typedSeasons);
-
-      // Transform pricing data
-      const transformedPricing = (pricingData || []).map((p: Record<string, unknown>) => ({
-        id: p.id as string,
-        package_id: p.package_id as string,
-        vehicle_type: p.vehicle_type as VehicleType,
-        season_id: p.season_id as string,
-        season_name: (p.seasons as { name: string } | null)?.name || "Unknown",
-        price: p.price as number,
-        notes: p.notes as string | null,
-        is_active: p.is_active as boolean,
-      }));
-
-      setPricing(transformedPricing);
-
-      if (typedPackages.length > 0) {
-        setSelectedPackage(typedPackages[0].id);
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
+    if (packagesResult.status === "fulfilled") {
+      setPackages(packagesResult.value.data || []);
+    } else {
+      failures.push("packages");
+      console.error("Error fetching packages:", packagesResult.reason);
     }
+
+    if (routesResult.status === "fulfilled") {
+      setRoutes(routesResult.value.data || []);
+    } else {
+      failures.push("routes");
+      console.error("Error fetching routes:", routesResult.reason);
+    }
+
+    if (pricingResult.status === "fulfilled") {
+      setPricing(pricingResult.value.pricing || []);
+      setRoutePricing(pricingResult.value.routePricing || []);
+      setSeasons(pricingResult.value.seasons || []);
+    } else {
+      failures.push("pricing");
+      console.error("Error fetching pricing:", pricingResult.reason);
+    }
+
+    setLoadError(
+      failures.length > 0
+        ? `Couldn't load ${failures.join(", ")}. Try refreshing the page.`
+        : ""
+    );
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchAll();
+  }, [fetchAll]);
 
-  const getPriceKey = (packageId: string, vehicleType: VehicleType, seasonId: string) => {
-    return `${packageId}-${vehicleType}-${seasonId}`;
-  };
+  useEffect(() => {
+    if (!banner) return;
+    const timer = setTimeout(() => setBanner(null), 3000);
+    return () => clearTimeout(timer);
+  }, [banner]);
 
-  const getCurrentPrice = (packageId: string, vehicleType: VehicleType, seasonId: string) => {
-    const key = getPriceKey(packageId, vehicleType, seasonId);
-    if (editedPrices[key] !== undefined) {
-      return editedPrices[key];
+  const seasonHints = useMemo(() => buildSeasonHints(seasons), [seasons]);
+
+  const filteredPackages = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? packages.filter((p) => p.title.toLowerCase().includes(q)) : packages;
+  }, [packages, search]);
+
+  const filteredRoutes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q
+      ? routes.filter((r) => `${r.pickup_location} ${r.drop_location}`.toLowerCase().includes(q))
+      : routes;
+  }, [routes, search]);
+
+  const postPricing = async (updates: Record<string, unknown>[]) => {
+    const response = await fetch("/api/admin/pricing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to save prices");
     }
-    const priceEntry = pricing.find(
-      (p) => p.package_id === packageId && p.vehicle_type === vehicleType && p.season_id === seasonId
-    );
-    return priceEntry?.price || 0;
+    const { data } = await response.json();
+    return data as { pricing: Pricing[]; routePricing: RoutePricing[] };
   };
 
-  const handlePriceChange = (
-    packageId: string,
-    vehicleType: VehicleType,
-    seasonId: string,
-    value: string
-  ) => {
-    const key = getPriceKey(packageId, vehicleType, seasonId);
-    const numValue = parseInt(value) || 0;
-    setEditedPrices((prev) => ({ ...prev, [key]: numValue }));
-    setHasChanges(true);
-  };
-
-  const savePrice = async (packageId: string, vehicleType: VehicleType, seasonId: string) => {
-    const key = getPriceKey(packageId, vehicleType, seasonId);
-    const newPrice = editedPrices[key];
-
-    if (newPrice === undefined) return;
-
-    setSaving(key);
+  const savePackagePrices = async (packageId: string, edits: PendingPriceEdit[]) => {
     try {
-      // Check if pricing entry exists
-      const existingEntry = pricing.find(
-        (p) => p.package_id === packageId && p.vehicle_type === vehicleType && p.season_id === seasonId
-      );
-
-      if (existingEntry) {
-        // Update existing
-        const response = await fetch("/api/admin/pricing", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: existingEntry.id, price: newPrice }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to update price");
-        }
-
-        setPricing((prev) =>
-          prev.map((p) =>
-            p.id === existingEntry.id ? { ...p, price: newPrice } : p
-          )
-        );
-      } else {
-        // Insert new
-        const response = await fetch("/api/admin/pricing", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            package_id: packageId,
-            vehicle_type: vehicleType,
-            season_id: seasonId,
-            price: newPrice,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to create price");
-        }
-
-        const { data } = await response.json();
-
-        if (data) {
-          setPricing((prev) => [
-            ...prev,
-            {
-              id: data.id,
-              package_id: data.package_id,
-              vehicle_type: data.vehicle_type,
-              season_id: data.season_id,
-              season_name: (data.seasons as { name: string } | null)?.name || "Unknown",
-              price: data.price,
-              notes: data.notes,
-              is_active: data.is_active,
-            },
-          ]);
-        }
-      }
-
-      // Remove from edited prices
-      setEditedPrices((prev) => {
-        const newEdited = { ...prev };
-        delete newEdited[key];
-        return newEdited;
+      const data = await postPricing(edits.map((e) => ({ package_id: packageId, ...e })));
+      setPricing((prev) => {
+        const touched = (p: Pricing) =>
+          p.package_id === packageId &&
+          edits.some((e) => e.vehicle_type === p.vehicle_type && e.season_name === p.season_name);
+        return [...prev.filter((p) => !touched(p)), ...(data.pricing || [])];
       });
-
-      setHasChanges(Object.keys(editedPrices).length > 1);
-    } catch (error) {
-      console.error("Error saving price:", error);
-      alert("Failed to save price. Please try again.");
-    } finally {
-      setSaving(null);
+      setBanner({ type: "success", text: "Prices saved." });
+    } catch (err) {
+      setBanner({ type: "error", text: err instanceof Error ? err.message : "Failed to save prices." });
+      throw err;
     }
   };
 
-  const saveAllPrices = async () => {
-    const keys = Object.keys(editedPrices);
-    for (const key of keys) {
-      const [packageId, vehicleType, seasonId] = key.split("-");
-      await savePrice(packageId, vehicleType as VehicleType, seasonId);
+  const saveRoutePrices = async (routeId: string, edits: PendingPriceEdit[]) => {
+    try {
+      const data = await postPricing(edits.map((e) => ({ route_id: routeId, ...e })));
+      setRoutePricing((prev) => {
+        const touched = (p: RoutePricing) =>
+          p.route_id === routeId &&
+          edits.some((e) => e.vehicle_type === p.vehicle_type && e.season_name === p.season_name);
+        return [...prev.filter((p) => !touched(p)), ...(data.routePricing || [])];
+      });
+      setBanner({ type: "success", text: "Prices saved." });
+    } catch (err) {
+      setBanner({ type: "error", text: err instanceof Error ? err.message : "Failed to save prices." });
+      throw err;
     }
-    setHasChanges(false);
   };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-IN").format(price);
-  };
-
-  const selectedPackageData = packages.find((p) => p.id === selectedPackage);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-xl font-display text-ink animate-pulse">
+        <div className="flex items-center gap-2 text-xl font-display text-ink animate-pulse">
+          <Loader2 className="w-6 h-6 animate-spin" />
           Loading pricing...
         </div>
       </div>
@@ -245,144 +198,118 @@ export default function PricingPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display text-ink">Pricing Manager</h1>
-          <p className="text-ink/60 font-body mt-1">
-            Set prices for each package, vehicle type, and season
-          </p>
-        </div>
-        {hasChanges && (
-          <button
-            onClick={saveAllPrices}
-            className="flex items-center gap-2 px-6 py-3 bg-whatsapp text-white border-3 border-ink rounded-xl font-display shadow-retro-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-          >
-            <Save className="w-5 h-5" />
-            Save All Changes
-          </button>
-        )}
+      <div>
+        <h1 className="text-3xl font-display text-ink">Pricing Manager</h1>
+        <p className="text-ink/60 font-body mt-1">
+          Set prices for each package or route, by vehicle type and season
+        </p>
       </div>
 
-      {/* Package Selector */}
-      <div className="bg-white rounded-2xl border-3 border-ink p-4 shadow-retro">
-        <div className="flex items-center gap-3 mb-4">
-          <Package className="w-5 h-5 text-ink" />
-          <h2 className="font-display text-lg text-ink">Select Package</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {packages.map((pkg) => (
-            <button
-              key={pkg.id}
-              onClick={() => setSelectedPackage(pkg.id)}
-              className={cn(
-                "px-4 py-2 rounded-xl font-body text-sm border-2 transition-all",
-                selectedPackage === pkg.id
-                  ? "bg-sunshine border-ink shadow-retro-sm"
-                  : "bg-white border-ink/20 hover:border-ink/40"
-              )}
-            >
-              {pkg.title}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Pricing Table */}
-      {selectedPackageData && (
-        <div className="bg-white rounded-2xl border-3 border-ink shadow-retro overflow-hidden">
-          <div className="p-4 border-b-3 border-ink bg-sunrise/30">
-            <h2 className="font-display text-xl text-ink">{selectedPackageData.title}</h2>
-            <p className="text-ink/60 font-body text-sm mt-1">
-              {selectedPackageData.type === "tour" ? "Tour Package" : "Transfer"} •{" "}
-              {selectedPackageData.duration}
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b-2 border-ink/20">
-                  <th className="text-left p-4 font-display text-ink">
-                    <div className="flex items-center gap-2">
-                      <Car className="w-4 h-4" />
-                      Vehicle Type
-                    </div>
-                  </th>
-                  {seasons.map((season) => (
-                    <th key={season.id} className="text-center p-4 font-display text-ink">
-                      {season.name}
-                      {season.description && (
-                        <div className="text-xs font-body text-ink/60 font-normal">
-                          {season.description}
-                        </div>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {VEHICLE_TYPES.map((vehicleType) => (
-                  <tr key={vehicleType} className="border-b border-ink/10 hover:bg-sunrise/10">
-                    <td className="p-4">
-                      <div className="font-body font-semibold text-ink">
-                        {VehicleTypeDisplayNames[vehicleType]}
-                      </div>
-                    </td>
-                    {seasons.map((season) => {
-                      const key = getPriceKey(selectedPackage!, vehicleType, season.id);
-                      const currentPrice = getCurrentPrice(selectedPackage!, vehicleType, season.id);
-                      const isEdited = editedPrices[key] !== undefined;
-                      const isSaving = saving === key;
-
-                      return (
-                        <td key={season.id} className="p-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="relative">
-                              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40" />
-                              <input
-                                type="number"
-                                value={currentPrice}
-                                onChange={(e) =>
-                                  handlePriceChange(
-                                    selectedPackage!,
-                                    vehicleType,
-                                    season.id,
-                                    e.target.value
-                                  )
-                                }
-                                className={cn(
-                                  "w-32 pl-8 pr-3 py-2 border-2 rounded-lg font-body text-right focus:outline-none focus:ring-2 focus:ring-sunshine",
-                                  isEdited ? "border-sunshine bg-sunshine/10" : "border-ink/20"
-                                )}
-                              />
-                            </div>
-                            {isEdited && (
-                              <button
-                                onClick={() =>
-                                  savePrice(selectedPackage!, vehicleType, season.id)
-                                }
-                                disabled={isSaving}
-                                className={cn(
-                                  "p-2 rounded-lg transition-colors",
-                                  isSaving
-                                    ? "bg-ink/10 text-ink/40"
-                                    : "bg-whatsapp text-white hover:opacity-90"
-                                )}
-                              >
-                                <Save className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {loadError && (
+        <div className="bg-coral/10 border-3 border-coral rounded-xl p-4 text-coral font-body flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          {loadError}
         </div>
       )}
+      {banner && (
+        <div
+          className={cn(
+            "border-3 rounded-xl p-4 font-body",
+            banner.type === "success" ? "bg-teal/10 border-teal text-teal" : "bg-coral/10 border-coral text-coral"
+          )}
+        >
+          {banner.text}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setTab("packages")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl font-body text-sm border-2 transition-all",
+            tab === "packages" ? "bg-sunshine border-ink shadow-retro-sm" : "bg-white border-ink/20 hover:border-ink/40"
+          )}
+        >
+          <PackageIcon className="w-4 h-4" />
+          Package Pricing
+          <span className="text-xs text-ink/50">({packages.length})</span>
+        </button>
+        <button
+          onClick={() => setTab("transfers")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl font-body text-sm border-2 transition-all",
+            tab === "transfers" ? "bg-sunshine border-ink shadow-retro-sm" : "bg-white border-ink/20 hover:border-ink/40"
+          )}
+        >
+          <RouteIcon className="w-4 h-4" />
+          Transfer Pricing
+          <span className="text-xs text-ink/50">({routes.length})</span>
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={tab === "packages" ? "Search packages..." : "Search routes..."}
+          className="w-full pl-9 pr-3 py-2 border-2 border-ink/20 rounded-xl font-body text-sm focus:outline-none focus:ring-2 focus:ring-sunshine"
+        />
+      </div>
+
+      {/* Cards */}
+      <div className="space-y-3">
+        {tab === "packages" &&
+          (filteredPackages.length === 0 ? (
+            <p className="text-ink/50 font-body text-sm p-4">No packages found.</p>
+          ) : (
+            filteredPackages.map((pkg) => (
+              <PricingCard
+                key={pkg.id}
+                subject={{
+                  id: pkg.id,
+                  name: pkg.title,
+                  sublabel: [pkg.type === "tour" ? "Tour Package" : "Transfer", pkg.duration]
+                    .filter(Boolean)
+                    .join(" • "),
+                  isActive: pkg.is_active,
+                }}
+                prices={pricing
+                  .filter((p) => p.package_id === pkg.id)
+                  .map((p) => ({ vehicle_type: p.vehicle_type, season_name: p.season_name, price: p.price }))}
+                seasonHints={seasonHints}
+                onSave={savePackagePrices}
+              />
+            ))
+          ))}
+
+        {tab === "transfers" &&
+          (filteredRoutes.length === 0 ? (
+            <p className="text-ink/50 font-body text-sm p-4">No routes found.</p>
+          ) : (
+            filteredRoutes.map((route) => (
+              <PricingCard
+                key={route.id}
+                subject={{
+                  id: route.id,
+                  name: `${route.pickup_location} → ${route.drop_location}`,
+                  sublabel: [route.distance ? `${route.distance} km` : null, route.duration]
+                    .filter(Boolean)
+                    .join(" • "),
+                  isActive: route.is_active,
+                }}
+                prices={routePricing
+                  .filter((p) => p.route_id === route.id)
+                  .map((p) => ({ vehicle_type: p.vehicle_type, season_name: p.season_name, price: p.price }))}
+                seasonHints={seasonHints}
+                onSave={saveRoutePrices}
+              />
+            ))
+          ))}
+      </div>
 
       {/* Info Box */}
       <div className="bg-lake/20 rounded-2xl border-3 border-ink p-4 shadow-retro">
@@ -393,25 +320,33 @@ export default function PricingPage() {
             <ul className="list-disc list-inside mt-2 space-y-1 text-ink/70">
               <li>Prices are in INR (Indian Rupees)</li>
               <li>Season prices apply automatically based on the booking date</li>
+              <li>
+                Leave a price blank to mark that vehicle unavailable for this package/route —
+                it will be hidden from customers instead of showing ₹0
+              </li>
               <li>Changes are highlighted in yellow until saved</li>
-              <li>Click the save button next to each price or use &quot;Save All Changes&quot;</li>
+              <li>Expand a card and use its own &quot;Save Prices&quot; button</li>
             </ul>
           </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border-3 border-ink p-4 shadow-retro">
           <div className="text-3xl font-display text-ink">{packages.length}</div>
-          <div className="text-sm font-body text-ink/60">Active Packages</div>
+          <div className="text-sm font-body text-ink/60">Packages</div>
+        </div>
+        <div className="bg-white rounded-2xl border-3 border-ink p-4 shadow-retro">
+          <div className="text-3xl font-display text-ink">{routes.length}</div>
+          <div className="text-sm font-body text-ink/60">Transfer Routes</div>
         </div>
         <div className="bg-white rounded-2xl border-3 border-ink p-4 shadow-retro">
           <div className="text-3xl font-display text-ink">{seasons.length}</div>
           <div className="text-sm font-body text-ink/60">Seasons Configured</div>
         </div>
         <div className="bg-white rounded-2xl border-3 border-ink p-4 shadow-retro">
-          <div className="text-3xl font-display text-ink">{pricing.length}</div>
+          <div className="text-3xl font-display text-ink">{pricing.length + routePricing.length}</div>
           <div className="text-sm font-body text-ink/60">Price Entries</div>
         </div>
       </div>

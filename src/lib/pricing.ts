@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { VehicleType } from '@/store/bookingStore';
+import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
 
 export interface PriceResult {
   price: number;
@@ -262,6 +263,8 @@ export async function getAllRoutePrices(
 interface AvailabilityRow {
   total_fleet_size: number;
   cars_booked: number;
+  is_blocked: boolean;
+  public_message: string | null;
 }
 
 /**
@@ -272,9 +275,12 @@ export async function getAvailabilityForDate(date: string): Promise<{
   carsAvailable: number;
   totalFleetSize: number;
   carsBooked: number;
+  message?: string;
 } | null> {
   try {
-    // Check if booking is allowed for this date (not in blackout)
+    // Check if booking is allowed for this date via the *separate* date-range
+    // booking_blackout mechanism — distinct admin concept from the
+    // single-date availability.is_blocked flag checked below. Either blocks.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: blackoutCheck } = await (supabase.rpc as any)('is_booking_allowed', {
       check_date: date
@@ -285,14 +291,15 @@ export async function getAvailabilityForDate(date: string): Promise<{
         status: 'blocked',
         carsAvailable: 0,
         totalFleetSize: 0,
-        carsBooked: 0
+        carsBooked: 0,
+        message: DEFAULT_BLOCKED_MESSAGE
       };
     }
 
     // Get availability record for the date
     const { data: availabilityData, error: fetchError } = await supabase
       .from('availability')
-      .select('total_fleet_size, cars_booked')
+      .select('total_fleet_size, cars_booked, is_blocked, public_message')
       .eq('date', date)
       .single();
 
@@ -320,6 +327,18 @@ export async function getAvailabilityForDate(date: string): Promise<{
     }
 
     const availability = availabilityData as AvailabilityRow;
+
+    // Admin has explicitly blocked this single date via /admin/availability —
+    // short-circuit regardless of remaining fleet capacity.
+    if (availability.is_blocked) {
+      return {
+        status: 'blocked',
+        carsAvailable: 0,
+        totalFleetSize: availability.total_fleet_size,
+        carsBooked: availability.cars_booked,
+        message: availability.public_message || DEFAULT_BLOCKED_MESSAGE
+      };
+    }
 
     const carsAvailable = availability.total_fleet_size - availability.cars_booked;
     let status: 'available' | 'limited' | 'sold_out' | 'blocked';

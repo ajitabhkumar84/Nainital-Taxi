@@ -63,7 +63,12 @@ export default function ContactPageForm() {
     (async () => {
       try {
         const response = await fetch("/api/admin/contact-page");
-        if (!response.ok) throw new Error("Failed to load contact page content");
+        if (!response.ok) {
+          // Prefer the server's own wording — it distinguishes "the migration
+          // hasn't been run" from a genuine fault, which a generic string hides.
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error || "Failed to load contact page content");
+        }
         const content: ContactPageContent = await response.json();
         setData({
           ...content,

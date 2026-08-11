@@ -429,10 +429,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to check if online booking is allowed for a date
+-- Blocks on EITHER an active booking_blackout date range OR the single-date
+-- availability.is_blocked flag (set via /admin/availability).
 CREATE OR REPLACE FUNCTION is_booking_allowed(check_date DATE)
 RETURNS BOOLEAN AS $$
 DECLARE
   blackout_count INTEGER;
+  date_is_blocked BOOLEAN;
 BEGIN
   SELECT COUNT(*) INTO blackout_count
   FROM booking_blackout
@@ -440,7 +443,11 @@ BEGIN
     AND start_date <= check_date
     AND end_date >= check_date;
 
-  RETURN (blackout_count = 0);
+  SELECT is_blocked INTO date_is_blocked
+  FROM availability
+  WHERE date = check_date;
+
+  RETURN (blackout_count = 0) AND (COALESCE(date_is_blocked, FALSE) = FALSE);
 END;
 $$ LANGUAGE plpgsql;
 

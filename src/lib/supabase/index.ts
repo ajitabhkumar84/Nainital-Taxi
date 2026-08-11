@@ -89,12 +89,10 @@ export {
   getSeasonDateRanges,
 
   // Availability
-  checkAvailability,
   getAvailabilityRange,
   getUpcomingAvailability,
 
   // Bookings
-  createBooking,
   getUserBookings,
   getBooking,
   updateBookingStatus,

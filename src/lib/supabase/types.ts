@@ -1480,6 +1480,21 @@ export const VehicleTypeDisplayNames: Record<VehicleType, string> = {
 };
 
 /**
+ * All vehicle types, in display order. Shared by every admin pricing UI
+ * (RouteForm, the /admin/pricing tabs) so the row order can't drift between them.
+ */
+export const VEHICLE_TYPES: VehicleType[] = ['sedan', 'suv_normal', 'suv_deluxe', 'suv_luxury'];
+
+/**
+ * The only two season names the `pricing` / `route_pricing` tables accept
+ * (see the CHECK constraints in supabase/schema_enhanced.sql and
+ * supabase/create_routes_table.sql). Not the same thing as rows in the
+ * `seasons` table, which can have several date ranges per name.
+ */
+export const SEASON_NAMES = ['Off-Season', 'Season'] as const;
+export type SeasonName = (typeof SEASON_NAMES)[number];
+
+/**
  * Type for updating booking status
  */
 export type UpdateBookingStatus = {
