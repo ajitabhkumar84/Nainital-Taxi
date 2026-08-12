@@ -1627,6 +1627,8 @@ export interface CTAButton {
 export interface HeaderConfig {
   logoText: string;
   logoEmoji: string;
+  /** Uploaded favicon image URL (Supabase Storage). Falls back to /favicon.ico when unset. */
+  faviconUrl?: string;
   navLinks: NavLink[];
   ctaPrimary: CTAButton;
   ctaSecondary: CTAButton;

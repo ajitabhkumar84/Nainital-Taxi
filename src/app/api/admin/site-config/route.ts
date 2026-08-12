@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { SiteConfig, DEFAULT_SITE_CONFIG } from '@/lib/supabase/types';
 import { TRACKING_CONFIG_CACHE_TAG } from '@/lib/trackingScripts';
+import { HEADER_CONFIG_CACHE_TAG } from '@/lib/branding';
 
 const SITE_CONFIG_KEYS = [
   'site_config_header',
@@ -132,6 +133,14 @@ export async function POST(request: NextRequest) {
       // on every single page view — bust that cache now so the save takes
       // effect on the live site immediately instead of up to 5 minutes later.
       revalidateTag(TRACKING_CONFIG_CACHE_TAG);
+    }
+
+    if (header) {
+      // Same reasoning as tracking above — the root layout's getFaviconUrl()
+      // (see src/lib/branding.ts) caches the header row so a favicon/logo
+      // save (including its cache-busting `updated_at` timestamp) shows up
+      // on the live site immediately instead of up to 5 minutes later.
+      revalidateTag(HEADER_CONFIG_CACHE_TAG);
     }
 
     return NextResponse.json(updatedConfig);

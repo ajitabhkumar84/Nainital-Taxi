@@ -6,6 +6,7 @@ import { generateLocalBusinessSchema } from "@/lib/structuredData";
 import { SITE_URL } from "@/lib/siteUrl";
 import GlobalContactWidgets from "@/components/GlobalContactWidgets";
 import { getTrackingConfig } from "@/lib/trackingScripts";
+import { getFaviconUrl } from "@/lib/branding";
 import {
   TrackingBodyEnd,
   TrackingBodyStart,
@@ -30,33 +31,50 @@ const nunito = Inter({
 
 const baseUrl = SITE_URL;
 
-export const metadata: Metadata = {
-  metadataBase: new URL(baseUrl),
-  title: {
-    default: "Nainital Taxi - Premium Taxi & Tour Services in Nainital",
-    template: "%s | Nainital Taxi"
-  },
-  description: "Book premium taxi services in Nainital. Reliable transfers from Kathgodam, Delhi, Pantnagar. Tour packages to Bhimtal, Naukuchiatal, Kainchi Dham & more. Best rates guaranteed.",
-  keywords: ["nainital taxi", "kathgodam to nainital taxi", "nainital tour packages", "taxi service nainital", "delhi to nainital taxi"],
-  openGraph: {
-    type: "website",
-    locale: "en_IN",
-    url: baseUrl,
-    siteName: "Nainital Taxi",
-    title: "Nainital Taxi - Premium Taxi & Tour Services",
-    description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Nainital Taxi - Premium Taxi & Tour Services",
-    description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
-  },
-  // No `alternates.canonical` here on purpose. Child pages inherit a parent's
-  // `alternates` wholesale when they don't declare their own, so a root canonical
-  // pointed every such page (/fleet, /rates, /packages/*, ...) at the homepage —
-  // telling Google to drop them. Pages that need a canonical set their own; the
-  // rest emit none and are self-canonicalized.
-};
+// Static file at public/favicon.ico (moved out of src/app/ on purpose — Next's
+// App Router file-based icon convention only scans src/app/, so keeping it
+// there would have Next auto-inject its own <link rel="icon"> alongside the
+// one generateMetadata sets below, leaving two competing icon tags in <head>.
+// This is the sole fallback now, referenced explicitly so there's always
+// exactly one favicon source.
+const DEFAULT_FAVICON = "/favicon.ico";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const faviconUrl = (await getFaviconUrl()) ?? DEFAULT_FAVICON;
+
+  return {
+    metadataBase: new URL(baseUrl),
+    title: {
+      default: "Nainital Taxi - Premium Taxi & Tour Services in Nainital",
+      template: "%s | Nainital Taxi"
+    },
+    description: "Book premium taxi services in Nainital. Reliable transfers from Kathgodam, Delhi, Pantnagar. Tour packages to Bhimtal, Naukuchiatal, Kainchi Dham & more. Best rates guaranteed.",
+    keywords: ["nainital taxi", "kathgodam to nainital taxi", "nainital tour packages", "taxi service nainital", "delhi to nainital taxi"],
+    openGraph: {
+      type: "website",
+      locale: "en_IN",
+      url: baseUrl,
+      siteName: "Nainital Taxi",
+      title: "Nainital Taxi - Premium Taxi & Tour Services",
+      description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Nainital Taxi - Premium Taxi & Tour Services",
+      description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
+    },
+    icons: {
+      icon: faviconUrl,
+      shortcut: faviconUrl,
+      apple: faviconUrl,
+    },
+    // No `alternates.canonical` here on purpose. Child pages inherit a parent's
+    // `alternates` wholesale when they don't declare their own, so a root canonical
+    // pointed every such page (/fleet, /rates, /packages/*, ...) at the homepage —
+    // telling Google to drop them. Pages that need a canonical set their own; the
+    // rest emit none and are self-canonicalized.
+  };
+}
 
 export default async function RootLayout({
   children,

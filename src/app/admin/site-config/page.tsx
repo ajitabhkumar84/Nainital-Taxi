@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAdminSiteConfig } from "@/hooks/useSiteConfig";
 import { NavLink, SocialLink, CTAButton, FooterLinkSection, DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 export default function SiteConfigPage() {
   const { config, isLoading, updateConfig, isSaving, initializeConfig } = useAdminSiteConfig();
@@ -287,7 +288,7 @@ export default function SiteConfigPage() {
         <div className="space-y-6">
           {/* Logo Settings */}
           <div className="bg-white rounded-xl border-3 border-ink p-6 space-y-4">
-            <h2 className="font-display text-lg text-ink border-b-2 border-ink/10 pb-2">Logo</h2>
+            <h2 className="font-display text-lg text-ink border-b-2 border-ink/10 pb-2">Logo & Favicon</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block font-body text-sm text-ink/70 mb-1">Logo Text</label>
@@ -319,6 +320,29 @@ export default function SiteConfigPage() {
                   className="w-full px-4 py-2 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
                 />
               </div>
+            </div>
+
+            <div className="pt-2 border-t-2 border-ink/10">
+              <ImageUploader
+                value={localConfig.header.faviconUrl || ""}
+                onChange={(url) => {
+                  setLocalConfig({
+                    ...localConfig,
+                    header: { ...localConfig.header, faviconUrl: url },
+                  });
+                  setHasChanges(true);
+                }}
+                folder="site-assets"
+                label="Favicon"
+                recommendedSize="512 x 512"
+                aspectRatio="1:1"
+              />
+              <p className="text-xs text-ink/50 mt-2 font-body">
+                Square PNG, 512×512 recommended (minimum 48×48). Solid or transparent background —
+                browsers automatically scale it down for the browser tab icon, bookmarks, and mobile
+                home-screen shortcuts. Changes can take a minute to appear and may need a hard refresh,
+                since browsers cache favicons aggressively.
+              </p>
             </div>
           </div>
 
