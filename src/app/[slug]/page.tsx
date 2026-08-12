@@ -8,6 +8,9 @@ import {
 } from "@/lib/multiDayRental";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
 import MultiDayRentalPageContent from "@/components/multi-day-rental/MultiDayRentalPageContent";
+import Header from "@/components/ui/Header";
+// Direct path, not the ui barrel — see the note in FooterServer.tsx.
+import FooterServer from "@/components/ui/FooterServer";
 
 // Scoped intentionally to just the multi-day-rental page for now. If more
 // single-row CMS pages get custom slugs later, this lookup will need to
@@ -50,10 +53,14 @@ export default async function DynamicSlugPage({
   const featuredPackages = await getMultiDayRentalFeaturedPackages(pageData);
 
   return (
-    <MultiDayRentalPageContent
-      pageData={pageData}
-      whatsappNumber={whatsappNumber}
-      featuredPackages={featuredPackages}
-    />
+    <>
+      <Header />
+      <MultiDayRentalPageContent
+        pageData={pageData}
+        whatsappNumber={whatsappNumber}
+        featuredPackages={featuredPackages}
+      />
+      <FooterServer />
+    </>
   );
 }

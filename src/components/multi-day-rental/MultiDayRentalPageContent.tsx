@@ -23,7 +23,7 @@ export default function MultiDayRentalPageContent({
 }) {
   if (!pageData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pt-24">
         <div className="text-center">
           <h1 className="text-3xl font-display text-ink mb-4">Page Not Available</h1>
           <p className="text-ink/70">The multi-day rental page is currently being configured.</p>
@@ -61,7 +61,8 @@ export default function MultiDayRentalPageContent({
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-black rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+        {/* Top padding clears the fixed global Header the route renders above us. */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 lg:pt-32 lg:pb-16">
           <div className="grid lg:grid-cols-2 gap-8 items-center">
             <div className="space-y-4 order-1">
               {/* Badge */}
