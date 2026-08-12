@@ -17,6 +17,7 @@ import {
   Route,
   RoutePricing,
   RouteCategory,
+  Destination,
   VehicleType,
   VEHICLE_TYPES,
   SEASON_NAMES,
@@ -43,6 +44,10 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const [categories, setCategories] = useState<RouteCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
+  // Destinations (for the "View Details" link on /rates)
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loadingDestinations, setLoadingDestinations] = useState(true);
+
   // Basic Info
   const [pickupLocation, setPickupLocation] = useState(
     toCanonicalPickupLocation(initialData?.pickup_location || "")
@@ -63,6 +68,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const [showOnDestinationPage, setShowOnDestinationPage] = useState(
     initialData?.show_on_destination_page ?? true
   );
+  const [destinationSlug, setDestinationSlug] = useState(initialData?.destination_slug || "");
 
   // Status
   const [isActive, setIsActive] = useState(initialData?.is_active ?? true);
@@ -99,6 +105,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
 
   useEffect(() => {
     fetchCategories();
+    fetchDestinations();
   }, []);
 
   const fetchCategories = async () => {
@@ -113,6 +120,21 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
       console.error("Error fetching categories:", error);
     } finally {
       setLoadingCategories(false);
+    }
+  };
+
+  const fetchDestinations = async () => {
+    try {
+      const response = await fetch("/api/admin/destinations");
+
+      if (!response.ok) throw new Error("Failed to fetch destinations");
+
+      const data = await response.json();
+      setDestinations(data);
+    } catch (error) {
+      console.error("Error fetching destinations:", error);
+    } finally {
+      setLoadingDestinations(false);
     }
   };
 
@@ -170,6 +192,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
       featured_package_id: featuredPackageId || null,
       has_hotel_option: hasHotelOption,
       show_on_destination_page: showOnDestinationPage,
+      destination_slug: destinationSlug || null,
       is_active: isActive,
       enable_online_booking: enableOnlineBooking,
       meta_title: metaTitle || null,
@@ -447,6 +470,31 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
             />
             <span className="font-body">Show on Destination Pages</span>
           </label>
+        </div>
+
+        <div className="mt-4">
+          <label className="block font-body text-sm text-ink/60 mb-2 flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Linked Destination Page
+          </label>
+          <select
+            value={destinationSlug}
+            onChange={(e) => setDestinationSlug(e.target.value)}
+            className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
+            disabled={loadingDestinations}
+          >
+            <option value="">— None (direct booking only) —</option>
+            {destinations.map((destination) => (
+              <option key={destination.id} value={destination.slug}>
+                {destination.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-ink/50 mt-1">
+            Linked → the route on /rates shows a &ldquo;View Details&rdquo; link to
+            that destination page alongside &ldquo;Book Now&rdquo;. None → the route
+            shows only &ldquo;Book Now&rdquo;.
+          </p>
         </div>
       </div>
 

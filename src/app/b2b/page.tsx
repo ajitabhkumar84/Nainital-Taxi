@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { B2BPageConfig, DEFAULT_B2B_CONFIG } from "@/lib/supabase/types";
+import { SITE_URL } from "@/lib/siteUrl";
 
 function getSupabaseClient() {
   return createClient(
@@ -45,7 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: config.meta_title || "B2B Partnership | Tour Operator Services | Nainital Taxi",
     description: config.meta_description || "Partner with Nainital's most reliable taxi service. Competitive rates for tour operators.",
     alternates: {
-      canonical: "https://nainialtaxi.com/b2b",
+      canonical: `${SITE_URL}/b2b`,
     },
   };
 }

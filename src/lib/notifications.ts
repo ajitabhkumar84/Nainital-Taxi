@@ -6,6 +6,7 @@
  */
 
 import { formatPrice, formatDate, formatTime, getVehicleDisplayName } from './booking';
+import { SITE_URL } from './siteUrl';
 
 // Configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -14,7 +15,7 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'bookings@nainitaltaxi.in';
 const BUSINESS_NAME = 'Nainital Taxi';
 const BUSINESS_PHONE = '8445206116';
 const BUSINESS_WHATSAPP = '918445206116';
-const WEBSITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://nainitaltaxi.in';
+const WEBSITE_URL = process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
 
 interface EmailOptions {
   to: string;

@@ -9,7 +9,7 @@
 
 import { cache } from 'react';
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, RoutePricing } from './types';
 import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
 
@@ -820,7 +820,8 @@ export async function getTransferRoutes(): Promise<TransferRoute[]> {
   const { data: routes, error: routesError } = await (supabase.from as any)('routes')
     .select('id, slug, pickup_location, drop_location, distance, duration')
     .eq('is_active', true)
-    .order('display_order', { ascending: true }) as {
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true }) as {
       data: Array<{
         id: string;
         slug: string;
@@ -870,6 +871,99 @@ export async function getTransferRoutes(): Promise<TransferRoute[]> {
     };
   });
 }
+
+export interface CategoryWithRoutes extends RouteCategory {
+  routes: (RouteWithCategory & { pricing?: RoutePricing[] })[];
+}
+
+/**
+ * All active routes grouped by their route_category, with pricing attached —
+ * backs /rates. Same shape /api/routes-with-categories has always returned
+ * ({ categories, allRoutes }), now computed here so /rates can call it
+ * directly as a server component instead of round-tripping through its own
+ * API route. The route handler now delegates to this function too, so
+ * /quote (its other caller) sees no change.
+ *
+ * Ties on display_order are broken by created_at so the grouping is stable
+ * across renders. Any failure (e.g. route_categories not yet migrated —
+ * see the schema-drift note on getTransferRoutes above) degrades to an
+ * empty result rather than throwing, so /rates renders its empty state
+ * instead of a 500.
+ */
+export const getRoutesWithCategories = cache(async (): Promise<{
+  categories: CategoryWithRoutes[];
+  allRoutes: (RouteWithCategory & { pricing?: RoutePricing[] })[];
+}> => {
+  const empty = { categories: [], allRoutes: [] };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: categories, error: categoriesError } = await (supabase.from as any)('route_categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true }) as { data: RouteCategory[] | null; error: unknown };
+
+    if (categoriesError || !categories) {
+      if (categoriesError) console.error('Error fetching route categories:', categoriesError);
+      return empty;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: routes, error: routesError } = await (supabase.from as any)('routes')
+      .select('*, category:route_categories(*)')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true }) as { data: RouteWithCategory[] | null; error: unknown };
+
+    if (routesError || !routes) {
+      if (routesError) console.error('Error fetching routes:', routesError);
+      return empty;
+    }
+
+    const routeIds = routes.map((r) => r.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: pricing, error: pricingError } = await (supabase.from as any)('route_pricing')
+      .select('*')
+      .in('route_id', routeIds)
+      .eq('is_active', true) as { data: RoutePricing[] | null; error: unknown };
+
+    if (pricingError) console.error('Error fetching route pricing:', pricingError);
+
+    const routesWithPricing = routes.map((route) => ({
+      ...route,
+      pricing: (pricing || []).filter((p) => p.route_id === route.id),
+    }));
+
+    const categorizedRoutes: CategoryWithRoutes[] = categories.map((category) => ({
+      ...category,
+      routes: routesWithPricing.filter((r) => r.category_id === category.id),
+    }));
+
+    const uncategorizedRoutes = routesWithPricing.filter((r) => !r.category_id);
+    if (uncategorizedRoutes.length > 0) {
+      categorizedRoutes.push({
+        id: 'uncategorized',
+        category_name: 'Other Routes',
+        category_slug: 'other-routes',
+        category_description: null,
+        icon: 'road',
+        display_order: 999,
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+        routes: uncategorizedRoutes,
+      });
+    }
+
+    return {
+      categories: categorizedRoutes.filter((c) => c.routes.length > 0),
+      allRoutes: routesWithPricing,
+    };
+  } catch (error) {
+    console.error('Error fetching routes with categories:', error);
+    return empty;
+  }
+});
 
 /**
  * Get season date ranges

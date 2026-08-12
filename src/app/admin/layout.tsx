@@ -68,6 +68,7 @@ const navEntries: NavEntry[] = [
   { type: "item", href: "/admin/trust-section", label: "Trust & Safety", icon: <ShieldCheck className="w-5 h-5" /> },
   { type: "item", href: "/admin/tour-trust-section", label: "Tour Page Trust Section", icon: <ShieldCheck className="w-5 h-5" /> },
   { type: "item", href: "/admin/routes", label: "Transfer Routes", icon: <RouteIcon className="w-5 h-5" /> },
+  { type: "item", href: "/admin/one-way-taxi", label: "One-Way Taxi Page", icon: <IndianRupee className="w-5 h-5" /> },
   { type: "item", href: "/admin/route-categories", label: "Route Categories", icon: <FolderTree className="w-5 h-5" /> },
   { type: "item", href: "/admin/temples", label: "Temples", icon: <Church className="w-5 h-5" /> },
   { type: "item", href: "/admin/temple-categories", label: "Temple Categories", icon: <FolderTree className="w-5 h-5" /> },

@@ -101,7 +101,7 @@ export default async function TemplesPage() {
       {config.show_category_navigation && categories.length > 0 && (
         <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-sm border-b-3 border-ink shadow-lg">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <span className="text-sm font-body text-ink/60 whitespace-nowrap">
                 Jump to:
               </span>

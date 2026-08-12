@@ -3,6 +3,8 @@
  * Generates schema.org markup for rich snippets in search results
  */
 
+import { SITE_URL } from '@/lib/siteUrl';
+
 interface LocalBusinessSchema {
   '@context': 'https://schema.org';
   '@type': 'LocalBusiness';
@@ -81,10 +83,10 @@ export function generateLocalBusinessSchema(): LocalBusinessSchema {
   return {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
-    '@id': 'https://nainialtaxi.com/#organization',
+    '@id': `${SITE_URL}/#organization`,
     name: 'Nainital Taxi',
     description: 'Premium taxi and tour services in Nainital, Uttarakhand. Book reliable transfers and tour packages.',
-    url: 'https://nainialtaxi.com',
+    url: SITE_URL,
     telephone: '+918445206116',
     priceRange: '₹₹',
     address: {

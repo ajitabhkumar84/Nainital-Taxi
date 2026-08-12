@@ -48,6 +48,10 @@ export async function generateMetadata(): Promise<Metadata> {
     // seo_title is already the complete, brand-inclusive title for '/'.
     title: { absolute: title },
     description,
+    // Declared here rather than inherited from the root layout — a root canonical
+    // would apply to every page, not just '/'. Relative, so it resolves against
+    // metadataBase.
+    alternates: { canonical: "/" },
   };
 }
 

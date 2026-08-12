@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       .from("routes")
       .select("*")
       .eq("is_active", true)
-      .order("display_order", { ascending: true });
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
 
     if (pickup) {
       query = query.eq("pickup_location", pickup);

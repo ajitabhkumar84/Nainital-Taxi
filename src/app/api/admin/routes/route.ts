@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+/**
+ * Route changes affect the /rates browser and the homepage's "Fixed-fare
+ * transfers" table. Wrapped in try/catch so a revalidation failure never
+ * masks a successful DB write (same pattern as /api/admin/pricing).
+ */
+function revalidateRoutePages() {
+  try {
+    revalidatePath("/rates", "page");
+    revalidatePath("/", "page");
+  } catch (error) {
+    console.error("Revalidation failed (DB write succeeded):", error);
+  }
+}
 
 /**
  * GET /api/admin/routes
@@ -102,6 +117,8 @@ export async function POST(request: NextRequest) {
       if (pricingError) throw pricingError;
     }
 
+    revalidateRoutePages();
+
     return NextResponse.json({
       success: true,
       data: route,
@@ -169,6 +186,8 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    revalidateRoutePages();
+
     return NextResponse.json({
       success: true,
       data: route,
@@ -206,6 +225,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase.from("routes").delete().eq("id", id);
 
     if (error) throw error;
+
+    revalidateRoutePages();
 
     return NextResponse.json({
       success: true,

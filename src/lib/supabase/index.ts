@@ -80,6 +80,8 @@ export {
   getAllPricingForPackage,
   getMinPricePerPackage,
   getTransferRoutes,
+  getRoutesWithCategories,
+  type CategoryWithRoutes,
 
   // Season & Blackout helpers
   getSeasonForDate,

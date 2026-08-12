@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { buildBookingUrl } from "@/lib/bookingLink";
+import { SITE_URL } from "@/lib/siteUrl";
 import { Package, Pricing, TourItinerary, GalleryImage, hasHotelOption } from "@/lib/supabase/types";
 import { getTourTrustSection } from "@/lib/supabase";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
@@ -99,7 +100,7 @@ export async function generateMetadata({
 
   const pricing = await getPackagePricing(pkg.id);
   const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p) => p.price)) : 0;
-  const url = `https://nainialtaxi.com/tour/${pkg.slug}`;
+  const url = `${SITE_URL}/tour/${pkg.slug}`;
 
   return {
     title: pkg.meta_title || `${pkg.title} | Nainital Taxi Tour Packages`,
@@ -148,7 +149,7 @@ export default async function TourPackagePage({
   const touristTripSchema = generateTouristTripSchema({
     name: pkg.title,
     description: pkg.description || `Book ${pkg.title} tour package with Nainital Taxi`,
-    url: `https://nainialtaxi.com/tour/${pkg.slug}`,
+    url: `${SITE_URL}/tour/${pkg.slug}`,
     image: pkg.image_url ?? undefined,
     itinerary: itinerary?.days?.map(day => ({
       name: day.title,

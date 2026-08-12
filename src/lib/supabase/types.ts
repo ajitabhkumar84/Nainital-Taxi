@@ -389,6 +389,11 @@ export interface Route {
   // Destination Page Display
   show_on_destination_page: boolean;
 
+  // Optional link to a /destinations/[slug] page. Set -> /rates shows a
+  // "View Details" link alongside "Book". NULL -> /rates shows only "Book",
+  // so a route never links to a page that doesn't exist.
+  destination_slug?: string | null;
+
   // Status
   is_active: boolean;
   enable_online_booking: boolean;
@@ -435,6 +440,51 @@ export interface RoutePricing {
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * Singleton config for the /rates (One-Way Transfers) page hero and stat
+ * blocks, edited from /admin/one-way-taxi. See
+ * supabase/add_one_way_taxi_settings_and_route_destination_link.sql.
+ */
+export interface OneWayTaxiSettings {
+  id: string;
+
+  hero_heading: string;
+  hero_subheading: string;
+
+  stat_1_value: string;
+  stat_1_label: string;
+  stat_2_value: string;
+  stat_2_label: string;
+  stat_3_value: string;
+  stat_3_label: string;
+
+  seo_title: string;
+  seo_description: string;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export const DEFAULT_ONE_WAY_TAXI_SETTINGS: Omit<
+  OneWayTaxiSettings,
+  "id" | "created_at" | "updated_at"
+> = {
+  hero_heading: "Transfer Routes",
+  hero_subheading:
+    "Browse all available taxi routes from Nainital. Fixed rates, no hidden charges, comfortable vehicles.",
+
+  stat_1_value: "500+",
+  stat_1_label: "Happy Travelers",
+  stat_2_value: "24/7",
+  stat_2_label: "Support",
+  stat_3_value: "15+",
+  stat_3_label: "Years",
+
+  seo_title: "One-Way Taxi Fares & Routes | Nainital Taxi",
+  seo_description:
+    "Transparent one-way taxi fares from Nainital to Kathgodam, Delhi, Pantnagar and more. Fixed rates, no hidden charges, professional drivers.",
+};
 
 export interface Availability {
   id: string; // UUID
@@ -1930,7 +1980,7 @@ export const DEFAULT_B2B_CONFIG: B2BPageConfig = {
 
   contact_person_name: "Partnership Manager",
   contact_person_designation: "B2B Relations",
-  contact_email: "b2b@nainialtaxi.com",
+  contact_email: "taxinainital@gmail.com",
   contact_phone: "+918445206116",
   contact_whatsapp: "+918445206116",
 

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { generateLocalBusinessSchema } from "@/lib/structuredData";
+import { SITE_URL } from "@/lib/siteUrl";
 import GlobalContactWidgets from "@/components/GlobalContactWidgets";
 import { getTrackingConfig } from "@/lib/trackingScripts";
 import {
@@ -27,7 +28,7 @@ const nunito = Inter({
   display: "swap",
 });
 
-const baseUrl = "https://nainialtaxi.com";
+const baseUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -50,9 +51,11 @@ export const metadata: Metadata = {
     title: "Nainital Taxi - Premium Taxi & Tour Services",
     description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
   },
-  alternates: {
-    canonical: baseUrl,
-  },
+  // No `alternates.canonical` here on purpose. Child pages inherit a parent's
+  // `alternates` wholesale when they don't declare their own, so a root canonical
+  // pointed every such page (/fleet, /rates, /packages/*, ...) at the homepage —
+  // telling Google to drop them. Pages that need a canonical set their own; the
+  // rest emit none and are self-canonicalized.
 };
 
 export default async function RootLayout({

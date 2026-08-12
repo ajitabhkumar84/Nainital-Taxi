@@ -29,7 +29,10 @@ export default function RoutesPage() {
       if (!response.ok) throw new Error("Failed to fetch routes");
 
       const { data } = await response.json();
-      setRoutes(data);
+      // The API orders by created_at DESC; sort here by display_order so the
+      // list matches the order routes actually appear in on / and /rates.
+      const sorted = [...data].sort((a, b) => a.display_order - b.display_order);
+      setRoutes(sorted);
     } catch (error) {
       console.error("Error fetching routes:", error);
       alert("Failed to load routes");
@@ -166,6 +169,10 @@ export default function RoutesPage() {
 
                   {/* Status Badges */}
                   <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-body font-semibold rounded-full border-2 bg-gray-100 border-gray-300 text-gray-600">
+                      Order: {route.display_order}
+                    </span>
+
                     <button
                       onClick={() => toggleStatus(route, "is_active")}
                       className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-body font-semibold rounded-full border-2 transition-colors ${
@@ -201,6 +208,16 @@ export default function RoutesPage() {
                     {route.show_on_destination_page && (
                       <span className="px-3 py-1 text-xs font-body font-semibold rounded-full border-2 bg-lake/10 border-lake text-lake">
                         Show on Destination Page
+                      </span>
+                    )}
+
+                    {route.destination_slug ? (
+                      <span className="px-3 py-1 text-xs font-body font-semibold rounded-full border-2 bg-sunshine/10 border-sunshine text-ink">
+                        Links to /destinations/{route.destination_slug}
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 text-xs font-body font-semibold rounded-full border-2 bg-gray-100 border-gray-300 text-gray-500">
+                        Direct booking only
                       </span>
                     )}
 
