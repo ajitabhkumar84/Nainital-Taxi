@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Footer, Badge } from "@/components/ui";
+import { Header, Badge } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import { Church, MapPin, Star, ArrowRight, Navigation, Sparkles } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { getTempleCategoriesWithTemples, getTemplesPageConfig } from "@/lib/supabase/queries_enhanced";
@@ -512,7 +513,7 @@ export default async function TemplesPage() {
         }}
       />
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

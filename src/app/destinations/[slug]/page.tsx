@@ -2,7 +2,8 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { Header, Footer, Button, Card, CardContent, TourTrustSection } from "@/components/ui";
+import { Header, Button, Card, CardContent, TourTrustSection } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import FAQAccordion, { FAQAccordionItem } from "@/components/ui/FAQAccordion";
 import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
@@ -481,7 +482,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       })()}
       </main>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

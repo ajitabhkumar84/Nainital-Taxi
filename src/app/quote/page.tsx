@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Header, Footer, Button } from "@/components/ui";
+import { Header, Button } from "@/components/ui";
+import FooterClient from "@/components/ui/FooterClient";
 import { Car, Calendar, MapPin, IndianRupee, Phone, MessageCircle, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { buildBookingUrl } from "@/lib/bookingLink";
@@ -378,7 +379,7 @@ export default function InstantQuotePage() {
           </div>
         </div>
       </main>
-      <Footer />
+      <FooterClient />
     </>
   );
 }

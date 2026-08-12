@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Header, Footer, Button } from "@/components/ui";
+import { Header, Button } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import { Phone } from "lucide-react";
 import RouteBrowser from "@/components/rates/RouteBrowser";
 import { getRoutesWithCategories } from "@/lib/supabase";
@@ -103,7 +104,7 @@ export default async function RatesPage() {
         </div>
       </div>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

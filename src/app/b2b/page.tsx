@@ -1,7 +1,8 @@
 import React from "react";
 import { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { Header, Footer, Button } from "@/components/ui";
+import { Header, Button } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import {
   Building2, Users, Shield, FileCheck, MessageCircle, Phone,
   Download, CheckCircle, Star, TrendingUp, Clock, Award,
@@ -518,7 +519,7 @@ export default async function B2BPage() {
           </div>
         </section>
       </main>
-      <Footer />
+      <FooterServer />
     </>
   );
 }

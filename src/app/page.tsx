@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { buildBookingUrl } from "@/lib/bookingLink";
-import { Header, Footer, Button } from "@/components/ui";
+import { Header, Button } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin, ArrowRight } from "lucide-react";
 import DestinationCard from "@/components/home/DestinationCard";
 import PackageCard from "@/components/home/PackageCard";
@@ -425,7 +426,7 @@ export default async function Home() {
       </section>
 
       {/* Footer */}
-      <Footer />
+      <FooterServer />
 
       <BookingTicker />
     </>

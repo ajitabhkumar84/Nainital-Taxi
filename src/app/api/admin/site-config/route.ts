@@ -5,6 +5,7 @@ import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { SiteConfig, DEFAULT_SITE_CONFIG } from '@/lib/supabase/types';
 import { TRACKING_CONFIG_CACHE_TAG } from '@/lib/trackingScripts';
 import { HEADER_CONFIG_CACHE_TAG } from '@/lib/branding';
+import { FOOTER_CONFIG_CACHE_TAG } from '@/lib/footerConfig';
 
 const SITE_CONFIG_KEYS = [
   'site_config_header',
@@ -12,6 +13,26 @@ const SITE_CONFIG_KEYS = [
   'site_config_contact',
   'site_config_tracking',
 ];
+
+// GET below takes no arguments and calls no dynamic function, so Next would
+// otherwise prerender it as a *static* Route Handler at build time and serve
+// that build-time JSON forever — the same trap documented for
+// /api/routes-with-categories in src/app/api/admin/routes/route.ts. The
+// client-side useSiteConfig() hook reads this endpoint (Header on every page,
+// FooterClient, and the admin form itself), so a frozen response means admin
+// edits never reach those consumers.
+export const dynamic = 'force-dynamic';
+
+// force-dynamic only opts out of build-time prerendering; an explicit
+// Cache-Control is still honoured at the edge. Without it, every public
+// visitor's useSiteConfig() fetch would hit Supabase directly, since Header
+// renders on all pages. 300s matches the CACHE_DURATION already in
+// src/hooks/useSiteConfig.ts, so this adds no staleness the client didn't
+// already have — and the server-rendered footer/header paths bypass this
+// endpoint entirely and stay instant via revalidateTag.
+const CONFIG_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
+};
 
 // GET - Fetch site configuration
 export async function GET() {
@@ -24,8 +45,9 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching site config:', error);
-      // Return default config if error
-      return NextResponse.json(DEFAULT_SITE_CONFIG);
+      // Return default config if error. Still cached — an uncacheable fallback
+      // would drop the edge protection exactly when Supabase is struggling.
+      return NextResponse.json(DEFAULT_SITE_CONFIG, { headers: CONFIG_CACHE_HEADERS });
     }
 
     // Build config from settings or use defaults
@@ -39,10 +61,10 @@ export async function GET() {
       tracking: (configMap.get('site_config_tracking') as SiteConfig['tracking']) || DEFAULT_SITE_CONFIG.tracking,
     };
 
-    return NextResponse.json(siteConfig);
+    return NextResponse.json(siteConfig, { headers: CONFIG_CACHE_HEADERS });
   } catch (error) {
     console.error('Error in GET /api/admin/site-config:', error);
-    return NextResponse.json(DEFAULT_SITE_CONFIG);
+    return NextResponse.json(DEFAULT_SITE_CONFIG, { headers: CONFIG_CACHE_HEADERS });
   }
 }
 
@@ -141,6 +163,14 @@ export async function POST(request: NextRequest) {
       // save (including its cache-busting `updated_at` timestamp) shows up
       // on the live site immediately instead of up to 5 minutes later.
       revalidateTag(HEADER_CONFIG_CACHE_TAG);
+    }
+
+    if (footer) {
+      // Every public page server-renders its footer through
+      // src/components/ui/FooterServer.tsx -> getFooterConfig(), which caches
+      // this row (see src/lib/footerConfig.ts). Without this the site would
+      // keep serving the previous footer until the 300s TTL lapsed.
+      revalidateTag(FOOTER_CONFIG_CACHE_TAG);
     }
 
     return NextResponse.json(updatedConfig);

@@ -20,7 +20,8 @@ import { SITE_URL } from "@/lib/siteUrl";
 import { Package, Pricing, TourItinerary, GalleryImage, hasHotelOption } from "@/lib/supabase/types";
 import { getTourTrustSection } from "@/lib/supabase";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
-import { Header, Footer, TourTrustSection } from "@/components/ui";
+import { Header, TourTrustSection } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { generateTouristTripSchema } from "@/lib/structuredData";
 import ItineraryTimeline from "@/components/packages/ItineraryTimeline";
@@ -437,7 +438,7 @@ export default async function TourPackagePage({
         </section>
       </main>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

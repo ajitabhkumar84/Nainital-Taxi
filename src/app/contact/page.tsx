@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Header, Footer, Button } from '@/components/ui';
+import { Header, Button } from '@/components/ui';
+import FooterServer from '@/components/ui/FooterServer';
 import { ContactHero, ContactForm, ContactInfo, ContactFAQ } from '@/components/contact';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
 import { Shield, Award, Heart, Star, Clock } from 'lucide-react';
@@ -186,7 +187,7 @@ export default async function ContactPage() {
         </section>
       </main>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

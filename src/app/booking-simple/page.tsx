@@ -3,7 +3,8 @@
 import { Suspense } from "react";
 import { useBookingStore } from "@/store/bookingStore";
 import { CheckCircle2, Shield, Star, Users, Award } from "lucide-react";
-import { Header, Footer } from "@/components/ui";
+import { Header } from "@/components/ui";
+import FooterClient from "@/components/ui/FooterClient";
 import SimplifiedStep1BookingDetails from "@/components/booking/SimplifiedStep1BookingDetails";
 import SimplifiedStep2ContactAndPayment from "@/components/booking/SimplifiedStep2ContactAndPayment";
 
@@ -136,7 +137,7 @@ export default function SimplifiedBookingPage() {
           </Suspense>
         </div>
       </div>
-      <Footer />
+      <FooterClient />
     </>
   );
 }

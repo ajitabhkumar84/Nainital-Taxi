@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 import { revalidateRoutePages } from "@/lib/revalidateRoutePages";
 
-// POST - Reorder categories
+// POST - Reorder routes
+//
+// Takes the full renumbered list rather than a pair of swapped rows, so a
+// dropped or out-of-order request can never leave a partial ordering behind —
+// each request fully describes the intended order. display_order has no unique
+// constraint, so the values can be written directly with no two-phase swap.
 export async function POST(request: NextRequest) {
   const supabase = getAdminSupabaseClient();
 
@@ -17,10 +22,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update each category's display_order
+    // Update each route's display_order
     const promises = updates.map((update: { id: string; display_order: number }) =>
       supabase
-        .from("route_categories")
+        .from("routes")
         .update({ display_order: update.display_order })
         .eq("id", update.id)
     );
@@ -30,19 +35,17 @@ export async function POST(request: NextRequest) {
     // Check for errors
     const errors = results.filter((result) => result.error);
     if (errors.length > 0) {
-      throw new Error("Failed to reorder some categories");
+      throw new Error("Failed to reorder some routes");
     }
 
-    // Categories are joined into the same getRoutesWithCategories() read that
-    // feeds /, /rates and /quote, so a reorder goes stale on exactly the pages
-    // a route change does.
+    // Route order drives the homepage transfers table, /rates and /quote.
     revalidateRoutePages();
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error reordering categories:", error);
+    console.error("Error reordering routes:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to reorder categories" },
+      { error: error.message || "Failed to reorder routes" },
       { status: 500 }
     );
   }

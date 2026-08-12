@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabase/admin";
+import { revalidateRoutePages } from "@/lib/revalidateRoutePages";
 
 // GET - Fetch all categories or a specific category
 export async function GET(request: NextRequest) {
@@ -54,6 +55,8 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    revalidateRoutePages();
+
     return NextResponse.json({ data }, { status: 201 });
   } catch (error: any) {
     console.error("Error creating category:", error);
@@ -88,6 +91,8 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error;
 
+    revalidateRoutePages();
+
     return NextResponse.json({ data });
   } catch (error: any) {
     console.error("Error updating category:", error);
@@ -118,6 +123,8 @@ export async function DELETE(request: NextRequest) {
       .eq("id", id);
 
     if (error) throw error;
+
+    revalidateRoutePages();
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

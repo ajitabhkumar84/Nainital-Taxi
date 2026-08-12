@@ -1,37 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
+import { revalidateRoutePages } from "@/lib/revalidateRoutePages";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-/**
- * Route changes affect the /rates browser and the homepage's "Fixed-fare
- * transfers" table — both read routes server-side via getRoutesWithCategories()
- * / getTransferRoutes(), so revalidating their own paths is enough for them.
- *
- * /api/routes-with-categories is a *separate* cache entry (it has no dynamic
- * function, so Next prerenders it as a static Route Handler — confirmed by
- * "○ /api/routes-with-categories" in the build output) consumed by /quote's
- * client-side fetch. revalidatePath('/rates') does not touch it, so without
- * revalidating it explicitly here, /quote would keep serving routes as they
- * were at the last build/revalidation indefinitely.
- *
- * Wrapped in try/catch so a revalidation failure never masks a successful DB
- * write (same pattern as /api/admin/pricing).
- */
-function revalidateRoutePages() {
-  try {
-    revalidatePath("/rates", "page");
-    revalidatePath("/", "page");
-    revalidatePath("/api/routes-with-categories");
-    revalidatePath("/quote", "page");
-  } catch (error) {
-    console.error("Revalidation failed (DB write succeeded):", error);
-  }
-}
 
 /**
  * GET /api/admin/routes
@@ -71,11 +45,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: route });
     }
 
-    // Fetch all routes
+    // Fetch all routes. `withPricing` used to be honoured only on the
+    // single-route branch above, so the admin list — which requests it — got
+    // routes with no `pricing` key at all and flagged every route as having no
+    // pricing configured. Embed the relation off the existing
+    // route_pricing.route_id -> routes.id FK instead.
+    //
+    // Ordered by display_order to match the public read in
+    // getRoutesWithCategories(), so the admin list shows routes in the same
+    // order the site does (and the drag-to-reorder UI has a stable baseline).
     const { data: routes, error } = await supabase
       .from("routes")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select(
+        withPricing
+          ? "*, pricing:route_pricing(vehicle_type, season_name, price, is_active)"
+          : "*"
+      )
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
 

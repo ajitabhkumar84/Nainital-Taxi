@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Footer, Button, Card, CardContent } from "@/components/ui";
+import { Header, Button, Card, CardContent } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import { MapPin, Clock, ArrowRight } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { getDestinations } from "@/lib/supabase/queries_enhanced";
@@ -152,7 +153,7 @@ export default async function DestinationsPage() {
         </div>
       </section>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }

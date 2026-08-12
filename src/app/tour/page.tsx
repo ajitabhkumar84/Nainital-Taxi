@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Footer, Button } from "@/components/ui";
+import { Header, Button } from "@/components/ui";
+import FooterServer from "@/components/ui/FooterServer";
 import { Clock, MapPin, Star, ArrowRight, Users, IndianRupee } from "lucide-react";
 import { getPackages, getAllPricingForPackage } from "@/lib/supabase/queries_enhanced";
 import { TourItinerary, hasHotelOption } from "@/lib/supabase/types";
@@ -348,7 +349,7 @@ export default async function TourPackagesPage() {
         </div>
       </section>
 
-      <Footer />
+      <FooterServer />
     </>
   );
 }
