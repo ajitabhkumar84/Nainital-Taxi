@@ -7,16 +7,12 @@ import { Calendar, MapPin, Users, Car, Loader2, MessageCircle } from "lucide-rea
 import { getPackages, getPrice } from "@/lib/supabase";
 import { getVehicleCapacity, getAvailabilityForDate } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
-import type { Route, RoutePricing } from "@/lib/supabase/types";
+import type { Route, RoutePricing, PickupLocationRow } from "@/lib/supabase/types";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useVehicleLabels } from "@/hooks/useVehicleLabels";
 import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
-import {
-  PICKUP_LOCATIONS,
-  resolvePickupAliases,
-  toCanonicalPickupLocation,
-} from "@/lib/pickupLocations";
+import { resolvePickupAliases, toCanonicalPickupLocation } from "@/lib/pickupLocations";
 import BlockedDateNotice from "@/components/booking/BlockedDateNotice";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
@@ -28,7 +24,16 @@ const VEHICLE_OPTIONS: { value: VehicleType; label: string }[] = [
   { value: "suv_luxury", label: "Innova Crysta" },
 ];
 
-export default function BookingWidget() {
+interface BookingWidgetProps {
+  // Server-fetched (see src/lib/supabase/queries_enhanced.ts's
+  // getPickupLocations(), called from src/app/page.tsx / src/app/lp/taxi's
+  // page.tsx) so the correct list is present on first render — no
+  // client-side fetch, no fallback constant, no flicker on this
+  // conversion-critical widget.
+  pickupLocations: PickupLocationRow[];
+}
+
+export default function BookingWidget({ pickupLocations }: BookingWidgetProps) {
   const router = useRouter();
   const { config: siteConfig } = useSiteConfig();
   const { labels: vehicleLabels } = useVehicleLabels();
@@ -98,17 +103,17 @@ export default function BookingWidget() {
   const getDropLocations = () => {
     if (!transferFrom) return [];
 
-    const fromAliases = resolvePickupAliases(transferFrom);
+    const fromAliases = resolvePickupAliases(pickupLocations, transferFrom);
     const validDrops = new Set<string>();
 
     routes.forEach((route) => {
       // Forward route
       if (fromAliases.includes(route.pickup_location)) {
-        validDrops.add(toCanonicalPickupLocation(route.drop_location));
+        validDrops.add(toCanonicalPickupLocation(pickupLocations, route.drop_location));
       }
       // Bidirectional route
       if (fromAliases.includes(route.drop_location)) {
-        validDrops.add(toCanonicalPickupLocation(route.pickup_location));
+        validDrops.add(toCanonicalPickupLocation(pickupLocations, route.pickup_location));
       }
     });
 
@@ -181,8 +186,8 @@ export default function BookingWidget() {
       return;
     }
 
-    const pickupAliases = resolvePickupAliases(transferFrom);
-    const dropAliases = resolvePickupAliases(transferTo);
+    const pickupAliases = resolvePickupAliases(pickupLocations, transferFrom);
+    const dropAliases = resolvePickupAliases(pickupLocations, transferTo);
     const route =
       routes.find(
         (r) =>
@@ -206,7 +211,7 @@ export default function BookingWidget() {
     } else {
       setPriceInfo(null);
     }
-  }, [transferFrom, transferTo, transferVehicle, transferDate, routes]);
+  }, [transferFrom, transferTo, transferVehicle, transferDate, routes, pickupLocations]);
 
   // Calculate transfer price — async because it now also checks
   // availability.is_blocked / booking_blackout for the picked date. Before
@@ -575,9 +580,9 @@ export default function BookingWidget() {
                 onChange={(e) => handlePickupChange(e.target.value)}
               >
                 <option value="">Choose pick-up point</option>
-                {PICKUP_LOCATIONS.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
+                {pickupLocations.map((location) => (
+                  <option key={location.id} value={location.name}>
+                    {location.name}
                   </option>
                 ))}
               </Select>
@@ -686,8 +691,8 @@ export default function BookingWidget() {
           {selectedRoute && (
             <div className="border border-slate-200 bg-slate-50 rounded-md p-4">
               <div className="font-medium text-ink">
-                {toCanonicalPickupLocation(selectedRoute.pickup_location)} →{" "}
-                {toCanonicalPickupLocation(selectedRoute.drop_location)}
+                {toCanonicalPickupLocation(pickupLocations, selectedRoute.pickup_location)} →{" "}
+                {toCanonicalPickupLocation(pickupLocations, selectedRoute.drop_location)}
               </div>
               {(selectedRoute.distance || selectedRoute.duration) && (
                 <div className="text-sm text-slate-500 mt-1">

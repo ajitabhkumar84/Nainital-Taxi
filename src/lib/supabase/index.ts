@@ -82,6 +82,7 @@ export {
   getTransferRoutes,
   getRoutesWithCategories,
   type CategoryWithRoutes,
+  getPickupLocations,
 
   // Season & Blackout helpers
   getSeasonForDate,

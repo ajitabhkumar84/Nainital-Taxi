@@ -18,11 +18,12 @@ import {
   RoutePricing,
   RouteCategory,
   Destination,
+  PickupLocationRow,
   VehicleType,
   VEHICLE_TYPES,
   SEASON_NAMES,
 } from "@/lib/supabase/types";
-import { PICKUP_LOCATIONS, toCanonicalPickupLocation } from "@/lib/pickupLocations";
+import { toCanonicalPickupLocation } from "@/lib/pickupLocations";
 
 interface RouteFormProps {
   initialData?: (Route & { pricing?: RoutePricing[] }) | null;
@@ -48,9 +49,17 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loadingDestinations, setLoadingDestinations] = useState(true);
 
+  // Pickup locations (admin-manageable, replacing the old hardcoded list)
+  const [pickupLocations, setPickupLocations] = useState<PickupLocationRow[]>([]);
+  const [loadingPickupLocations, setLoadingPickupLocations] = useState(true);
+
   // Basic Info
+  // Canonicalized against [] until fetchPickupLocations() resolves — the
+  // re-derivation effect below corrects this once the real list is in, so
+  // an existing route using a legacy alias (e.g. "Kathgodam") still ends up
+  // selecting the right canonical option.
   const [pickupLocation, setPickupLocation] = useState(
-    toCanonicalPickupLocation(initialData?.pickup_location || "")
+    toCanonicalPickupLocation([], initialData?.pickup_location || "")
   );
   const [dropLocation, setDropLocation] = useState(initialData?.drop_location || "");
   const [slug, setSlug] = useState(initialData?.slug || "");
@@ -106,7 +115,19 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   useEffect(() => {
     fetchCategories();
     fetchDestinations();
+    fetchPickupLocations();
   }, []);
+
+  // Re-derive the initial pickup selection once the live list has loaded —
+  // pickupLocation's useState initializer above ran against [] (nothing to
+  // canonicalize against yet), so an existing route stored under a legacy
+  // alias (e.g. "Kathgodam") needs this pass to land on its canonical name.
+  useEffect(() => {
+    if (!initialData?.pickup_location || pickupLocations.length === 0) return;
+    const canonical = toCanonicalPickupLocation(pickupLocations, initialData.pickup_location);
+    setPickupLocation((current) => (current !== canonical ? canonical : current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupLocations]);
 
   const fetchCategories = async () => {
     try {
@@ -138,6 +159,21 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
     }
   };
 
+  const fetchPickupLocations = async () => {
+    try {
+      const response = await fetch("/api/admin/pickup-locations");
+
+      if (!response.ok) throw new Error("Failed to fetch pickup locations");
+
+      const { data } = await response.json();
+      setPickupLocations(data || []);
+    } catch (error) {
+      console.error("Error fetching pickup locations:", error);
+    } finally {
+      setLoadingPickupLocations(false);
+    }
+  };
+
   const handlePickupChange = (value: string) => {
     setPickupLocation(value);
     if (!initialData && value && dropLocation) {
@@ -156,7 +192,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   // typing "Kathgodam Railway Station" won't flip to "Kathgodam Station" until they
   // tab/click away.
   const handleDropBlur = () => {
-    const canonical = toCanonicalPickupLocation(dropLocation);
+    const canonical = toCanonicalPickupLocation(pickupLocations, dropLocation);
     if (canonical !== dropLocation) {
       handleDropChange(canonical);
     }
@@ -219,15 +255,19 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
               value={pickupLocation}
               onChange={(e) => handlePickupChange(e.target.value)}
               className="w-full px-4 py-3 border-3 border-ink rounded-xl font-body focus:outline-none focus:ring-2 focus:ring-sunshine"
+              disabled={loadingPickupLocations}
               required
             >
               <option value="">Choose pickup location</option>
-              {PICKUP_LOCATIONS.map((location) => (
-                <option key={location} value={location}>
-                  {location}
+              {pickupLocations.map((location) => (
+                <option key={location.id} value={location.name}>
+                  {location.name}
                 </option>
               ))}
             </select>
+            {loadingPickupLocations && (
+              <p className="text-xs text-ink/50 mt-1">Loading pickup locations...</p>
+            )}
           </div>
 
           <div>

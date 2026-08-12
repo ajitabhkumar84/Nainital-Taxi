@@ -8,8 +8,9 @@
  */
 
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, RoutePricing } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, RoutePricing, PickupLocationRow } from './types';
 import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
 
@@ -1239,3 +1240,34 @@ export async function getTemplesPageConfig() {
 
   return data;
 }
+
+/**
+ * Active pickup locations for the Transfers booking widget, server-fetched
+ * so the correct list (including anything the admin just added) is present
+ * in the very first HTML response — no client-side fetch-then-flicker.
+ *
+ * Unlike the React cache()-wrapped helpers above (which only dedupe calls
+ * within a single request), this is wrapped in unstable_cache so the result
+ * is cached *across* requests/visitors, with a 'pickup-locations' tag the
+ * admin API calls revalidateTag() on after every add/edit/delete for
+ * near-instant invalidation. The 5-minute revalidate is a fallback for
+ * edits made directly in the Supabase table editor, which never go through
+ * that API and so never fire the tag.
+ */
+export const getPickupLocations = unstable_cache(
+  async (): Promise<PickupLocationRow[]> => {
+    const { data, error } = await supabase
+      .from('pickup_locations')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching pickup locations:', error);
+      return [];
+    }
+    return data || [];
+  },
+  ['pickup-locations'],
+  { tags: ['pickup-locations'], revalidate: 300 }
+);

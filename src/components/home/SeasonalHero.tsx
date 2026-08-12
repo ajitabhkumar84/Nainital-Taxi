@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import BookingWidget from '@/components/BookingWidget';
+import type { PickupLocationRow } from '@/lib/supabase/types';
 
 interface SeasonConfig {
   backgroundImage: string;
@@ -15,6 +16,10 @@ interface SeasonalHeroProps {
   overrideImage?: string | null;
   overrideTitle?: string | null;
   overrideSubtitle?: string | null;
+  // Server-fetched (see src/app/page.tsx) and passed straight through to
+  // BookingWidget — arrives as part of the initial render payload despite
+  // this being a client component, so there's no post-mount fetch/flicker.
+  pickupLocations: PickupLocationRow[];
 }
 
 const TRUST_FIGURES = [
@@ -28,7 +33,8 @@ export default function SeasonalHero({
   overrideImage,
   overrideTitle,
   overrideSubtitle,
-}: SeasonalHeroProps = {}) {
+  pickupLocations,
+}: SeasonalHeroProps) {
   const seasonConfig = useMemo<SeasonConfig>(() => {
     const month = new Date().getMonth(); // 0-11
 
@@ -104,7 +110,7 @@ export default function SeasonalHero({
 
           {/* Booking widget */}
           <div>
-            <BookingWidget />
+            <BookingWidget pickupLocations={pickupLocations} />
           </div>
         </div>
       </div>

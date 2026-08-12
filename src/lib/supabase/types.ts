@@ -366,6 +366,16 @@ export interface RouteCategory {
   updated_at: string;
 }
 
+export interface PickupLocationRow {
+  id: string;             // UUID
+  name: string;           // canonical display name, e.g. "Pantnagar Airport"
+  aliases: string[];      // extra legacy variants only — `name` is always implicitly included
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Route {
   id: string; // UUID
 
@@ -1418,6 +1428,13 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Omit<Destination, 'id' | 'created_at'>>;
+      };
+      pickup_locations: {
+        Row: PickupLocationRow;
+        Insert: Omit<PickupLocationRow, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+        };
+        Update: Partial<Omit<PickupLocationRow, 'id' | 'created_at'>>;
       };
       packages: {
         Row: Package;

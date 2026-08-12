@@ -10,6 +10,7 @@ import {
   getAdminSetting,
   getPackages,
   getMinPricePerPackage,
+  getPickupLocations,
 } from '@/lib/supabase';
 import {
   DEFAULT_LANDING_PAGE_CONFIG,
@@ -41,11 +42,12 @@ function mergeConfig(saved: unknown): LandingPageConfig {
 }
 
 export default async function TaxiLandingPage() {
-  const [savedConfig, savedContact, tourPackages, minPrices] = await Promise.all([
+  const [savedConfig, savedContact, tourPackages, minPrices, pickupLocations] = await Promise.all([
     getAdminSetting('landing_page_config'),
     getAdminSetting('site_config_contact'),
     getPackages('tour'),
     getMinPricePerPackage(),
+    getPickupLocations(),
   ]);
 
   const config = mergeConfig(savedConfig);
@@ -83,7 +85,7 @@ export default async function TaxiLandingPage() {
               Get Your Exact Fare in 30 Seconds
             </h2>
             <div className="mt-6">
-              <BookingWidget />
+              <BookingWidget pickupLocations={pickupLocations} />
             </div>
           </div>
         </section>

@@ -16,6 +16,7 @@ import {
   getFeaturedReviews,
   getTrustSection,
   getPageContent,
+  getPickupLocations,
   PageSection,
 } from "@/lib/supabase";
 import { getMultiDayRentalPageData } from "@/lib/multiDayRental";
@@ -57,7 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   // Fetch homepage content from Supabase in parallel
-  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection, pageContent, multiDayRentalPage] = await Promise.all([
+  const [destinations, tourPackages, minPrices, transferRoutes, testimonials, trustSection, pageContent, multiDayRentalPage, pickupLocations] = await Promise.all([
     getDestinations(),
     getPackages("tour"),
     getMinPricePerPackage(),
@@ -66,6 +67,7 @@ export default async function Home() {
     getTrustSection(),
     getPageContent("home"),
     getMultiDayRentalPageData(),
+    getPickupLocations(),
   ]);
 
   const trustPillars = (trustSection.trust_pillars || [])
@@ -85,6 +87,7 @@ export default async function Home() {
         overrideImage={pageContent.hero_image_url}
         overrideTitle={pageContent.hero_title}
         overrideSubtitle={pageContent.hero_subtitle}
+        pickupLocations={pickupLocations}
       />
 
       {/* Trust Figures Bar */}

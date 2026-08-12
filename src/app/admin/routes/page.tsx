@@ -109,13 +109,22 @@ export default function RoutesPage() {
             Manage pickup to drop location routes
           </p>
         </div>
-        <Link
-          href="/admin/routes/new"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-whatsapp text-white font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Add New Route
-        </Link>
+        <div className="flex gap-3">
+          <Link
+            href="/admin/routes/pickup-locations"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-ink font-body font-semibold rounded-xl border-3 border-ink hover:bg-ink/5 transition-colors"
+          >
+            <MapPin className="w-5 h-5" />
+            Manage Pickup Locations
+          </Link>
+          <Link
+            href="/admin/routes/new"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-whatsapp text-white font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Route
+          </Link>
+        </div>
       </div>
 
       {/* Routes List */}
