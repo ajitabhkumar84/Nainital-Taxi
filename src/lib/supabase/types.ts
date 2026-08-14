@@ -412,10 +412,26 @@ export interface Route {
   meta_title?: string | null;
   meta_description?: string | null;
 
+  // Set on an auto-generated return route, pointing at the primary route it
+  // mirrors. NULL on ordinary routes and on ones the admin has unlinked.
+  // Only pricing / is_active / enable_online_booking are kept in sync — see
+  // REVERSE_MIRROR_FIELDS in src/lib/routeReverse.ts.
+  reverse_of_route_id?: string | null;
+
   // Metadata
   display_order: number;
   created_at: string;
   updated_at: string;
+}
+
+// Returned by GET /api/admin/routes?id=... so the edit form can describe the
+// route's partner. At most one is ever populated: a route is either a primary
+// (linkedReverse) or a generated reverse (reverseParent), never both.
+export interface RoutePartner {
+  id: string;
+  slug: string;
+  pickup_location: string;
+  drop_location: string;
 }
 
 /**

@@ -1,11 +1,202 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { revalidateRoutePages } from "@/lib/revalidateRoutePages";
+import {
+  buildReverseRouteInsert,
+  buildReverseMirrorPatch,
+  generateRouteSlug,
+  pricingDiffers,
+} from "@/lib/routeReverse";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const PARTNER_COLUMNS = "id, slug, pickup_location, drop_location";
+
+// Strips the columns the DB owns so a pricing row can be re-inserted against a
+// different route_id. Mirrors the inline logic the POST/PATCH pricing writes
+// have always used.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toPricingInsert(rows: any[], routeId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((p: any) => {
+    const { id: _id, created_at, updated_at, route_id: _routeId, ...fields } = p;
+    return { ...fields, route_id: routeId };
+  });
+}
+
+async function replacePricing(routeId: string, pricing: unknown[]) {
+  await supabase.from("route_pricing").delete().eq("route_id", routeId);
+  if (pricing.length > 0) {
+    const { error } = await supabase
+      .from("route_pricing")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .insert(toPricingInsert(pricing as any[], routeId));
+    if (error) throw error;
+  }
+}
+
+/**
+ * Finds the row that should act as `primary`'s return route, in priority
+ * order:
+ *   1. an already-linked reverse (the normal case on re-save),
+ *   2. a route whose pickup/drop is exactly the swapped pair,
+ *   3. a route already sitting on the slug we'd generate.
+ *
+ * (2) and (3) let the toggle be switched on for a pair whose return route the
+ * admin built by hand: we adopt and link that row instead of failing on the
+ * `slug UNIQUE` constraint or creating a near-duplicate.
+ */
+async function findExistingReverse(primary: {
+  id: string;
+  pickup_location: string;
+  drop_location: string;
+}) {
+  const { data: linked } = await supabase
+    .from("routes")
+    .select("*")
+    .eq("reverse_of_route_id", primary.id)
+    .maybeSingle();
+  if (linked) return linked;
+
+  // limit(1) rather than maybeSingle(): nothing stops an admin having created
+  // two routes for the same pair by hand, and maybeSingle() errors outright on
+  // more than one row. Adopting the first is better than failing the save.
+  const { data: byPair } = await supabase
+    .from("routes")
+    .select("*")
+    .eq("pickup_location", primary.drop_location)
+    .eq("drop_location", primary.pickup_location)
+    .neq("id", primary.id)
+    .limit(1);
+  if (byPair && byPair.length > 0) return byPair[0];
+
+  const { data: bySlug } = await supabase
+    .from("routes")
+    .select("*")
+    .eq("slug", generateRouteSlug(primary.drop_location, primary.pickup_location))
+    .neq("id", primary.id)
+    .limit(1);
+  return bySlug && bySlug.length > 0 ? bySlug[0] : null;
+}
+
+/**
+ * Signals that the caller must confirm before an existing reverse route's
+ * hand-edited prices get overwritten. Carried out of syncReverseRoute() as a
+ * value rather than thrown, so the primary's own (already committed) write is
+ * never mistaken for a failure.
+ */
+interface ReverseConfirmationRequired {
+  requiresReverseConfirmation: true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reverse: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  currentPricing: any[];
+}
+
+interface ReverseSyncResult {
+  confirmation?: ReverseConfirmationRequired;
+  warning?: string;
+}
+
+/**
+ * Creates or re-syncs `primary`'s return route.
+ *
+ * The asymmetry here is the whole point: a NEW reverse gets a full generated
+ * payload (swapped pair, generated slug, city names swapped through its
+ * description/meta copy), while an EXISTING one only receives the swapped
+ * pickup/drop pair, is_active / enable_online_booking, and a fresh copy of the
+ * pricing matrix. Anything editorial the admin has since written on the
+ * reverse route — its slug, description and meta_* copy — survives.
+ *
+ * pickup/drop are mirrored (unlike the editorial fields) because they're the
+ * route's structural identity, not copy: if the primary's endpoints are edited
+ * and the reverse kept its old ones, the link would assert a relationship that
+ * is no longer true, and the pair would resolve to two unrelated routes.
+ */
+async function syncReverseRoute(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  primary: any,
+  pricing: unknown[] | null | undefined,
+  { confirmOverwrite }: { confirmOverwrite: boolean }
+): Promise<ReverseSyncResult> {
+  const existing = await findExistingReverse(primary);
+
+  if (!existing) {
+    const { data: created, error } = await supabase
+      .from("routes")
+      .insert([buildReverseRouteInsert(primary)])
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (pricing && pricing.length > 0) {
+      await replacePricing((created as { id: string }).id, pricing);
+    }
+    return {};
+  }
+
+  // Existing reverse: warn before discarding prices that no longer match.
+  // Uphill and downhill fares differ often enough in hill-station transport
+  // that silently overwriting would be the wrong default.
+  if (pricing) {
+    const { data: currentPricing } = await supabase
+      .from("route_pricing")
+      .select("*")
+      .eq("route_id", existing.id);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!confirmOverwrite && pricingDiffers(currentPricing as any[], pricing as any[])) {
+      return {
+        confirmation: {
+          requiresReverseConfirmation: true,
+          reverse: {
+            id: existing.id,
+            slug: existing.slug,
+            pickup_location: existing.pickup_location,
+            drop_location: existing.drop_location,
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          currentPricing: (currentPricing as any[]) || [],
+        },
+      };
+    }
+  }
+
+  const nextPickup = primary.drop_location;
+  const nextDrop = primary.pickup_location;
+
+  // The endpoints moved, so the reverse's hand-editable slug/meta may now
+  // describe the wrong journey. We don't rewrite them (that's the admin's
+  // copy), but we do say so rather than leave it to be discovered later.
+  let warning: string | undefined;
+  if (
+    existing.pickup_location !== nextPickup ||
+    existing.drop_location !== nextDrop
+  ) {
+    warning =
+      `The return route now runs ${nextPickup} → ${nextDrop}. Its URL (/${existing.slug}) ` +
+      `and SEO fields were left as they were — review them if they mention the old locations.`;
+  }
+
+  const { error: updateError } = await supabase
+    .from("routes")
+    .update({
+      ...buildReverseMirrorPatch(primary),
+      pickup_location: nextPickup,
+      drop_location: nextDrop,
+      reverse_of_route_id: primary.id,
+    })
+    .eq("id", existing.id);
+  if (updateError) throw updateError;
+
+  if (pricing) {
+    await replacePricing(existing.id, pricing);
+  }
+  return { warning };
+}
 
 /**
  * GET /api/admin/routes
@@ -30,6 +221,32 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
+      // Resolve the route's partner in BOTH directions, so the edit form can
+      // always name it and link to it:
+      //   - linkedReverse: this route is a primary, and X is the return route
+      //     it generated.
+      //   - reverseParent: this route IS a generated return route, and X is
+      //     the primary it came from. Without this lookup the "auto-generated
+      //     as the return of X" notice has no X to render.
+      // At most one is ever populated — the routes_reverse_not_self check and
+      // the unique partial index rule out a row being both.
+      const { data: linkedReverse } = await supabase
+        .from("routes")
+        .select(PARTNER_COLUMNS)
+        .eq("reverse_of_route_id", id)
+        .maybeSingle();
+
+      const parentId = (route as { reverse_of_route_id?: string | null })?.reverse_of_route_id;
+      let reverseParent = null;
+      if (parentId) {
+        const { data } = await supabase
+          .from("routes")
+          .select(PARTNER_COLUMNS)
+          .eq("id", parentId)
+          .maybeSingle();
+        reverseParent = data || null;
+      }
+
       if (withPricing) {
         const { data: pricing } = await supabase
           .from("route_pricing")
@@ -38,11 +255,19 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          data: { ...route, pricing: pricing || [] },
+          data: {
+            ...route,
+            pricing: pricing || [],
+            linkedReverse: linkedReverse || null,
+            reverseParent,
+          },
         });
       }
 
-      return NextResponse.json({ success: true, data: route });
+      return NextResponse.json({
+        success: true,
+        data: { ...route, linkedReverse: linkedReverse || null, reverseParent },
+      });
     }
 
     // Fetch all routes. `withPricing` used to be honoured only on the
@@ -87,7 +312,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { pricing, ...routeData } = body;
+    const { pricing, create_reverse: createReverse, ...routeData } = body;
 
     // Create route
     const { data: route, error: routeError } = await supabase
@@ -116,11 +341,42 @@ export async function POST(request: NextRequest) {
       if (pricingError) throw pricingError;
     }
 
+    // Generate the return route. A failure here is reported as a warning
+    // rather than an error: the primary route is already committed, and
+    // surfacing this as a 500 would tell the admin their route wasn't saved
+    // when it was — leading them to create it a second time.
+    let warning: string | undefined;
+    if (createReverse) {
+      try {
+        // confirmOverwrite stays false even on create. The normal path here
+        // inserts a fresh return route, but findExistingReverse() may instead
+        // adopt a matching route the admin built by hand — and silently
+        // replacing that route's fares would be data loss with no undo. On
+        // create there is no confirmation UI to fall back to (the route is
+        // already committed), so we adopt it, leave its prices alone, and say so.
+        const result = await syncReverseRoute(route, pricing, { confirmOverwrite: false });
+        if (result.confirmation) {
+          const { pickup_location, drop_location } = result.confirmation.reverse;
+          warning =
+            `Route created. A return route (${pickup_location} → ${drop_location}) already ` +
+            `existed and is now linked, but it kept its own prices — open it to sync them.`;
+        } else {
+          warning = result.warning;
+        }
+      } catch (reverseError: any) {
+        console.error("Error creating reverse route:", reverseError);
+        warning =
+          "Route saved, but the return route could not be created: " +
+          (reverseError?.message || String(reverseError));
+      }
+    }
+
     revalidateRoutePages();
 
     return NextResponse.json({
       success: true,
       data: route,
+      ...(warning ? { warning } : {}),
     });
   } catch (error: any) {
     console.error("Error creating route:", error);
@@ -142,13 +398,40 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, updates, pricing } = body;
+    const {
+      id,
+      updates,
+      pricing,
+      create_reverse: createReverse,
+      confirm_overwrite_reverse: confirmOverwriteReverse,
+    } = body;
 
     if (!id) {
       return NextResponse.json(
         { error: "Route ID is required" },
         { status: 400 }
       );
+    }
+
+    // A generated return route can't have a return route of its own — that
+    // would be the primary, and the pair would sync in a loop.
+    if (createReverse) {
+      const { data: target } = await supabase
+        .from("routes")
+        .select("reverse_of_route_id")
+        .eq("id", id)
+        .maybeSingle();
+
+      if ((target as { reverse_of_route_id?: string | null })?.reverse_of_route_id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "This route is itself an auto-generated return route, so it can't generate one of its own.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Update route
@@ -185,11 +468,43 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    let warning: string | undefined;
+
+    if (createReverse) {
+      const result = await syncReverseRoute(route, pricing, {
+        confirmOverwrite: !!confirmOverwriteReverse,
+      });
+
+      if (result.confirmation) {
+        // The primary's own update above is already committed and stands; only
+        // the reverse sync is being held for confirmation. Revalidate before
+        // returning so the primary's new values aren't left stale on the
+        // public pages while the admin decides.
+        revalidateRoutePages();
+        return NextResponse.json({ success: false, ...result.confirmation }, { status: 409 });
+      }
+      warning = result.warning;
+    } else {
+      // Toggle switched off: unlink but keep the row. It stays live and
+      // bookable as an independent route the admin can edit or delete — a
+      // hard delete would fail anyway once bookings.route_id points at it.
+      const { error: unlinkError } = await supabase
+        .from("routes")
+        .update({ reverse_of_route_id: null })
+        .eq("reverse_of_route_id", id);
+
+      if (unlinkError) {
+        console.error("Error unlinking reverse route:", unlinkError);
+        warning = "Route saved, but the return route could not be unlinked.";
+      }
+    }
+
     revalidateRoutePages();
 
     return NextResponse.json({
       success: true,
       data: route,
+      ...(warning ? { warning } : {}),
     });
   } catch (error: any) {
     console.error("Error updating route:", error);

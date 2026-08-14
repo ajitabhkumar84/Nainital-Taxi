@@ -126,6 +126,16 @@ function SortableRouteCard({
                 <h3 className="text-xl font-display text-ink">
                   {route.drop_location}
                 </h3>
+                {/* Explains why the list holds paired entries, and warns that
+                    this row's prices are mirrored from its primary. */}
+                {route.reverse_of_route_id && (
+                  <span
+                    className="px-2 py-0.5 text-xs font-body font-semibold bg-lake/15 text-lake border-2 border-lake rounded-lg whitespace-nowrap"
+                    title="Auto-generated return route — its prices follow the primary route"
+                  >
+                    ↩ auto return
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm text-ink/60 font-body">
                 <span className="inline-flex items-center gap-1">

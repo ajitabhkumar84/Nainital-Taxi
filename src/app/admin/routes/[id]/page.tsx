@@ -4,15 +4,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import RouteForm from "@/components/admin/RouteForm";
-import { Route, RoutePricing } from "@/lib/supabase/types";
+import RouteForm, { RouteFormData } from "@/components/admin/RouteForm";
+import { Route, RoutePricing, RoutePartner } from "@/lib/supabase/types";
+
+type EditableRoute = Route & {
+  pricing?: RoutePricing[];
+  linkedReverse?: RoutePartner | null;
+  reverseParent?: RoutePartner | null;
+};
 
 export default function EditRoutePage() {
   const router = useRouter();
   const params = useParams();
   const routeId = params.id as string;
 
-  const [route, setRoute] = useState<(Route & { pricing?: RoutePricing[] }) | null>(null);
+  const [route, setRoute] = useState<EditableRoute | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,11 +42,17 @@ export default function EditRoutePage() {
     fetchRoute();
   }, [fetchRoute]);
 
-  const handleSubmit = async (data: Partial<Route & { pricing: Partial<RoutePricing>[] }>) => {
+  const handleSubmit = async (data: RouteFormData) => {
     setIsSubmitting(true);
     try {
-      // Separate pricing from route data
-      const { pricing, ...routeUpdates } = data;
+      // Separate pricing and the reverse-route flags from the route columns —
+      // the API takes those as siblings of `updates`, not inside it.
+      const {
+        pricing,
+        create_reverse: createReverse,
+        confirm_overwrite_reverse: confirmOverwriteReverse,
+        ...routeUpdates
+      } = data as RouteFormData & { confirm_overwrite_reverse?: boolean };
 
       const response = await fetch("/api/admin/routes", {
         method: "PATCH",
@@ -51,17 +63,30 @@ export default function EditRoutePage() {
           id: routeId,
           updates: routeUpdates,
           pricing: pricing,
+          create_reverse: createReverse,
+          confirm_overwrite_reverse: confirmOverwriteReverse,
         }),
       });
+
+      // 409 = the linked return route's prices diverged. Reject with the
+      // payload so RouteForm can render its confirmation panel; this is a
+      // question, not a failure, so it must not fall through to the alert.
+      if (response.status === 409) {
+        throw await response.json();
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update route");
       }
 
-      alert("Route updated successfully!");
+      const result = await response.json();
+      alert(result.warning || "Route updated successfully!");
       router.push("/admin/routes");
     } catch (error) {
+      if ((error as { requiresReverseConfirmation?: boolean })?.requiresReverseConfirmation) {
+        throw error;
+      }
       console.error("Error updating route:", error);
       alert("Failed to update route. Please try again.");
     } finally {

@@ -19,6 +19,8 @@ import { getMinBookingDate, formatDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import BlockedDateNotice from './BlockedDateNotice';
+import TransferRouteSelector, { TransferRoute } from './TransferRouteSelector';
+import type { PickupLocationRow } from '@/lib/supabase/types';
 
 interface Package {
   id: string;
@@ -39,7 +41,18 @@ const vehicleTypes: { type: VehicleType; emoji: string; badge?: string }[] = [
   { type: 'suv_luxury', emoji: '👑', badge: 'Premium' },
 ];
 
-export default function Step1PackageSelection() {
+interface Step1PackageSelectionProps {
+  // Server-fetched by /booking's page component so the transfer picker's
+  // dropdowns are populated on first paint (same prop-drilling shape the
+  // homepage uses for BookingWidget).
+  pickupLocations: PickupLocationRow[];
+  transferRoutes: TransferRoute[];
+}
+
+export default function Step1PackageSelection({
+  pickupLocations,
+  transferRoutes,
+}: Step1PackageSelectionProps) {
   const {
     bookingType,
     packageId,
@@ -47,8 +60,14 @@ export default function Step1PackageSelection() {
     packageTitle,
     vehicleType,
     tripDate,
+    pickupLocation,
+    dropoffLocation,
     setBookingType,
     setPackage,
+    setRoute,
+    clearRoute,
+    setPickupLocation,
+    setDropoffLocation,
     setVehicleType,
     setTripDate,
     nextStep,
@@ -126,15 +145,59 @@ export default function Step1PackageSelection() {
   // routeId is included alongside packageId since a route-based transfer
   // arrival (BookingWidget) should also collapse to the summary card.
   const [isEditing, setIsEditing] = useState(false);
-  const showPicker = isEditing || !(packageId || routeId);
+  // Set once the user resolves a route via the A-to-B picker below. Without
+  // it, matching a route would immediately satisfy `routeId` and collapse the
+  // picker to a summary card — yanking the From/To dropdowns out from under
+  // someone who is still adjusting them. A deep-linked arrival (routeId from
+  // the URL, pickedInline still false) still collapses as before.
+  const [pickedInline, setPickedInline] = useState(false);
+  const isTransfer = bookingType === 'transfer';
+  const showPicker = isEditing || pickedInline || !(packageId || routeId);
 
   useEffect(() => {
-    if (!showPicker) return;
+    // Transfers are routes, not packages — the A-to-B picker reads from the
+    // server-supplied `transferRoutes` prop, so there is nothing to fetch.
+    if (!showPicker || isTransfer) return;
     fetchPackages();
     // Only refetch when the picker is open and the type filter changes —
     // skip entirely while collapsed behind a summary card.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingType, showPicker]);
+  }, [bookingType, showPicker, isTransfer]);
+
+  // Switching trip type must drop whatever was selected under the old one.
+  // Without this, picking a transfer route and then switching to Tour Packages
+  // would leave routeId set and the vehicle cards priced against a route the
+  // user can no longer see — the same stale-selection trap the A-to-B picker
+  // guards with clearRoute() below.
+  const handleBookingTypeChange = (type: 'tour' | 'transfer') => {
+    if (type !== bookingType) {
+      clearRoute();
+      setPickedInline(false);
+      setError('');
+    }
+    setBookingType(type);
+  };
+
+  // Mirrors the A-to-B dropdowns into the store on every change. The route is
+  // cleared the moment the pair stops resolving, so a half-edited selection
+  // can never leave a stale routeId behind for handleNext to submit.
+  const handleTransferChange = (
+    nextPickup: string,
+    nextDropoff: string,
+    route: TransferRoute | null
+  ) => {
+    setPickupLocation(nextPickup);
+    setDropoffLocation(nextDropoff);
+
+    if (!route) {
+      clearRoute();
+      return;
+    }
+
+    setRoute(route.id, `Transfer: ${nextPickup} to ${nextDropoff}`);
+    setPickedInline(true);
+    setError('');
+  };
 
   async function fetchPackages() {
     setLoading(true);
@@ -172,7 +235,11 @@ export default function Step1PackageSelection() {
 
   const handleNext = () => {
     if ((!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing) {
-      setError('Please select a package, a date, and a vehicle type with an available price');
+      setError(
+        isTransfer
+          ? 'Please select a pick-up and drop-off location, a date, and a vehicle type with an available price'
+          : 'Please select a package, a date, and a vehicle type with an available price'
+      );
       return;
     }
     setError('');
@@ -220,7 +287,7 @@ export default function Step1PackageSelection() {
             </label>
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => setBookingType('tour')}
+                onClick={() => handleBookingTypeChange('tour')}
                 className={`
                   p-6 rounded-2xl border-4 transition-all duration-200
                   ${
@@ -236,7 +303,7 @@ export default function Step1PackageSelection() {
               </button>
 
               <button
-                onClick={() => setBookingType('transfer')}
+                onClick={() => handleBookingTypeChange('transfer')}
                 className={`
                   p-6 rounded-2xl border-4 transition-all duration-200
                   ${
@@ -253,8 +320,22 @@ export default function Step1PackageSelection() {
             </div>
           </div>
 
+          {/* Transfers are point-to-point routes, so they get an A-to-B picker
+              rather than a list of pre-built packages. The date + vehicle
+              blocks further down already key off routeId, so they work
+              unchanged once this sets one. */}
+          {isTransfer && (
+            <TransferRouteSelector
+              pickupLocations={pickupLocations}
+              routes={transferRoutes}
+              pickup={pickupLocation}
+              dropoff={dropoffLocation}
+              onChange={handleTransferChange}
+            />
+          )}
+
           {/* Package Selection */}
-          {bookingType && (
+          {bookingType && !isTransfer && (
             <div>
               <label className="block text-sm font-bold text-[#2D3436] mb-3">
                 Select Package

@@ -12,6 +12,16 @@ import { revalidatePath } from "next/cache";
  * revalidating it explicitly here, /quote would keep serving routes as they
  * were at the last build/revalidation indefinitely.
  *
+ * /booking is server-rendered too: its page component fetches routes + pickup
+ * locations and passes them to Step 1's transfer picker as props (that is what
+ * keeps the A-to-B dropdowns flicker-free on first paint). It currently builds
+ * as a dynamic route and its two queries invalidate themselves —
+ * getRoutesWithCategories() is a per-request React cache(), and
+ * getPickupLocations() is tag-busted by /api/admin/pickup-locations — so this
+ * line is belt-and-braces rather than load-bearing today. It's kept so the page
+ * can't go stale if it ever becomes statically renderable or picks up a cached
+ * fetch, which would otherwise be an invisible regression.
+ *
  * Wrapped in try/catch so a revalidation failure never masks a successful DB
  * write (same pattern as /api/admin/pricing).
  *
@@ -25,6 +35,7 @@ export function revalidateRoutePages() {
     revalidatePath("/", "page");
     revalidatePath("/api/routes-with-categories");
     revalidatePath("/quote", "page");
+    revalidatePath("/booking", "page");
   } catch (error) {
     console.error("Revalidation failed (DB write succeeded):", error);
   }

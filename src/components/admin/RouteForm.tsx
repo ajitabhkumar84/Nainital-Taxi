@@ -17,6 +17,7 @@ import {
   Route,
   RoutePricing,
   RouteCategory,
+  RoutePartner,
   Destination,
   PickupLocationRow,
   VehicleType,
@@ -24,20 +25,32 @@ import {
   SEASON_NAMES,
 } from "@/lib/supabase/types";
 import { toCanonicalPickupLocation } from "@/lib/pickupLocations";
+import { generateRouteSlug } from "@/lib/routeReverse";
 
-interface RouteFormProps {
-  initialData?: (Route & { pricing?: RoutePricing[] }) | null;
-  onSubmit: (data: Partial<Route & { pricing: Partial<RoutePricing>[] }>) => Promise<void>;
-  isSubmitting: boolean;
+// What the server sends back on a 409 when the linked return route's prices
+// have been hand-edited and no longer match what's about to be saved.
+export interface ReverseConflict {
+  reverse: RoutePartner;
 }
 
-function generateSlug(pickup: string, drop: string): string {
-  return `${pickup}-to-${drop}`
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
+export type RouteFormData = Partial<
+  Route & { pricing: Partial<RoutePricing>[]; create_reverse: boolean }
+>;
+
+interface RouteFormProps {
+  initialData?:
+    | (Route & {
+        pricing?: RoutePricing[];
+        // Populated by GET /api/admin/routes?id=... — this route's partner in
+        // whichever direction applies. Never both.
+        linkedReverse?: RoutePartner | null;
+        reverseParent?: RoutePartner | null;
+      })
+    | null;
+  // Rejects with a ReverseConflict when the server asks for confirmation
+  // before overwriting a diverged return route.
+  onSubmit: (data: RouteFormData) => Promise<void>;
+  isSubmitting: boolean;
 }
 
 export default function RouteForm({ initialData, onSubmit, isSubmitting }: RouteFormProps) {
@@ -112,6 +125,17 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
 
   const [pricing, setPricing] = useState<Partial<RoutePricing>[]>(initializePricing());
 
+  // Reverse route. `reverseParent` being set means THIS row is itself a
+  // generated return route — it can't have one of its own, so the toggle is
+  // replaced by a notice pointing back at the primary.
+  const reverseParent = initialData?.reverseParent ?? null;
+  const linkedReverse = initialData?.linkedReverse ?? null;
+  const isGeneratedReverse = Boolean(reverseParent);
+  const [createReverse, setCreateReverse] = useState(Boolean(linkedReverse));
+  // Set from the server's 409 when the linked return route's prices have
+  // diverged and overwriting them needs explicit sign-off.
+  const [reverseConflict, setReverseConflict] = useState<ReverseConflict | null>(null);
+
   useEffect(() => {
     fetchCategories();
     fetchDestinations();
@@ -177,14 +201,14 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   const handlePickupChange = (value: string) => {
     setPickupLocation(value);
     if (!initialData && value && dropLocation) {
-      setSlug(generateSlug(value, dropLocation));
+      setSlug(generateRouteSlug(value, dropLocation));
     }
   };
 
   const handleDropChange = (value: string) => {
     setDropLocation(value);
     if (!initialData && pickupLocation && value) {
-      setSlug(generateSlug(pickupLocation, value));
+      setSlug(generateRouteSlug(pickupLocation, value));
     }
   };
 
@@ -210,13 +234,37 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await submitWith(false);
+  };
 
+  // `confirmOverwriteReverse` is only ever true on the retry the confirmation
+  // panel triggers, so a diverged return route can't be overwritten without
+  // the admin having seen it named.
+  const submitWith = async (confirmOverwriteReverse: boolean) => {
     if (!pickupLocation || !dropLocation) {
       alert("Pickup and drop locations are required");
       return;
     }
 
-    await onSubmit({
+    try {
+      await onSubmit({
+        ...buildPayload(),
+        ...(isGeneratedReverse ? {} : { create_reverse: createReverse }),
+        ...(confirmOverwriteReverse ? { confirm_overwrite_reverse: true } : {}),
+      } as RouteFormData);
+      setReverseConflict(null);
+    } catch (error) {
+      const conflict = error as ReverseConflict | undefined;
+      if (conflict?.reverse) {
+        setReverseConflict(conflict);
+        return;
+      }
+      throw error;
+    }
+  };
+
+  const buildPayload = () => {
+    return {
       pickup_location: pickupLocation,
       drop_location: dropLocation,
       slug,
@@ -234,7 +282,7 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
       meta_title: metaTitle || null,
       meta_description: metaDescription || null,
       pricing: pricing.filter((p) => p.price && p.price > 0),
-    });
+    };
   };
 
   return (
@@ -512,6 +560,65 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
           </label>
         </div>
 
+        {/* Reverse route: either this row generates one, or it IS one. */}
+        <div className="mt-4 pt-4 border-t-2 border-ink/10">
+          {isGeneratedReverse ? (
+            <div className="p-4 bg-lake/10 border-2 border-lake rounded-xl">
+              <p className="font-body text-sm text-ink">
+                ↩ This route was auto-generated as the return of{" "}
+                <strong>
+                  {reverseParent!.pickup_location} → {reverseParent!.drop_location}
+                </strong>
+                .
+              </p>
+              <p className="font-body text-xs text-ink/60 mt-1">
+                Its prices and status follow that route. Everything else here — slug, description
+                and SEO fields — is yours to edit and won&apos;t be overwritten.
+              </p>
+              <a
+                href={`/admin/routes/${reverseParent!.id}`}
+                className="inline-block mt-2 font-body text-sm text-lake underline hover:text-ink"
+              >
+                Edit the primary route →
+              </a>
+            </div>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={createReverse}
+                  onChange={(e) => setCreateReverse(e.target.checked)}
+                  className="w-5 h-5 rounded border-2 border-ink accent-coral"
+                />
+                <span className="font-body">Auto-generate return route</span>
+              </label>
+              <p className="text-xs text-ink/50 mt-1 ml-7">
+                {linkedReverse ? (
+                  <>
+                    Keeping{" "}
+                    <strong>
+                      {linkedReverse.pickup_location} → {linkedReverse.drop_location}
+                    </strong>{" "}
+                    in sync. Prices and status mirror this route; its SEO fields and description are
+                    yours to edit. Untick to unlink — it stays live with its own prices.
+                  </>
+                ) : pickupLocation && dropLocation ? (
+                  <>
+                    Also creates{" "}
+                    <strong>
+                      {dropLocation} → {pickupLocation}
+                    </strong>{" "}
+                    with identical pricing.
+                  </>
+                ) : (
+                  "Also creates the opposite direction with identical pricing."
+                )}
+              </p>
+            </>
+          )}
+        </div>
+
         <div className="mt-4">
           <label className="block font-body text-sm text-ink/60 mb-2 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
@@ -568,6 +675,45 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
           </div>
         </div>
       </div>
+
+      {/* Diverged return route — needs explicit sign-off before overwriting. */}
+      {reverseConflict && (
+        <div className="bg-sunshine/15 border-3 border-sunshine rounded-2xl p-6">
+          <h3 className="font-display text-lg text-ink mb-2">
+            ⚠ The return route has different prices
+          </h3>
+          <p className="font-body text-sm text-ink">
+            <strong>
+              {reverseConflict.reverse.pickup_location} → {reverseConflict.reverse.drop_location}
+            </strong>{" "}
+            currently has prices that differ from this route. Saving will overwrite them with the
+            prices above.
+          </p>
+          <p className="font-body text-sm text-ink/70 mt-2">
+            Different rates each way? Untick <strong>Auto-generate return route</strong> to unlink
+            them — the return route stays live and keeps its own prices, and you&apos;ll stop seeing
+            this warning.
+          </p>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => setReverseConflict(null)}
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-white text-ink font-body font-semibold rounded-xl border-3 border-ink hover:bg-sunrise/30 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => submitWith(true)}
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-coral text-white font-body font-semibold rounded-xl border-3 border-ink shadow-retro hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? "Saving..." : "Overwrite return route"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Submit Button */}
       <div className="flex justify-end">

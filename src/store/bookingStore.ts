@@ -99,6 +99,10 @@ export interface BookingState {
   setBookingType: (type: BookingType) => void;
   setPackage: (id: string, title: string, slug?: string) => void;
   setRoute: (id: string, title: string) => void;
+  // Drops the current route selection without touching pickup/dropoff — the
+  // state an in-progress A-to-B dropdown edit produces, which setRoute (which
+  // requires an id) can't express.
+  clearRoute: () => void;
   setVehicleType: (type: VehicleType) => void;
 
   // Step 2 actions
@@ -201,6 +205,9 @@ export const useBookingStore = create<BookingState>()(
       setBookingType: (type) => set({ bookingType: type }),
       setPackage: (id, title, slug) => set({ packageId: id, routeId: null, packageTitle: title, packageSlug: slug ?? null }),
       setRoute: (id, title) => set({ routeId: id, packageId: null, packageTitle: title, packageSlug: null }),
+      // Deliberately leaves pickupLocation/dropoffLocation alone: the user is
+      // mid-edit on those, and they're what the next lookup is derived from.
+      clearRoute: () => set({ routeId: null, packageTitle: null }),
       setVehicleType: (type) => set({ vehicleType: type }),
 
       // Step 2 actions

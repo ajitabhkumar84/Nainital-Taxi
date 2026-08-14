@@ -4,14 +4,13 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import RouteForm from "@/components/admin/RouteForm";
-import { Route, RoutePricing } from "@/lib/supabase/types";
+import RouteForm, { RouteFormData } from "@/components/admin/RouteForm";
 
 export default function NewRoutePage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (data: Partial<Route & { pricing: Partial<RoutePricing>[] }>) => {
+  const handleSubmit = async (data: RouteFormData) => {
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/admin/routes", {
@@ -27,7 +26,10 @@ export default function NewRoutePage() {
         throw new Error(errorData.error || "Failed to create route");
       }
 
-      alert("Route created successfully!");
+      // A reverse-route failure comes back as success + warning: the route
+      // itself saved, so don't send the admin back to create it again.
+      const result = await response.json();
+      alert(result.warning || "Route created successfully!");
       router.push("/admin/routes");
     } catch (error) {
       console.error("Error creating route:", error);

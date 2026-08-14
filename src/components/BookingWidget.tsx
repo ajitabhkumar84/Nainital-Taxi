@@ -13,6 +13,7 @@ import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useVehicleLabels } from "@/hooks/useVehicleLabels";
 import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 import { resolvePickupAliases, toCanonicalPickupLocation } from "@/lib/pickupLocations";
+import { findRouteForPair } from "@/lib/routeReverse";
 import BlockedDateNotice from "@/components/booking/BlockedDateNotice";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
@@ -188,12 +189,13 @@ export default function BookingWidget({ pickupLocations }: BookingWidgetProps) {
 
     const pickupAliases = resolvePickupAliases(pickupLocations, transferFrom);
     const dropAliases = resolvePickupAliases(pickupLocations, transferTo);
-    const route =
-      routes.find(
-        (r) =>
-          (pickupAliases.includes(r.pickup_location) && dropAliases.includes(r.drop_location)) ||
-          (pickupAliases.includes(r.drop_location) && dropAliases.includes(r.pickup_location))
-      ) || null;
+    // Exact forward match wins over the opposite-direction fallback. This used
+    // to be a single .find() with an OR, which was fine while each pair had
+    // one row — but now that the admin can auto-generate real reverse routes,
+    // both rows satisfy the OR and it would return whichever came first,
+    // handing the booking a backwards route_id and a backwards
+    // "Transfer: X to Y" title.
+    const route = findRouteForPair(routes, pickupAliases, dropAliases);
 
     setSelectedRoute(route);
 
