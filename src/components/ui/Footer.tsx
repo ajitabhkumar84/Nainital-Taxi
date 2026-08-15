@@ -166,6 +166,9 @@ export default function Footer({
               <Link href="/terms" className="font-body text-white/60 hover:text-teal transition-colors">
                 Terms of Service
               </Link>
+              <Link href="/cancellation-policy" className="font-body text-white/60 hover:text-teal transition-colors">
+                Cancellation Policy
+              </Link>
             </div>
           </div>
         </div>

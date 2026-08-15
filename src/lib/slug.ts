@@ -8,9 +8,10 @@ const MAX_LEN = 80;
 // Next.js special file. "multi-day-rental" is deliberately NOT in this
 // list: it's this page's own default slug and must remain choosable.
 export const RESERVED_PAGE_SLUGS: readonly string[] = [
-  'admin', 'api', 'b2b', 'booking', 'booking-simple', 'contact',
-  'destinations', 'fleet', 'lp', 'packages', 'quote', 'rates',
-  'temples', 'tour', 'favicon.ico', 'robots.txt', 'sitemap.xml', '_next',
+  'admin', 'api', 'b2b', 'booking', 'booking-simple', 'cancellation-policy',
+  'contact', 'destinations', 'fleet', 'lp', 'packages', 'privacy', 'quote',
+  'rates', 'temples', 'terms', 'tour', 'favicon.ico', 'robots.txt',
+  'sitemap.xml', '_next',
 ];
 
 export function slugify(input: string): string {

@@ -172,7 +172,10 @@ export default async function Home() {
                 driver, fuel and state taxes.
               </p>
               <Button variant="primary" size="sm" asChild className="min-h-[44px]">
-                <Link href="/multi-day-rental">
+                {/* Points at the live page_slug directly — /multi-day-rental
+                    still exists but 308-redirects here, so linking straight
+                    to the current slug skips that extra hop. */}
+                <Link href={`/${multiDayRentalPage?.page_slug || "taxi-rental"}`}>
                   See rental options
                   <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Link>
