@@ -375,6 +375,13 @@ export function formatPrice(price: number): string {
 }
 
 /**
+ * Canonical display order for vehicle types — smallest/cheapest to
+ * largest/priciest. Single source of truth so pricing grids (e.g.
+ * src/components/rates/RouteCard.tsx) don't each redeclare their own copy.
+ */
+export const VEHICLE_ORDER: VehicleType[] = ['sedan', 'suv_normal', 'suv_deluxe', 'suv_luxury'];
+
+/**
  * Get vehicle type display name
  */
 export function getVehicleTypeName(vehicleType: VehicleType): string {
