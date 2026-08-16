@@ -76,6 +76,7 @@ const navEntries: NavEntry[] = [
   { type: "item", href: "/admin/multi-day-rental", label: "Multi-Day Rental", icon: <CalendarDays className="w-5 h-5" /> },
   { type: "item", href: "/admin/availability", label: "Availability", icon: <Calendar className="w-5 h-5" /> },
   { type: "item", href: "/admin/bookings", label: "Bookings", icon: <BookOpen className="w-5 h-5" /> },
+  { type: "item", href: "/admin/contact-enquiries", label: "Contact Enquiries", icon: <Mail className="w-5 h-5" /> },
   { type: "item", href: "/admin/pricing", label: "Pricing", icon: <IndianRupee className="w-5 h-5" /> },
   { type: "item", href: "/admin/seasons", label: "Seasons", icon: <Sun className="w-5 h-5" /> },
   { type: "item", href: "/admin/site-config", label: "Site Config", icon: <Globe className="w-5 h-5" /> },

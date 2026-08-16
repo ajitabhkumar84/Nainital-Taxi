@@ -31,7 +31,7 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, source: 'mobile_quick_enquiry' }),
       });
 
       const data = await response.json();

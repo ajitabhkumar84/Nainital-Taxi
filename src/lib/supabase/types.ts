@@ -734,6 +734,28 @@ export interface TickerBooking {
   updated_at: string;
 }
 
+/**
+ * A row in contact_enquiries — the durable backup of every /api/contact
+ * submission, written independently of whether the notification email
+ * succeeds. See supabase/create_contact_enquiries_schema.sql.
+ */
+export interface ContactEnquiry {
+  id: string; // UUID
+  name: string;
+  phone: string;
+  email: string | null;
+  subject: string | null; // not populated by either form yet; reserved for future use
+  message: string | null;
+  pickup: string | null;
+  drop_location: string | null;
+  travel_date: string | null;
+  travel_time: string | null;
+  passengers: string | null;
+  vehicle: string | null;
+  source: 'contact_page' | 'mobile_quick_enquiry';
+  created_at: string;
+}
+
 export interface TrustPillar {
   icon_name: string; // e.g. 'user-check' | 'shield' | 'award' | 'heart' | 'car' | 'phone'
   title: string;

@@ -41,6 +41,7 @@ export default function ContactForm({
         vehicle: formData.get('vehicle'),
         message: formData.get('message'),
         company: formData.get('company'), // honeypot — real users never fill this
+        source: 'contact_page',
       };
 
       const response = await fetch('/api/contact', {

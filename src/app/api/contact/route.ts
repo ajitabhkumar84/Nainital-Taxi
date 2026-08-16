@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendContactEnquiry } from '@/lib/notifications';
 import { checkContactRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getContactPageContent } from '@/lib/contactPage';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,25 +69,55 @@ export async function POST(request: NextRequest) {
       time: time?.trim() || '',
       passengers: passengers?.trim() || '',
       vehicle: vehicle?.trim() || '',
+      source: (body.source === 'mobile_quick_enquiry' ? 'mobile_quick_enquiry' : 'contact_page') as
+        | 'mobile_quick_enquiry'
+        | 'contact_page',
     };
+
+    // Persist first — this is now the durable record of the enquiry, independent
+    // of whether email delivery works. Never let a DB problem take down email,
+    // or vice versa (see the dbSaved/emailResult check below).
+    let dbSaved = false;
+    try {
+      const supabaseAdmin = getAdminSupabaseClient();
+      const { error: dbError } = await supabaseAdmin.from('contact_enquiries').insert({
+        name: contactData.name,
+        phone: contactData.phone,
+        email: contactData.email,
+        message: contactData.message,
+        pickup: contactData.pickup || null,
+        drop_location: contactData.drop || null,
+        travel_date: contactData.date || null,
+        travel_time: contactData.time || null,
+        passengers: contactData.passengers || null,
+        vehicle: contactData.vehicle || null,
+        source: contactData.source,
+      });
+
+      if (dbError) {
+        console.error('[api/contact] Supabase insert failed:', dbError);
+      } else {
+        dbSaved = true;
+      }
+    } catch (error) {
+      console.error('[api/contact] Unexpected error saving enquiry to Supabase:', error);
+    }
 
     // Recipient is admin-editable at /admin/pages/contact; falls back to the
     // ADMIN_EMAIL env var when unset.
     const { enquiry_recipient_email } = await getContactPageContent();
+    const emailResult = await sendContactEnquiry(contactData, enquiry_recipient_email);
 
-    // Send emails via Resend
-    const emailSent = await sendContactEnquiry(contactData, enquiry_recipient_email);
-
-    if (!emailSent) {
-      // There is no database record of contact enquiries — email IS the
-      // delivery mechanism. Reporting success here would tell the visitor
-      // we'd received an enquiry that in fact reached nobody, and they'd
-      // wait for a callback that never comes. Fail loudly and point them at
-      // WhatsApp instead.
+    if (!emailResult.ok) {
       console.error(
-        'Contact enquiry email failed to send — enquiry not delivered. ' +
+        `[api/contact] Enquiry email not delivered — ${emailResult.reason || 'unknown reason'}. ` +
         'Check RESEND_API_KEY and that the FROM_EMAIL domain is verified in Resend.'
       );
+    }
+
+    if (!dbSaved && !emailResult.ok) {
+      // Both the durable record and the notification failed — genuinely nothing
+      // was captured. This is the only case worth failing loudly to the visitor.
       return NextResponse.json(
         {
           success: false,
@@ -103,7 +134,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Contact form error:', error);
+    console.error(
+      '[api/contact] Unexpected error processing enquiry:',
+      error instanceof Error ? error.stack || error.message : error
+    );
     return NextResponse.json(
       { success: false, error: 'Failed to process enquiry. Please try again.' },
       { status: 500 }

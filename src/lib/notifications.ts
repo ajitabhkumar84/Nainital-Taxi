@@ -59,13 +59,19 @@ interface BookingData {
   special_requests?: string | null;
 }
 
+type SendResult = { ok: true } | { ok: false; reason: string };
+
 /**
- * Send email via Resend API
+ * Send email via Resend API, reporting *why* a failure happened (invalid/missing
+ * key, unverified domain, network error, ...) rather than just a boolean —
+ * callers that need to log a specific cause use this; sendEmail() below stays
+ * boolean for the callers that don't.
  */
-async function sendEmail(options: EmailOptions): Promise<boolean> {
+async function sendEmailWithResult(options: EmailOptions): Promise<SendResult> {
   if (!RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY not configured. Email not sent.');
-    return false;
+    const reason = 'RESEND_API_KEY is not set in this environment';
+    console.warn(`[notifications] ${reason}. Email not sent.`);
+    return { ok: false, reason };
   }
 
   try {
@@ -85,15 +91,24 @@ async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Resend API error:', errorData);
-      return false;
+      const reason = `Resend API ${response.status}: ${errorData?.message || JSON.stringify(errorData)}`;
+      console.error(`[notifications] ${reason}`);
+      return { ok: false, reason };
     }
 
-    return true;
+    return { ok: true };
   } catch (error) {
-    console.error('Failed to send email:', error);
-    return false;
+    const reason = error instanceof Error ? error.message : 'Unknown fetch error';
+    console.error('[notifications] Failed to reach Resend API:', error);
+    return { ok: false, reason };
   }
+}
+
+/**
+ * Send email via Resend API
+ */
+async function sendEmail(options: EmailOptions): Promise<boolean> {
+  return (await sendEmailWithResult(options)).ok;
 }
 
 /**
@@ -535,6 +550,7 @@ interface ContactData {
   time?: string;
   passengers?: string;
   vehicle?: string;
+  source?: 'contact_page' | 'mobile_quick_enquiry';
 }
 
 /**
@@ -769,16 +785,16 @@ function generateContactAutoReplyEmail(data: ContactData): string {
  * enquiries without an env change or redeploy; it falls back to the
  * ADMIN_EMAIL env var when unset.
  *
- * The boolean reflects the *admin* notification only — the auto-reply is a
+ * The result reflects the *admin* notification only — the auto-reply is a
  * courtesy and its failure must not make a received enquiry look lost.
  */
 export async function sendContactEnquiry(
   data: ContactData,
   recipient?: string | null
-): Promise<boolean> {
+): Promise<SendResult> {
   try {
     // Always send admin notification
-    const adminEmailSent = await sendEmail({
+    const adminResult = await sendEmailWithResult({
       to: recipient?.trim() || ADMIN_EMAIL,
       subject: `New Contact Enquiry - ${data.name}`,
       html: generateContactEnquiryAdminEmail(data),
@@ -786,16 +802,20 @@ export async function sendContactEnquiry(
 
     // Send auto-reply only if customer provided email
     if (data.email && data.email.trim().length > 0) {
-      await sendEmail({
+      const autoReplyResult = await sendEmailWithResult({
         to: data.email,
         subject: `We Received Your Enquiry | ${BUSINESS_NAME}`,
         html: generateContactAutoReplyEmail(data),
       });
+      if (!autoReplyResult.ok) {
+        console.error('[notifications] Auto-reply email failed:', autoReplyResult.reason);
+      }
     }
 
-    return adminEmailSent;
+    return adminResult;
   } catch (error) {
-    console.error('Failed to send contact enquiry emails:', error);
-    return false;
+    const reason = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[notifications] Failed to send contact enquiry emails:', error);
+    return { ok: false, reason };
   }
 }
