@@ -10,7 +10,7 @@
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { supabase } from './client';
-import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, RoutePricing, PickupLocationRow } from './types';
+import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, Route, RoutePricing, PickupLocationRow } from './types';
 import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
 
@@ -965,6 +965,53 @@ export const getRoutesWithCategories = cache(async (): Promise<{
     return empty;
   }
 });
+
+/**
+ * All active, destination-page-visible routes linked to a given destination
+ * via `destination_slug`, with their active pricing embedded — backs the
+ * "Taxi Fares to [Destination]" table on /destinations/[slug]. Deliberately
+ * a single embedded-relation query (route_pricing as a nested `pricing`
+ * resource) rather than the two-round-trip pattern getRoutesWithCategories
+ * uses above, since here we already know the (small) route set up front.
+ *
+ * route_pricing(*) embeds ALL pricing rows for the route regardless of
+ * is_active — PostgREST only filters embedded rows when the join is hinted
+ * `!inner`, which would instead drop the whole *route* if none of its
+ * pricing rows are active. That's too blunt here: a route with no active
+ * pricing yet should still be excludable by the caller (DestinationPricingTable
+ * drops it before rendering), not silently vanish from this function's
+ * result. So pricing is filtered to is_active in memory instead.
+ */
+export async function getRoutesForDestinationSlug(
+  destinationSlug: string
+): Promise<(Route & { pricing: RoutePricing[] })[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: routes, error } = await (supabase.from as any)('routes')
+      .select('*, pricing:route_pricing(*)')
+      .eq('destination_slug', destinationSlug)
+      .eq('is_active', true)
+      .eq('show_on_destination_page', true)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true }) as {
+        data: (Route & { pricing: RoutePricing[] })[] | null;
+        error: unknown;
+      };
+
+    if (error || !routes) {
+      if (error) console.error('Error fetching routes for destination:', error);
+      return [];
+    }
+
+    return routes.map((route) => ({
+      ...route,
+      pricing: (route.pricing || []).filter((p) => p.is_active),
+    }));
+  } catch (error) {
+    console.error('Error fetching routes for destination:', error);
+    return [];
+  }
+}
 
 /**
  * Get season date ranges

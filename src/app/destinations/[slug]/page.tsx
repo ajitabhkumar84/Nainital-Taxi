@@ -9,6 +9,7 @@ import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar } from
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import PackageCard from "@/components/home/PackageCard";
 import PricingGridForDestination from "@/components/destinations/PricingGridForDestination";
+import DestinationPricingTable from "@/components/destinations/DestinationPricingTable";
 import DetailedAttractions from "@/components/packages/DetailedAttractions";
 import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
 import BookingInstructions from "@/components/packages/BookingInstructions";
@@ -287,6 +288,12 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
           )}
         </div>
       </section>
+
+      {/* Taxi Fares — routes-based pricing table (independent of transferPackage) */}
+      <DestinationPricingTable
+        destinationSlug={params.slug}
+        destinationName={destination.name}
+      />
 
       {/* Quick Stats */}
       {transferPackage && (

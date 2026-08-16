@@ -28,6 +28,11 @@ import { revalidatePath } from "next/cache";
  * Shared by every admin endpoint that mutates routes *or* route categories —
  * getRoutesWithCategories() joins the two, so a category rename or reorder
  * goes stale on exactly the same set of pages a route change does.
+ *
+ * A route can also be linked to a /destinations/[slug] page via
+ * destination_slug and rendered there by DestinationPricingTable
+ * (getRoutesForDestinationSlug()) — revalidating the dynamic segment pattern
+ * busts every destination page's Full Route Cache entry, not just one slug.
  */
 export function revalidateRoutePages() {
   try {
@@ -36,6 +41,7 @@ export function revalidateRoutePages() {
     revalidatePath("/api/routes-with-categories");
     revalidatePath("/quote", "page");
     revalidatePath("/booking", "page");
+    revalidatePath("/destinations/[slug]", "page");
   } catch (error) {
     console.error("Revalidation failed (DB write succeeded):", error);
   }
