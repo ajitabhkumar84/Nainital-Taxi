@@ -62,9 +62,12 @@ export async function GET() {
       last_shown_at: new Date(now - Math.random() * MAX_STAGGER_MS).toISOString(),
     }));
 
-    const { error: updateError } = await supabase.from('ticker_bookings').upsert(
-      stamped.map((row) => ({ id: row.id, last_shown_at: row.last_shown_at }))
-    );
+    // Upsert the full rows, not just { id, last_shown_at }. Postgres builds
+    // the candidate INSERT row for an ON CONFLICT DO UPDATE *before* it checks
+    // for a conflict, so a partial payload trips the NOT NULL constraints on
+    // guest_first_name/guest_city/service_label even though every id here
+    // already exists and this always resolves to a plain UPDATE.
+    const { error: updateError } = await supabase.from('ticker_bookings').upsert(stamped);
 
     if (updateError) {
       console.error('Error stamping ticker batch:', updateError);
