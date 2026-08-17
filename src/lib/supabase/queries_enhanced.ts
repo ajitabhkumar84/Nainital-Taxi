@@ -29,6 +29,27 @@
  *   These stay UNCACHED. They are also low-volume, since they only run
  *   when someone is actively in the booking flow.
  *
+ * SINGLETON PAGE-COPY EXCEPTION
+ * -----------------------------
+ * getPageContent, getTrustSection and getTourTrustSection are content reads but
+ * are deliberately NOT in unstable_cache. Each is a single fixed row that an
+ * admin edits and then immediately reloads the page to verify, so a staleness
+ * window between saving and seeing reads as a broken save rather than a cache.
+ * That is not hypothetical: on 2026-08-17 a homepage hero image edit stayed
+ * stale on the live Vercel deployment for over 90 minutes even though the admin
+ * route called revalidateContent() on save, and the HTML itself was not
+ * edge-cached. Until that is root-caused, these three are read live.
+ *
+ * The cost is 3 queries per homepage view instead of 0 — against roughly 12
+ * before any of this work — and it buys back instant admin feedback on the rows
+ * that get edited most. The equivalent singletons in src/lib/multiDayRental.ts
+ * and src/lib/contactPage.ts were already React cache() only, so this keeps all
+ * the page-copy reads consistent with each other.
+ *
+ * Bulk list reads (destinations, packages, pricing, routes, reviews, vehicles,
+ * temples) stay cached: they are the bulk of the query count, and they are
+ * edited through list UIs where the 60s TTL ceiling is acceptable.
+ *
  * Cached functions MUST use the `supabase` singleton imported below (plain
  * @supabase/supabase-js, no cookies). unstable_cache throws at runtime if the
  * wrapped function touches cookies() or headers(), which rules out the
@@ -592,30 +613,31 @@ export const getFeaturedReviews = unstable_cache(
 // TRUST & SAFETY SECTION
 // ============================================================================
 
-export const getTrustSection = unstable_cache(
-  async (): Promise<TrustSection> => {
-    const FIXED_ID = '00000000-0000-0000-0000-000000000002';
+/**
+ * Deliberately NOT in unstable_cache — see the SINGLETON PAGE-COPY exception in
+ * the caching policy at the top of this file. React cache() only, so it is one
+ * query per render and always reflects the last admin save.
+ */
+export const getTrustSection = cache(async (): Promise<TrustSection> => {
+  const FIXED_ID = '00000000-0000-0000-0000-000000000002';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('trust_section') as any)
-      .select('*')
-      .eq('id', FIXED_ID)
-      .single();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('trust_section') as any)
+    .select('*')
+    .eq('id', FIXED_ID)
+    .single();
 
-    if (error || !data) {
-      return {
-        ...DEFAULT_TRUST_SECTION,
-        id: FIXED_ID,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
+  if (error || !data) {
+    return {
+      ...DEFAULT_TRUST_SECTION,
+      id: FIXED_ID,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
 
-    return data;
-  },
-  ['trust-section'],
-  { tags: [CACHE_TAGS.trustSection], revalidate: CONTENT_CACHE_TTL }
-);
+  return data;
+});
 
 // ============================================================================
 // TOUR PAGE TRUST SECTION
@@ -623,72 +645,67 @@ export const getTrustSection = unstable_cache(
 // Separate singleton from trust_section above — see the comment on
 // TourTrustSection in types.ts for why this isn't shared with the homepage.
 
-export const getTourTrustSection = unstable_cache(
-  async (): Promise<TourTrustSection> => {
-    const FIXED_ID = '00000000-0000-0000-0000-000000000003';
+// Same singleton page-copy exception as getTrustSection above.
+export const getTourTrustSection = cache(async (): Promise<TourTrustSection> => {
+  const FIXED_ID = '00000000-0000-0000-0000-000000000003';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('tour_trust_section') as any)
-      .select('*')
-      .eq('id', FIXED_ID)
-      .single();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('tour_trust_section') as any)
+    .select('*')
+    .eq('id', FIXED_ID)
+    .single();
 
-    if (error || !data) {
-      return {
-        ...DEFAULT_TOUR_TRUST_SECTION,
-        id: FIXED_ID,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
+  if (error || !data) {
+    return {
+      ...DEFAULT_TOUR_TRUST_SECTION,
+      id: FIXED_ID,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
 
-    return data;
-  },
-  ['tour-trust-section'],
-  { tags: [CACHE_TAGS.tourTrustSection], revalidate: CONTENT_CACHE_TTL }
-);
+  return data;
+});
 
 // ============================================================================
 // PAGE CONTENT (CMS)
 // ============================================================================
 
-// Two layers, doing two different jobs — both are needed:
-//
-//   unstable_cache (inner) caches the row ACROSS requests and visitors, keyed
-//   by slug and busted by the 'page-content' tag when an admin saves. This is
-//   what stops every homepage view from hitting Supabase.
-//
-//   React cache() (outer) dedupes WITHIN a single render, so the calls from
-//   generateMetadata and from the page component share one data-cache lookup
-//   instead of two. The Supabase client, unlike fetch, has no automatic
-//   request memoization, so this layer still earns its place.
-//
-// Previously this was cache() alone, which meant every visitor paid a fresh
-// Supabase round-trip — per-request deduping is not caching.
-export const getPageContent = cache(
-  unstable_cache(
-    async (slug: string): Promise<PageContent> => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('page_content') as any)
-        .select('*')
-        .eq('page_slug', slug)
-        .single();
+/**
+ * Deliberately NOT in unstable_cache — this is the read that motivated the
+ * SINGLETON PAGE-COPY exception described in the caching policy at the top of
+ * this file.
+ *
+ * It holds the homepage hero image, title, subtitle and section copy: the
+ * single most frequently edited row in the product, and the one an admin saves
+ * and then immediately reloads the homepage to check. Caching it across
+ * requests put a staleness window between "I saved it" and "I can see it",
+ * which on 2026-08-17 manifested as a hero image that stayed wrong on the live
+ * site for over 90 minutes.
+ *
+ * React cache() is kept so the calls from generateMetadata and the page
+ * component collapse into one query per render (the Supabase client, unlike
+ * fetch, has no automatic request memoization). That makes this one query per
+ * homepage view — a cost worth paying for edits that appear instantly.
+ */
+export const getPageContent = cache(async (slug: string): Promise<PageContent> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('page_content') as any)
+    .select('*')
+    .eq('page_slug', slug)
+    .single();
 
-      if (error || !data) {
-        return {
-          ...DEFAULT_PAGE_CONTENT,
-          page_slug: slug,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      }
+  if (error || !data) {
+    return {
+      ...DEFAULT_PAGE_CONTENT,
+      page_slug: slug,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
 
-      return data as PageContent;
-    },
-    ['page-content'],
-    { tags: [CACHE_TAGS.pageContent], revalidate: CONTENT_CACHE_TTL }
-  )
-);
+  return data as PageContent;
+});
 
 // ============================================================================
 // ADMIN HELPERS (for managing seasons and blackouts)

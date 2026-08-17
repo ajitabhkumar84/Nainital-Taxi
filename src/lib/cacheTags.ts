@@ -84,10 +84,18 @@ export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
  * bypass the API routes entirely, so nothing invalidates them and the site
  * keeps serving the old value until the TTL expires.
  *
- * 300s in production matches the TTL the pre-existing cached config reads
- * already use (src/lib/branding.ts, src/lib/footerConfig.ts,
- * src/lib/trackingScripts.ts), so the whole app has one staleness ceiling
- * rather than two.
+ * 60s in production, deliberately short. This started at 600s on the
+ * assumption that revalidateTag would do the real work and the TTL would never
+ * be reached. That assumption did not survive production: on 2026-08-17 a
+ * homepage hero image edit stayed stale on the live Vercel deployment for over
+ * 90 minutes despite /api/admin/pages/home calling revalidateContent() on save.
+ * The HTML was not edge-cached (Cache-Control: no-store, X-Vercel-Cache: MISS),
+ * so the stale value was coming from this data cache.
+ *
+ * Until that is understood, the TTL is the mechanism we can actually rely on,
+ * so it is set to a value where the worst case is a minute rather than an
+ * afternoon. Query volume is not the binding Supabase constraint here — egress
+ * is — so a short TTL costs little that matters.
  *
  * 1s in development because the cost/benefit inverts locally: there is no
  * free-tier traffic to protect, and a cache that outlives an edit turns
@@ -103,4 +111,4 @@ export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
  * routes and the public pages are the same deployment sharing one Data Cache.
  */
 export const CONTENT_CACHE_TTL =
-  process.env.NODE_ENV === 'production' ? 300 : 1;
+  process.env.NODE_ENV === 'production' ? 60 : 1;
