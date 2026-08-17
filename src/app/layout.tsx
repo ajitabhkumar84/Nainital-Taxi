@@ -57,11 +57,18 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "Nainital Taxi",
       title: "Nainital Taxi - Premium Taxi & Tour Services",
       description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
+      // `images` is deliberately NOT set here. src/app/opengraph-image.tsx
+      // supplies the site-wide 1200x630 card via Next's file convention, which
+      // emits og:image plus width/height/type with a correct absolute URL.
+      // Setting images here as well would override that with a hand-maintained
+      // path. Pages with their own artwork (/tour/[name],
+      // /destinations/[slug]) override it per-page instead.
     },
     twitter: {
       card: "summary_large_image",
       title: "Nainital Taxi - Premium Taxi & Tour Services",
       description: "Book premium taxi services in Nainital. Reliable transfers and tour packages.",
+      // Same reasoning — the file convention also populates twitter:image.
     },
     icons: {
       icon: faviconUrl,

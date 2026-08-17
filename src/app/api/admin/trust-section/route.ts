@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { DEFAULT_TRUST_SECTION, TrustSection } from '@/lib/supabase/types';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 
 const FIXED_ID = '00000000-0000-0000-0000-000000000002';
 
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     revalidatePath('/');
+    revalidateContent(CACHE_TAGS.trustSection);
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in POST /api/admin/trust-section:', error);

@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Header, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { Phone } from "lucide-react";
 import RouteBrowser from "@/components/rates/RouteBrowser";
@@ -39,7 +40,7 @@ export default async function RatesPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
 
       {/* Hero */}
       <div className="bg-lake border-b border-slate-200">

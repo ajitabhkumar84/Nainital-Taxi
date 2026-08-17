@@ -5,6 +5,34 @@
  * - Multiple season periods support
  * - Booking blackout dates
  * - Priority-based season selection
+ *
+ * ---------------------------------------------------------------------------
+ * CACHING POLICY — read this before adding a query to this file
+ * ---------------------------------------------------------------------------
+ * Every route in this app renders dynamically (src/app/layout.tsx reads
+ * headers() for the CSP nonce), so there is no Full Route Cache to fall back
+ * on. Without a data cache, every page view re-runs every query below against
+ * Supabase — roughly a dozen round-trips for one homepage load. See
+ * src/lib/cacheTags.ts for the full reasoning.
+ *
+ * There are therefore two classes of query in this file, and which one you are
+ * writing determines whether it gets cached:
+ *
+ *   CONTENT reads — destinations, packages, vehicles, reviews, CMS rows.
+ *   Changes only when an admin saves. WRAP in unstable_cache with a tag from
+ *   CACHE_TAGS, and make sure the corresponding admin write route calls
+ *   revalidateContent() with that tag.
+ *
+ *   BOOKING-PATH reads — availability, blackout dates, live pricing for a
+ *   specific date. Correctness beats cache hits: quoting a stale price or
+ *   taking a booking on a blocked date costs real money and real trust.
+ *   These stay UNCACHED. They are also low-volume, since they only run
+ *   when someone is actively in the booking flow.
+ *
+ * Cached functions MUST use the `supabase` singleton imported below (plain
+ * @supabase/supabase-js, no cookies). unstable_cache throws at runtime if the
+ * wrapped function touches cookies() or headers(), which rules out the
+ * @supabase/ssr client in ./server.ts.
  */
 
 import { cache } from 'react';
@@ -13,9 +41,16 @@ import { supabase } from './client';
 import type { VehicleType, Package, Vehicle, Destination, Review, Booking, TrustSection, TourTrustSection, PageContent, RouteCategory, RouteWithCategory, Route, RoutePricing, PickupLocationRow } from './types';
 import { DEFAULT_TRUST_SECTION, DEFAULT_TOUR_TRUST_SECTION, DEFAULT_PAGE_CONTENT } from './types';
 import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
+import { CACHE_TAGS, CONTENT_CACHE_TTL } from '@/lib/cacheTags';
 
 // ============================================================================
 // SEASON & PRICING HELPERS
+//
+// Everything in this section is BOOKING-PATH and deliberately uncached — see
+// the caching policy at the top of this file. getSeasonForDate/getPrice feed
+// the quote a customer is about to pay, and isBookingAllowed is the last gate
+// before a blocked date is accepted. A stale entry here is a wrong price or an
+// unfulfillable booking, so these always go to the database.
 // ============================================================================
 
 /**
@@ -229,43 +264,53 @@ export async function getPackagePriceRange(
 // PACKAGE QUERIES
 // ============================================================================
 
-export async function getPackages(type?: 'tour' | 'transfer'): Promise<Package[]> {
-  let query = supabase
-    .from('packages')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order');
+// Cached content read. `type` is part of the cache key, so 'tour' and
+// 'transfer' get independent entries rather than clobbering each other.
+export const getPackages = unstable_cache(
+  async (type?: 'tour' | 'transfer'): Promise<Package[]> => {
+    let query = supabase
+      .from('packages')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
 
-  if (type) {
-    query = query.eq('type', type);
-  }
+    if (type) {
+      query = query.eq('type', type);
+    }
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    console.error('Error fetching packages:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching packages:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['packages'],
+  { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+);
 
-export async function getPopularPackages(limit: number = 6): Promise<Package[]> {
-  const { data, error } = await supabase
-    .from('packages')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_popular', true)
-    .order('display_order')
-    .limit(limit);
+export const getPopularPackages = unstable_cache(
+  async (limit: number = 6): Promise<Package[]> => {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_popular', true)
+      .order('display_order')
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching popular packages:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching popular packages:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['popular-packages'],
+  { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Fetches specific packages by id, preserving the order of `ids`.
@@ -275,139 +320,182 @@ export async function getPopularPackages(limit: number = 6): Promise<Package[]> 
  * rental page's featured_package_ids), not an arbitrary set. Ids that no
  * longer resolve to an active package are simply dropped.
  */
-export async function getPackagesByIds(ids: string[]): Promise<Package[]> {
-  if (!ids || ids.length === 0) return [];
+export const getPackagesByIds = unstable_cache(
+  async (ids: string[]): Promise<Package[]> => {
+    if (!ids || ids.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from('packages')
-    .select('*')
-    .in('id', ids)
-    .eq('is_active', true);
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*')
+      .in('id', ids)
+      .eq('is_active', true);
 
-  if (error) {
-    console.error('Error fetching packages by id:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching packages by id:', error);
+      return [];
+    }
 
-  const rows = (data || []) as Package[];
-  const byId = new Map(rows.map((pkg) => [pkg.id, pkg]));
-  return ids.map((id) => byId.get(id)).filter((pkg): pkg is Package => Boolean(pkg));
-}
+    const rows = (data || []) as Package[];
+    const byId = new Map(rows.map((pkg) => [pkg.id, pkg]));
+    return ids.map((id) => byId.get(id)).filter((pkg): pkg is Package => Boolean(pkg));
+  },
+  ['packages-by-ids'],
+  { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+);
 
-export async function getPackageById(id: string): Promise<Package | null> {
-  const { data, error } = await supabase
-    .from('packages')
-    .select('*')
-    .eq('id', id)
-    .eq('is_active', true)
-    .single();
+export const getPackageById = unstable_cache(
+  async (id: string): Promise<Package | null> => {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*')
+      .eq('id', id)
+      .eq('is_active', true)
+      .single();
 
-  if (error) {
-    console.error('Error fetching package:', error);
-    return null;
-  }
+    if (error) {
+      console.error('Error fetching package:', error);
+      return null;
+    }
 
-  return data;
-}
+    return data;
+  },
+  ['package-by-id'],
+  { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+);
 
-export async function getPackageBySlug(slug: string): Promise<Package | null> {
-  const { data, error } = await supabase
-    .from('packages')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .single();
+export const getPackageBySlug = unstable_cache(
+  async (slug: string): Promise<Package | null> => {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
 
-  if (error) {
-    console.error('Error fetching package:', error);
-    return null;
-  }
+    if (error) {
+      console.error('Error fetching package:', error);
+      return null;
+    }
 
-  return data;
-}
+    return data;
+  },
+  ['package-by-slug'],
+  { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // VEHICLE QUERIES
 // ============================================================================
 
-export async function getVehicles(vehicleType?: VehicleType): Promise<Vehicle[]> {
-  let query = supabase
-    .from('vehicles')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order');
+export const getVehicles = unstable_cache(
+  async (vehicleType?: VehicleType): Promise<Vehicle[]> => {
+    let query = supabase
+      .from('vehicles')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
 
-  if (vehicleType) {
-    query = query.eq('vehicle_type', vehicleType);
-  }
+    if (vehicleType) {
+      query = query.eq('vehicle_type', vehicleType);
+    }
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    console.error('Error fetching vehicles:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching vehicles:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['vehicles'],
+  { tags: [CACHE_TAGS.vehicles], revalidate: CONTENT_CACHE_TTL }
+);
 
-export async function getFeaturedVehicles(limit: number = 3): Promise<Vehicle[]> {
-  const { data, error } = await supabase
-    .from('vehicles')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_featured', true)
-    .order('display_order')
-    .limit(limit);
+export const getFeaturedVehicles = unstable_cache(
+  async (limit: number = 3): Promise<Vehicle[]> => {
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_featured', true)
+      .order('display_order')
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching featured vehicles:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching featured vehicles:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['featured-vehicles'],
+  { tags: [CACHE_TAGS.vehicles], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // DESTINATION QUERIES
 // ============================================================================
 
-export async function getDestinations(): Promise<Destination[]> {
-  const { data, error } = await supabase
-    .from('destinations')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order');
+export const getDestinations = unstable_cache(
+  async (): Promise<Destination[]> => {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
 
-  if (error) {
-    console.error('Error fetching destinations:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching destinations:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['destinations'],
+  { tags: [CACHE_TAGS.destinations], revalidate: CONTENT_CACHE_TTL }
+);
 
-export async function getPopularDestinations(limit: number = 4): Promise<Destination[]> {
-  const { data, error } = await supabase
-    .from('destinations')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_popular', true)
-    .order('display_order')
-    .limit(limit);
+export const getPopularDestinations = unstable_cache(
+  async (limit: number = 4): Promise<Destination[]> => {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_popular', true)
+      .order('display_order')
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching popular destinations:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching popular destinations:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['popular-destinations'],
+  { tags: [CACHE_TAGS.destinations], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // AVAILABILITY QUERIES
 // ============================================================================
 
+/**
+ * Availability for a date range, with each date's booking_allowed resolved.
+ *
+ * Two queries total, regardless of range length. This previously called
+ * isBookingAllowed() inside a .map() over the result rows — an N+1 that cost
+ * two round-trips *per date*, so getUpcomingAvailability()'s 30-day window
+ * alone fired ~60 queries in a single request. Both underlying tables are
+ * range-queryable, so the whole window is fetched up front and each date is
+ * resolved in memory instead.
+ *
+ * Uncached by design (booking path) — but now cheap enough that it doesn't
+ * need to be. The per-date isBookingAllowed() is still the right call for the
+ * single-date checks in the booking flow; it is only fanning it out over a
+ * range that was wrong.
+ */
 export async function getAvailabilityRange(
   startDate: string,
   endDate: string
@@ -417,11 +505,18 @@ export async function getAvailabilityRange(
   status: string;
   booking_allowed: boolean;
 }>> {
-  type AvailabilityItem = { date: string; cars_available: number; status: string };
+  type AvailabilityItem = {
+    date: string;
+    cars_available: number;
+    status: string;
+    is_blocked: boolean | null;
+  };
 
+  // `is_blocked` is selected here so the per-date availability gate resolves
+  // from this same row rather than a follow-up query per date.
   const { data: availabilityData, error } = await supabase
     .from('availability')
-    .select('date, cars_available, status')
+    .select('date, cars_available, status, is_blocked')
     .gte('date', startDate)
     .lte('date', endDate)
     .order('date') as { data: AvailabilityItem[] | null; error: unknown };
@@ -431,65 +526,96 @@ export async function getAvailabilityRange(
     return [];
   }
 
-  // Check booking blackout for each date
-  const results = await Promise.all(
-    (availabilityData || []).map(async (item) => {
-      const bookingStatus = await isBookingAllowed(item.date);
-      return {
-        ...item,
-        booking_allowed: bookingStatus.allowed
-      };
-    })
-  );
+  const rows = availabilityData || [];
+  if (rows.length === 0) return [];
 
-  return results;
+  // Every blackout period that overlaps the window, in one query. An overlap
+  // is "starts on or before the window ends AND ends on or after it starts" —
+  // not the same as either endpoint falling inside the window, which would
+  // miss a blackout that spans the entire range.
+  type BlackoutRow = { start_date: string; end_date: string };
+  let blackouts: BlackoutRow[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: blackoutData, error: blackoutError } = await (supabase.from as any)(
+      'booking_blackout'
+    )
+      .select('start_date, end_date')
+      .eq('is_active', true)
+      .lte('start_date', endDate)
+      .gte('end_date', startDate) as { data: BlackoutRow[] | null; error: unknown };
+
+    // Matches isBookingAllowed(): a missing table or RLS error means "allow",
+    // never "block everything".
+    if (!blackoutError) blackouts = blackoutData || [];
+  } catch {
+    blackouts = [];
+  }
+
+  const isBlackedOut = (date: string) =>
+    blackouts.some((b) => b.start_date <= date && b.end_date >= date);
+
+  return rows.map((item) => ({
+    date: item.date,
+    cars_available: item.cars_available,
+    status: item.status,
+    booking_allowed: !item.is_blocked && !isBlackedOut(item.date),
+  }));
 }
 
 // ============================================================================
 // REVIEW QUERIES
 // ============================================================================
 
-export async function getFeaturedReviews(limit: number = 6): Promise<Review[]> {
-  const { data, error } = await supabase
-    .from('reviews')
-    .select('*')
-    .eq('is_approved', true)
-    .eq('is_featured', true)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+export const getFeaturedReviews = unstable_cache(
+  async (limit: number = 6): Promise<Review[]> => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('is_approved', true)
+      .eq('is_featured', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching reviews:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching reviews:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['featured-reviews'],
+  { tags: [CACHE_TAGS.reviews], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // TRUST & SAFETY SECTION
 // ============================================================================
 
-export async function getTrustSection(): Promise<TrustSection> {
-  const FIXED_ID = '00000000-0000-0000-0000-000000000002';
+export const getTrustSection = unstable_cache(
+  async (): Promise<TrustSection> => {
+    const FIXED_ID = '00000000-0000-0000-0000-000000000002';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('trust_section') as any)
-    .select('*')
-    .eq('id', FIXED_ID)
-    .single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('trust_section') as any)
+      .select('*')
+      .eq('id', FIXED_ID)
+      .single();
 
-  if (error || !data) {
-    return {
-      ...DEFAULT_TRUST_SECTION,
-      id: FIXED_ID,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  }
+    if (error || !data) {
+      return {
+        ...DEFAULT_TRUST_SECTION,
+        id: FIXED_ID,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
 
-  return data;
-}
+    return data;
+  },
+  ['trust-section'],
+  { tags: [CACHE_TAGS.trustSection], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // TOUR PAGE TRUST SECTION
@@ -497,53 +623,72 @@ export async function getTrustSection(): Promise<TrustSection> {
 // Separate singleton from trust_section above — see the comment on
 // TourTrustSection in types.ts for why this isn't shared with the homepage.
 
-export async function getTourTrustSection(): Promise<TourTrustSection> {
-  const FIXED_ID = '00000000-0000-0000-0000-000000000003';
+export const getTourTrustSection = unstable_cache(
+  async (): Promise<TourTrustSection> => {
+    const FIXED_ID = '00000000-0000-0000-0000-000000000003';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('tour_trust_section') as any)
-    .select('*')
-    .eq('id', FIXED_ID)
-    .single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('tour_trust_section') as any)
+      .select('*')
+      .eq('id', FIXED_ID)
+      .single();
 
-  if (error || !data) {
-    return {
-      ...DEFAULT_TOUR_TRUST_SECTION,
-      id: FIXED_ID,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  }
+    if (error || !data) {
+      return {
+        ...DEFAULT_TOUR_TRUST_SECTION,
+        id: FIXED_ID,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
 
-  return data;
-}
+    return data;
+  },
+  ['tour-trust-section'],
+  { tags: [CACHE_TAGS.tourTrustSection], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // PAGE CONTENT (CMS)
 // ============================================================================
 
-// Wrapped in React.cache so that calling this once from generateMetadata and
-// once from the page component in the same server render dedupes to a
-// single Supabase round-trip (the Supabase client, unlike fetch, has no
-// automatic request memoization). This cache is per-request only.
-export const getPageContent = cache(async (slug: string): Promise<PageContent> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('page_content') as any)
-    .select('*')
-    .eq('page_slug', slug)
-    .single();
+// Two layers, doing two different jobs — both are needed:
+//
+//   unstable_cache (inner) caches the row ACROSS requests and visitors, keyed
+//   by slug and busted by the 'page-content' tag when an admin saves. This is
+//   what stops every homepage view from hitting Supabase.
+//
+//   React cache() (outer) dedupes WITHIN a single render, so the calls from
+//   generateMetadata and from the page component share one data-cache lookup
+//   instead of two. The Supabase client, unlike fetch, has no automatic
+//   request memoization, so this layer still earns its place.
+//
+// Previously this was cache() alone, which meant every visitor paid a fresh
+// Supabase round-trip — per-request deduping is not caching.
+export const getPageContent = cache(
+  unstable_cache(
+    async (slug: string): Promise<PageContent> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.from('page_content') as any)
+        .select('*')
+        .eq('page_slug', slug)
+        .single();
 
-  if (error || !data) {
-    return {
-      ...DEFAULT_PAGE_CONTENT,
-      page_slug: slug,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  }
+      if (error || !data) {
+        return {
+          ...DEFAULT_PAGE_CONTENT,
+          page_slug: slug,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }
 
-  return data as PageContent;
-});
+      return data as PageContent;
+    },
+    ['page-content'],
+    { tags: [CACHE_TAGS.pageContent], revalidate: CONTENT_CACHE_TTL }
+  )
+);
 
 // ============================================================================
 // ADMIN HELPERS (for managing seasons and blackouts)
@@ -685,82 +830,101 @@ export async function updateBookingStatus(
 /**
  * Get all approved reviews
  */
-export async function getApprovedReviews(): Promise<Review[]> {
-  const { data, error } = await supabase
-    .from('reviews')
-    .select('*')
-    .eq('is_approved', true)
-    .order('created_at', { ascending: false });
+export const getApprovedReviews = unstable_cache(
+  async (): Promise<Review[]> => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('is_approved', true)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching approved reviews:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching approved reviews:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['approved-reviews'],
+  { tags: [CACHE_TAGS.reviews], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get a single destination by slug
  */
 /**
- * Wrapped in React cache() because destination pages call this twice per
- * request — once in generateMetadata and once in the page component. Next's
- * fetch-level dedupe doesn't apply to supabase-js calls, so without this it
- * is two identical round-trips.
+ * Same two-layer treatment as getPageContent — see the comment there.
+ *
+ * unstable_cache keyed by slug caches across visitors (busted by the
+ * 'destinations' tag on admin save); the React cache() wrapper collapses the
+ * generateMetadata + page-component pair into one lookup per render, since
+ * Next's fetch-level dedupe doesn't apply to supabase-js calls.
  */
-export const getDestinationBySlug = cache(async (slug: string): Promise<Destination | null> => {
-  const { data, error } = await supabase
-    .from('destinations')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .single();
+export const getDestinationBySlug = cache(
+  unstable_cache(
+    async (slug: string): Promise<Destination | null> => {
+      const { data, error } = await supabase
+        .from('destinations')
+        .select('*')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .single();
 
-  if (error) {
-    console.error('Error fetching destination:', error);
-    return null;
-  }
+      if (error) {
+        console.error('Error fetching destination:', error);
+        return null;
+      }
 
-  return data;
-});
+      return data;
+    },
+    ['destination-by-slug'],
+    { tags: [CACHE_TAGS.destinations], revalidate: CONTENT_CACHE_TTL }
+  )
+);
 
 /**
  * Get all pricing for a package (both Season and Off-Season, all vehicle types)
  * Used for destination pages to display pricing tables
  */
-export async function getAllPricingForPackage(packageId: string): Promise<Array<{
-  vehicle_type: VehicleType;
-  season_name: 'Season' | 'Off-Season';
-  price: number;
-}>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('pricing')
-    .select('vehicle_type, price, season_name')
-    .eq('package_id', packageId)
-    .eq('is_active', true)
-    .order('vehicle_type') as {
-      data: Array<{
-        vehicle_type: VehicleType;
-        price: number;
-        season_name: 'Season' | 'Off-Season';
-      }> | null;
-      error: unknown
-    };
+// Cached: this is the *display* pricing table on destination/tour pages, which
+// changes only when an admin edits pricing. It is not the booking-time quote —
+// that comes from getPrice(), which stays uncached.
+export const getAllPricingForPackage = unstable_cache(
+  async (packageId: string): Promise<Array<{
+    vehicle_type: VehicleType;
+    season_name: 'Season' | 'Off-Season';
+    price: number;
+  }>> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('pricing')
+      .select('vehicle_type, price, season_name')
+      .eq('package_id', packageId)
+      .eq('is_active', true)
+      .order('vehicle_type') as {
+        data: Array<{
+          vehicle_type: VehicleType;
+          price: number;
+          season_name: 'Season' | 'Off-Season';
+        }> | null;
+        error: unknown
+      };
 
-  if (error) {
-    console.error('Error fetching all pricing:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching all pricing:', error);
+      return [];
+    }
 
-  if (!data) return [];
+    if (!data) return [];
 
-  return data.map(item => ({
-    vehicle_type: item.vehicle_type,
-    season_name: item.season_name,
-    price: item.price
-  }));
-}
+    return data.map(item => ({
+      vehicle_type: item.vehicle_type,
+      season_name: item.season_name,
+      price: item.price
+    }));
+  },
+  ['all-pricing-for-package'],
+  { tags: [CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Lowest active price for every package, keyed by package id.
@@ -771,30 +935,34 @@ export async function getAllPricingForPackage(packageId: string): Promise<Array<
  * authoritative, season- and blackout-aware figure still comes from
  * getPrice() at booking time.
  */
-export async function getMinPricePerPackage(): Promise<Record<string, number>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('pricing')
-    .select('package_id, price')
-    .eq('is_active', true) as {
-      data: Array<{ package_id: string; price: number }> | null;
-      error: unknown;
-    };
+export const getMinPricePerPackage = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('pricing')
+      .select('package_id, price')
+      .eq('is_active', true) as {
+        data: Array<{ package_id: string; price: number }> | null;
+        error: unknown;
+      };
 
-  if (error) {
-    console.error('Error fetching minimum package prices:', error);
-    return {};
-  }
-
-  const minima: Record<string, number> = {};
-  for (const row of data || []) {
-    if (row.price == null) continue;
-    const current = minima[row.package_id];
-    if (current === undefined || row.price < current) {
-      minima[row.package_id] = row.price;
+    if (error) {
+      console.error('Error fetching minimum package prices:', error);
+      return {};
     }
-  }
-  return minima;
-}
+
+    const minima: Record<string, number> = {};
+    for (const row of data || []) {
+      if (row.price == null) continue;
+      const current = minima[row.package_id];
+      if (current === undefined || row.price < current) {
+        minima[row.package_id] = row.price;
+      }
+    }
+    return minima;
+  },
+  ['min-price-per-package'],
+  { tags: [CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+);
 
 export interface TransferRoute {
   id: string;
@@ -816,7 +984,8 @@ export interface TransferRoute {
  * at `routes` + `route_pricing`, the same tables BookingWidget's working
  * /api/routes endpoint uses.
  */
-export async function getTransferRoutes(): Promise<TransferRoute[]> {
+export const getTransferRoutes = unstable_cache(
+  async (): Promise<TransferRoute[]> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: routes, error: routesError } = await (supabase.from as any)('routes')
     .select('id, slug, pickup_location, drop_location, distance, duration')
@@ -871,7 +1040,12 @@ export async function getTransferRoutes(): Promise<TransferRoute[]> {
       suvPrice: minFor('suv_normal'),
     };
   });
-}
+  },
+  ['transfer-routes'],
+  // Tagged with both: the shape depends on `routes` rows and on
+  // `route_pricing`, so an edit to either must bust this entry.
+  { tags: [CACHE_TAGS.routes, CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+);
 
 export interface CategoryWithRoutes extends RouteCategory {
   routes: (RouteWithCategory & { pricing?: RoutePricing[] })[];
@@ -891,7 +1065,9 @@ export interface CategoryWithRoutes extends RouteCategory {
  * empty result rather than throwing, so /rates renders its empty state
  * instead of a 500.
  */
-export const getRoutesWithCategories = cache(async (): Promise<{
+export const getRoutesWithCategories = cache(
+  unstable_cache(
+    async (): Promise<{
   categories: CategoryWithRoutes[];
   allRoutes: (RouteWithCategory & { pricing?: RoutePricing[] })[];
 }> => {
@@ -964,7 +1140,17 @@ export const getRoutesWithCategories = cache(async (): Promise<{
     console.error('Error fetching routes with categories:', error);
     return empty;
   }
-});
+    },
+    ['routes-with-categories'],
+    // Three tables feed this (routes, route_categories, route_pricing), so all
+    // three tags must bust it — a category rename goes stale here just as
+    // surely as a fare change does.
+    {
+      tags: [CACHE_TAGS.routes, CACHE_TAGS.routeCategories, CACHE_TAGS.pricing],
+      revalidate: CONTENT_CACHE_TTL,
+    }
+  )
+);
 
 /**
  * All active, destination-page-visible routes linked to a given destination
@@ -982,63 +1168,74 @@ export const getRoutesWithCategories = cache(async (): Promise<{
  * drops it before rendering), not silently vanish from this function's
  * result. So pricing is filtered to is_active in memory instead.
  */
-export async function getRoutesForDestinationSlug(
-  destinationSlug: string
-): Promise<(Route & { pricing: RoutePricing[] })[]> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: routes, error } = await (supabase.from as any)('routes')
-      .select('*, pricing:route_pricing(*)')
-      .eq('destination_slug', destinationSlug)
-      .eq('is_active', true)
-      .eq('show_on_destination_page', true)
-      .order('display_order', { ascending: true })
-      .order('created_at', { ascending: true }) as {
-        data: (Route & { pricing: RoutePricing[] })[] | null;
-        error: unknown;
-      };
+export const getRoutesForDestinationSlug = unstable_cache(
+  async (
+    destinationSlug: string
+  ): Promise<(Route & { pricing: RoutePricing[] })[]> => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: routes, error } = await (supabase.from as any)('routes')
+        .select('*, pricing:route_pricing(*)')
+        .eq('destination_slug', destinationSlug)
+        .eq('is_active', true)
+        .eq('show_on_destination_page', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true }) as {
+          data: (Route & { pricing: RoutePricing[] })[] | null;
+          error: unknown;
+        };
 
-    if (error || !routes) {
-      if (error) console.error('Error fetching routes for destination:', error);
+      if (error || !routes) {
+        if (error) console.error('Error fetching routes for destination:', error);
+        return [];
+      }
+
+      return routes.map((route) => ({
+        ...route,
+        pricing: (route.pricing || []).filter((p) => p.is_active),
+      }));
+    } catch (error) {
+      console.error('Error fetching routes for destination:', error);
       return [];
     }
-
-    return routes.map((route) => ({
-      ...route,
-      pricing: (route.pricing || []).filter((p) => p.is_active),
-    }));
-  } catch (error) {
-    console.error('Error fetching routes for destination:', error);
-    return [];
-  }
-}
+  },
+  ['routes-for-destination-slug'],
+  { tags: [CACHE_TAGS.routes, CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get season date ranges
  * Returns all active season periods
  */
-export async function getSeasonDateRanges(): Promise<Array<{
-  name: 'Season' | 'Off-Season';
-  start_date: string;
-  end_date: string;
-  description: string | null;
-}>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('seasons')
-    .select('name, start_date, end_date, description')
-    .eq('is_active', true)
-    .order('priority', { ascending: false }) as {
-      data: Array<{ name: 'Season' | 'Off-Season'; start_date: string; end_date: string; description: string | null }> | null;
-      error: unknown
-    };
+// Cached: this is the "Season runs Apr–Jun" copy shown alongside pricing
+// tables, not the booking-time season lookup. getSeasonForDate() resolves the
+// season that a specific booking is actually priced against and stays uncached.
+export const getSeasonDateRanges = unstable_cache(
+  async (): Promise<Array<{
+    name: 'Season' | 'Off-Season';
+    start_date: string;
+    end_date: string;
+    description: string | null;
+  }>> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('seasons')
+      .select('name, start_date, end_date, description')
+      .eq('is_active', true)
+      .order('priority', { ascending: false }) as {
+        data: Array<{ name: 'Season' | 'Off-Season'; start_date: string; end_date: string; description: string | null }> | null;
+        error: unknown
+      };
 
-  if (error) {
-    console.error('Error fetching season ranges:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching season ranges:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['season-date-ranges'],
+  { tags: [CACHE_TAGS.seasons], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Add customer to waitlist for sold-out date
@@ -1097,36 +1294,74 @@ export async function getWaitlistForDate(date: string) {
 /**
  * Get a specific admin setting
  */
-export async function getAdminSetting(key: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('admin_settings')
-    .select('value')
-    .eq('key', key)
-    .single() as { data: { value: unknown } | null; error: unknown };
+export const getAdminSetting = unstable_cache(
+  async (key: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('admin_settings')
+      .select('value')
+      .eq('key', key)
+      .single() as { data: { value: unknown } | null; error: unknown };
 
-  if (error || !data) {
-    console.error('Error fetching admin setting:', error);
-    return null;
-  }
+    if (error || !data) {
+      console.error('Error fetching admin setting:', error);
+      return null;
+    }
 
-  return data.value;
-}
+    return data.value;
+  },
+  ['admin-setting'],
+  { tags: [CACHE_TAGS.adminSettings], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get all admin settings
  */
-export async function getAllAdminSettings() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('admin_settings')
-    .select('*');
+export const getAllAdminSettings = unstable_cache(
+  async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('admin_settings')
+      .select('*');
 
-  if (error) {
-    console.error('Error fetching admin settings:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching admin settings:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['all-admin-settings'],
+  { tags: [CACHE_TAGS.adminSettings], revalidate: CONTENT_CACHE_TTL }
+);
+
+/**
+ * Admin-configured vehicle category photos, keyed by category name.
+ *
+ * Lived as a byte-identical private copy in both /tour/[name]/page.tsx and
+ * /destinations/[slug]/page.tsx, each with its own throwaway Supabase client.
+ * Shared here so both pages hit one cache entry instead of two uncached
+ * queries, and so a change to the storage format only has one place to be made.
+ *
+ * The value column is jsonb but has historically been written as a JSON
+ * *string* by some admin paths, so both shapes are accepted.
+ */
+export const getVehicleCategoryImages = unstable_cache(
+  async (): Promise<Record<string, string> | null> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('admin_settings')
+      .select('value')
+      .eq('key', 'vehicle_category_images')
+      .single();
+
+    if (error || !data?.value) return null;
+    try {
+      return typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+    } catch {
+      return null;
+    }
+  },
+  ['vehicle-category-images'],
+  { tags: [CACHE_TAGS.adminSettings], revalidate: CONTENT_CACHE_TTL }
+);
 
 // ============================================================================
 // TEMPLE QUERIES
@@ -1135,101 +1370,134 @@ export async function getAllAdminSettings() {
 /**
  * Get all active temples
  */
-export async function getTemples() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('temples')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order')
-    .order('popularity', { ascending: false });
+export const getTemples = unstable_cache(
+  async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('temples')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order')
+      .order('popularity', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching temples:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching temples:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['temples'],
+  { tags: [CACHE_TAGS.temples], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
- * Get all temple categories with their temples
+ * All active temple categories with their temples nested.
+ *
+ * Two queries regardless of category count. This previously issued one temples
+ * query *per category* inside a Promise.all over the category list — six
+ * categories meant seven round-trips to build one page. Both tables are small
+ * and fully filterable, so everything is fetched up front and grouped in
+ * memory.
  */
-export async function getTempleCategoriesWithTemples() {
-  // First get all active categories
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: categories, error: categoriesError } = await (supabase.from as any)('temple_categories')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order');
+export const getTempleCategoriesWithTemples = unstable_cache(
+  async () => {
+    // Rows stay loosely typed here, matching the rest of the temple queries in
+    // this file — the generated Database type doesn't model these tables.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const { data: categories, error: categoriesError } = await (supabase.from as any)('temple_categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order') as { data: any[] | null; error: unknown };
 
-  if (categoriesError) {
-    console.error('Error fetching temple categories:', categoriesError);
-    return [];
-  }
+    if (categoriesError) {
+      console.error('Error fetching temple categories:', categoriesError);
+      return [];
+    }
 
-  if (!categories || categories.length === 0) {
-    return [];
-  }
+    if (!categories || categories.length === 0) {
+      return [];
+    }
 
-  // Get all temples for each category
-  const categoriesWithTemples = await Promise.all(
-    categories.map(async (category: { id: string }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: temples } = await (supabase.from as any)('temples')
-        .select('*')
-        .eq('category_id', category.id)
-        .eq('is_active', true)
-        .order('display_order')
-        .order('popularity', { ascending: false });
+    // Every temple in any of these categories, in one query.
+    const { data: temples, error: templesError } = await (supabase.from as any)('temples')
+      .select('*')
+      .in('category_id', categories.map((c: any) => c.id))
+      .eq('is_active', true)
+      .order('display_order')
+      .order('popularity', { ascending: false }) as { data: any[] | null; error: unknown };
 
-      return {
+    if (templesError) {
+      console.error('Error fetching temples for categories:', templesError);
+      return [];
+    }
+
+    // The .order() above already sorted the whole set and grouping preserves
+    // insertion order, so each category's slice keeps display_order then
+    // popularity order — same ordering the per-category queries produced.
+    const byCategory = new Map<string, any[]>();
+    for (const temple of temples || []) {
+      const bucket = byCategory.get(temple.category_id);
+      if (bucket) bucket.push(temple);
+      else byCategory.set(temple.category_id, [temple]);
+    }
+
+    return categories
+      .map((category: any) => ({
         ...category,
-        temples: temples || []
-      };
-    })
-  );
-
-  // Filter out categories with no temples
-  return categoriesWithTemples.filter(cat => cat.temples.length > 0);
-}
+        temples: byCategory.get(category.id) || [],
+      }))
+      .filter((cat: any) => cat.temples.length > 0);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  },
+  ['temple-categories-with-temples'],
+  { tags: [CACHE_TAGS.temples], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get a single temple by slug
  */
-export async function getTempleBySlug(slug: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: temple, error } = await (supabase.from as any)('temples')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .single();
+export const getTempleBySlug = unstable_cache(
+  async (slug: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: temple, error } = await (supabase.from as any)('temples')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
 
-  if (error) {
-    console.error('Error fetching temple:', error);
-    return null;
-  }
+    if (error) {
+      console.error('Error fetching temple:', error);
+      return null;
+    }
 
-  return temple;
-}
+    return temple;
+  },
+  ['temple-by-slug'],
+  { tags: [CACHE_TAGS.temples], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get temple pricing (taxi services from Nainital)
  */
-export async function getTemplePricing(templeId: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('temple_pricing')
-    .select('*')
-    .eq('temple_id', templeId)
-    .order('vehicle_type')
-    .order('season_name');
+export const getTemplePricing = unstable_cache(
+  async (templeId: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('temple_pricing')
+      .select('*')
+      .eq('temple_id', templeId)
+      .order('vehicle_type')
+      .order('season_name');
 
-  if (error) {
-    console.error('Error fetching temple pricing:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching temple pricing:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['temple-pricing'],
+  { tags: [CACHE_TAGS.temples, CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get temple FAQs
@@ -1253,53 +1521,59 @@ export async function getTempleFaqs(templeId: string) {
 /**
  * Get featured temples
  */
-export async function getFeaturedTemples(limit: number = 6) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('temples')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_featured', true)
-    .order('popularity', { ascending: false })
-    .limit(limit);
+export const getFeaturedTemples = unstable_cache(
+  async (limit: number = 6) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('temples')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_featured', true)
+      .order('popularity', { ascending: false })
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching featured temples:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching featured temples:', error);
+      return [];
+    }
 
-  return data || [];
-}
+    return data || [];
+  },
+  ['featured-temples'],
+  { tags: [CACHE_TAGS.temples], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Get temples page configuration
  */
-export async function getTemplesPageConfig() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from as any)('temples_page_config')
-    .select('*')
-    .eq('is_active', true)
-    .single();
+export const getTemplesPageConfig = unstable_cache(
+  async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('temples_page_config')
+      .select('*')
+      .eq('is_active', true)
+      .single();
 
-  if (error) {
-    console.error('Error fetching temples page config:', error);
-    return null;
-  }
+    if (error) {
+      console.error('Error fetching temples page config:', error);
+      return null;
+    }
 
-  return data;
-}
+    return data;
+  },
+  ['temples-page-config'],
+  { tags: [CACHE_TAGS.temples], revalidate: CONTENT_CACHE_TTL }
+);
 
 /**
  * Active pickup locations for the Transfers booking widget, server-fetched
  * so the correct list (including anything the admin just added) is present
  * in the very first HTML response — no client-side fetch-then-flicker.
  *
- * Unlike the React cache()-wrapped helpers above (which only dedupe calls
- * within a single request), this is wrapped in unstable_cache so the result
- * is cached *across* requests/visitors, with a 'pickup-locations' tag the
- * admin API calls revalidateTag() on after every add/edit/delete for
- * near-instant invalidation. The 5-minute revalidate is a fallback for
- * edits made directly in the Supabase table editor, which never go through
- * that API and so never fire the tag.
+ * This was the first query in the file to use unstable_cache, back when the
+ * rest relied on React cache() (per-request dedupe only). Every content read
+ * above now follows the same pattern — see the caching policy at the top of
+ * this file. The tag string and TTL are pulled from the shared registry so
+ * this and its admin invalidation can't drift apart.
  */
 export const getPickupLocations = unstable_cache(
   async (): Promise<PickupLocationRow[]> => {
@@ -1316,5 +1590,5 @@ export const getPickupLocations = unstable_cache(
     return data || [];
   },
   ['pickup-locations'],
-  { tags: ['pickup-locations'], revalidate: 300 }
+  { tags: [CACHE_TAGS.pickupLocations], revalidate: CONTENT_CACHE_TTL }
 );

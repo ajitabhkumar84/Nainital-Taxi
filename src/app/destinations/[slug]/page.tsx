@@ -1,8 +1,8 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@supabase/supabase-js";
-import { Header, Button, Card, CardContent, TourTrustSection } from "@/components/ui";
+import { Button, Card, CardContent, TourTrustSection } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import FAQAccordion, { FAQAccordionItem } from "@/components/ui/FAQAccordion";
 import { MapPin, Clock, Car, CheckCircle2, Phone, MessageCircle, Calendar } from "lucide-react";
@@ -21,6 +21,7 @@ import {
   getAllPricingForPackage,
   getSeasonDateRanges,
   getTourTrustSection,
+  getVehicleCategoryImages,
   Package,
 } from "@/lib/supabase";
 import { Destination, TransferContent } from "@/lib/supabase/types";
@@ -72,30 +73,6 @@ function buildDefaultDestinationFaqs(
   return faqs;
 }
 
-// Create Supabase client for server-side
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
-async function getVehicleCategoryImages(): Promise<Record<string, string> | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("admin_settings")
-    .select("value")
-    .eq("key", "vehicle_category_images")
-    .single();
-
-  if (error || !data?.value) return null;
-  try {
-    return typeof data.value === "string" ? JSON.parse(data.value) : data.value;
-  } catch {
-    return null;
-  }
-}
-
 interface DestinationPageProps {
   params: {
     slug: string;
@@ -127,12 +104,21 @@ export async function generateMetadata({ params }: DestinationPageProps): Promis
       description: destination.meta_description || destination.description || `Book taxi from Nainital to ${destination.name}.`,
       url: path,
       type: "website",
-      images: [
-        {
-          url: destination.hero_image_url || FALLBACK_HERO,
-          alt: `Taxi service from Nainital to ${destination.name}`,
-        },
-      ],
+      // FALLBACK_HERO was used here before: a 4:3-ish seasonal photo sized for
+      // a full-bleed hero, which crops badly at 1.91:1 and is well over the
+      // size WhatsApp will render a preview for. When the destination has no
+      // uploaded image, `images` is omitted so the purpose-built 1200x630 card
+      // from src/app/opengraph-image.tsx applies instead.
+      ...(destination.hero_image_url
+        ? {
+            images: [
+              {
+                url: destination.hero_image_url,
+                alt: `Taxi service from Nainital to ${destination.name}`,
+              },
+            ],
+          }
+        : {}),
     },
   };
 }
@@ -223,7 +209,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <FloatingWhatsApp destinationName={destination.name} />
 
       <main className="min-h-screen bg-white">

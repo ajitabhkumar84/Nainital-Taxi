@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
+
+/**
+ * Season date ranges are printed next to every pricing table
+ * (getSeasonDateRanges), which is a cached read, so a season edit has to bust
+ * the tag or the published dates keep showing the old range.
+ *
+ * Note this does NOT need to touch booking-time pricing: getSeasonForDate(),
+ * which decides what a customer is actually charged, is deliberately uncached.
+ */
+function revalidateSeasons() {
+  revalidatePath('/rates');
+  revalidatePath('/tour', 'layout');
+  revalidatePath('/destinations', 'layout');
+  revalidateContent(CACHE_TAGS.seasons);
+}
 
 // POST: Create new season
 export async function POST(request: NextRequest) {
@@ -33,6 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateSeasons();
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error in seasons POST:', error);
@@ -66,6 +85,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateSeasons();
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error in seasons PATCH:', error);
@@ -94,6 +114,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidateSeasons();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in seasons DELETE:', error);

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { IndianRupee, Users, Car } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -131,7 +132,14 @@ export default function PricingGridForDestination({
                     {/* Vehicle Image or Icon */}
                     {categoryImage ? (
                       <div className="w-16 h-12 rounded-lg overflow-hidden border-2 border-ink/20 flex-shrink-0 bg-white">
-                        <img src={categoryImage} alt={vehicle.name} className="w-full h-full object-cover" />
+                        <Image
+                            src={categoryImage}
+                            alt={vehicle.name}
+                            width={128}
+                            height={96}
+                            sizes="64px"
+                            className="w-full h-full object-cover"
+                          />
                       </div>
                     ) : (
                       <div className="w-16 h-12 rounded-lg bg-white/60 border-2 border-ink/10 flex items-center justify-center flex-shrink-0">
@@ -218,7 +226,14 @@ export default function PricingGridForDestination({
                     <div className="p-3 flex items-center justify-center">
                       {categoryImage ? (
                         <div className="w-16 h-12 rounded-lg overflow-hidden border-2 border-ink/15 bg-lake/30">
-                          <img src={categoryImage} alt={vehicle.name} className="w-full h-full object-cover" />
+                          <Image
+                            src={categoryImage}
+                            alt={vehicle.name}
+                            width={128}
+                            height={96}
+                            sizes="64px"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       ) : (
                         <div className="w-16 h-12 rounded-lg bg-lake/20 border-2 border-ink/10 flex items-center justify-center">

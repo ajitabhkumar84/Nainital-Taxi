@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { Vehicle } from '@/lib/supabase/types';
+import { revalidatePath } from 'next/cache';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
+
+/**
+ * The fleet page and the vehicle cards on tour/destination pricing grids read
+ * vehicles through unstable_cache (getVehicles, getFeaturedVehicles), so a
+ * write here must bust the tag or the fleet keeps showing a retired vehicle.
+ */
+function revalidateVehicles() {
+  revalidatePath('/fleet');
+  revalidatePath('/');
+  revalidateContent(CACHE_TAGS.vehicles);
+}
 
 // GET - Fetch vehicles
 export async function GET(request: NextRequest) {
@@ -130,6 +144,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create vehicle' }, { status: 500 });
     }
 
+    revalidateVehicles();
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/admin/vehicles:', error);
@@ -162,6 +177,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update vehicle' }, { status: 500 });
     }
 
+    revalidateVehicles();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PATCH /api/admin/vehicles:', error);
@@ -209,6 +225,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    revalidateVehicles();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/admin/vehicles:', error);

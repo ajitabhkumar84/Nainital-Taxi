@@ -1,7 +1,8 @@
 import React from "react";
 import { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { Header, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import {
   Building2, Users, Shield, FileCheck, MessageCircle, Phone,
@@ -11,6 +12,7 @@ import {
 import Link from "next/link";
 import { B2BPageConfig, DEFAULT_B2B_CONFIG } from "@/lib/supabase/types";
 import { SITE_URL } from "@/lib/siteUrl";
+import Image from "next/image";
 
 function getSupabaseClient() {
   return createClient(
@@ -57,7 +59,7 @@ export default async function B2BPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <main className="min-h-screen bg-white">
         {/* Hero Section */}
         <section className="relative bg-gradient-to-br from-ink via-teal to-lake text-white pt-32 pb-20">
@@ -181,9 +183,12 @@ export default async function B2BPage() {
                     className="bg-gradient-to-br from-white to-lake/10 rounded-2xl border-3 border-ink shadow-retro-lg overflow-hidden"
                   >
                     {vehicle.image_url && (
-                      <img
+                      <Image
                         src={vehicle.image_url}
                         alt={vehicle.vehicle_name}
+                        width={640}
+                        height={192}
+                        sizes="(max-width: 768px) 100vw, 33vw"
                         className="w-full h-48 object-cover"
                       />
                     )}

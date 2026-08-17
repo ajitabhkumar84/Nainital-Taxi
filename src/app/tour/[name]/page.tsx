@@ -2,6 +2,7 @@ import React from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
+import Image from "next/image";
 import { Metadata } from "next";
 import {
   Clock,
@@ -14,13 +15,16 @@ import {
   ArrowRight,
   Star,
 } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import { SITE_URL } from "@/lib/siteUrl";
+import { CACHE_TAGS, CONTENT_CACHE_TTL } from "@/lib/cacheTags";
 import { Package, Pricing, TourItinerary, GalleryImage, hasHotelOption } from "@/lib/supabase/types";
-import { getTourTrustSection } from "@/lib/supabase";
+import { supabase, getTourTrustSection, getVehicleCategoryImages } from "@/lib/supabase";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
-import { Header, TourTrustSection } from "@/components/ui";
+import { TourTrustSection } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { generateTouristTripSchema } from "@/lib/structuredData";
@@ -34,56 +38,55 @@ import DetailedAttractions from "@/components/packages/DetailedAttractions";
 import DetailedInclusionsExclusions from "@/components/packages/DetailedInclusionsExclusions";
 import BookingInstructions from "@/components/packages/BookingInstructions";
 
-// Create Supabase client for server-side
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+/**
+ * These three reads previously each built their own throwaway Supabase client
+ * and ran uncached, so one tour page cost five live queries: getTourPackage and
+ * getPackagePricing are both called twice (generateMetadata, then the page
+ * component), plus the settings lookup.
+ *
+ * Now they share the app-wide singleton and are cached the same way as the
+ * queries in src/lib/supabase/queries_enhanced.ts — see the caching policy at
+ * the top of that file. React cache() collapses the metadata/page pair within a
+ * render; unstable_cache holds the result across visitors until an admin edits
+ * packages or pricing.
+ */
+const getTourPackage = cache(
+  unstable_cache(
+    async (slug: string): Promise<Package | null> => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select("*")
+        .eq("slug", slug)
+        .eq("type", "tour")
+        .eq("is_active", true)
+        .single();
 
-async function getTourPackage(slug: string): Promise<Package | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("packages")
-    .select("*")
-    .eq("slug", slug)
-    .eq("type", "tour")
-    .eq("is_active", true)
-    .single();
+      if (error) return null;
+      return data as Package;
+    },
+    ["tour-package-by-slug"],
+    { tags: [CACHE_TAGS.packages], revalidate: CONTENT_CACHE_TTL }
+  )
+);
 
-  if (error) return null;
-  return data as Package;
-}
+const getPackagePricing = cache(
+  unstable_cache(
+    async (packageId: string): Promise<Pricing[]> => {
+      const { data, error } = await supabase
+        .from("pricing")
+        .select("*")
+        .eq("package_id", packageId)
+        .eq("is_active", true)
+        .order("vehicle_type");
 
-async function getPackagePricing(packageId: string): Promise<Pricing[]> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("pricing")
-    .select("*")
-    .eq("package_id", packageId)
-    .eq("is_active", true)
-    .order("vehicle_type");
+      if (error) return [];
+      return data as Pricing[];
+    },
+    ["tour-package-pricing"],
+    { tags: [CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+  )
+);
 
-  if (error) return [];
-  return data as Pricing[];
-}
-
-async function getVehicleCategoryImages(): Promise<Record<string, string> | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("admin_settings")
-    .select("value")
-    .eq("key", "vehicle_category_images")
-    .single();
-
-  if (error || !data?.value) return null;
-  try {
-    return typeof data.value === "string" ? JSON.parse(data.value) : data.value;
-  } catch {
-    return null;
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -114,7 +117,14 @@ export async function generateMetadata({
       description: pkg.description || `Book ${pkg.title} tour package`,
       url: url,
       type: 'website',
-      images: pkg.image_url ? [{ url: pkg.image_url, alt: pkg.title }] : [],
+      // When the package has no photo, `images` is left undefined rather than
+      // set to [] — an empty array suppresses the image entirely, whereas
+      // omitting it lets the site-wide card from src/app/opengraph-image.tsx
+      // through. That is the difference between a package sharing as a proper
+      // WhatsApp preview and sharing as a bare link.
+      ...(pkg.image_url
+        ? { images: [{ url: pkg.image_url, alt: pkg.title }] }
+        : {}),
     },
   };
 }
@@ -166,7 +176,7 @@ export default async function TourPackagePage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(touristTripSchema) }}
       />
-      <Header />
+      <HeaderServer />
       <FloatingWhatsApp packageName={pkg.title} />
 
       <main className="min-h-screen bg-white">
@@ -175,10 +185,19 @@ export default async function TourPackagePage({
           {/* Background Image */}
           <div className="absolute inset-0">
             {pkg.image_url ? (
-              <img
+              // The LCP element for this page. As a raw <img> it was fetched
+              // full-size straight from Supabase Storage (billed against the
+              // 5GB/month egress limit) and, with no priority hint, discovered
+              // late by the browser. next/image with `priority` emits a
+              // preload with fetchPriority=high and serves a right-sized WebP
+              // from Vercel's cache instead.
+              <Image
                 src={pkg.image_url}
                 alt={pkg.title}
-                className="w-full h-full object-cover"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-teal to-lake" />

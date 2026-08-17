@@ -39,7 +39,10 @@ async function fetchHeaderConfig(): Promise<HeaderConfigWithTimestamp> {
 // src/app/layout.tsx wraps every page, so an uncached call here would hit
 // Supabase on every single page view. 300s is just a safety-net TTL — the
 // admin save path busts this via revalidateTag well before that.
-const getCachedHeaderConfig = unstable_cache(
+// Exported for src/components/ui/HeaderServer.tsx, which renders the header
+// from this cached row instead of letting the client-side useSiteConfig() hook
+// fetch it after hydration.
+export const getCachedHeaderConfig = unstable_cache(
   fetchHeaderConfig,
   ['site-header-config'],
   { tags: [HEADER_CONFIG_CACHE_TAG], revalidate: 300 }

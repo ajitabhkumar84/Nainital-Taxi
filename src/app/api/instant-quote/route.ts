@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { checkQuoteRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,22 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // Unauthenticated POST that runs three pricing queries per call, so it is
+    // a free way for a script to generate Supabase load. Bounded per IP; see
+    // the POST-only rule in src/lib/rateLimit.ts.
+    const rate = await checkQuoteRateLimit(getClientIp(request));
+    if (!rate.success) {
+      return NextResponse.json(
+        { error: 'Too many quote requests. Please wait a moment and try again.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000))),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const { routeId, vehicleType, date } = body;
 

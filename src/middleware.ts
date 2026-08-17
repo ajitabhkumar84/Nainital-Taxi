@@ -15,8 +15,12 @@ export const config = {
  * Two responsibilities live here:
  *  1. Per-request CSP nonce injection (site-wide).
  *  2. The auth gate for the admin UI, every /api/admin/* route, and the
- *     admin-only /api/availability route — unchanged from Milestone 1,
- *     just re-scoped now that the matcher above covers the whole site.
+ *     admin-only /api/availability and /api/calendar-sync routes.
+ *
+ * Note this deliberately does NOT do rate limiting. The limiters in
+ * src/lib/rateLimit.ts are Redis-backed and billed per command, and this
+ * function runs on every document request — see the rule at the top of that
+ * file. Rate limiting belongs in the individual POST handlers.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -39,6 +43,12 @@ export async function middleware(request: NextRequest) {
   const isAdminAuthRoute = pathname.startsWith('/api/admin/auth');
   const isAdminApi = pathname.startsWith('/api/admin');
   const isAvailabilityApi = pathname.startsWith('/api/availability');
+  // /api/calendar-sync writes to the availability table using the SERVICE ROLE
+  // key (src/app/api/calendar-sync/route.ts) and had no auth check of its own,
+  // so anyone who knew the path could trigger a sync and overwrite the
+  // availability calendar. It gates the same way /api/availability does rather
+  // than growing its own check, so there is one place to audit.
+  const isCalendarSyncApi = pathname.startsWith('/api/calendar-sync');
   const isAdminSurface = pathname.startsWith('/admin');
   // Header/footer/contact config is public, non-sensitive data the homepage
   // itself needs (logo, nav links, phone number) — only the GET is public;
@@ -48,7 +58,7 @@ export async function middleware(request: NextRequest) {
 
   // Public site route (the vast majority of the newly-widened matcher) —
   // no auth gate, just the CSP/nonce headers.
-  if (!isAdminApi && !isAvailabilityApi && !isAdminSurface) {
+  if (!isAdminApi && !isAvailabilityApi && !isCalendarSyncApi && !isAdminSurface) {
     return withCsp(next());
   }
 
@@ -59,7 +69,7 @@ export async function middleware(request: NextRequest) {
 
   const authenticated = await verifyAdminSessionFromRequest(request);
 
-  if (isAdminApi || isAvailabilityApi) {
+  if (isAdminApi || isAvailabilityApi || isCalendarSyncApi) {
     if (!authenticated) {
       return withCsp(
         NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 })

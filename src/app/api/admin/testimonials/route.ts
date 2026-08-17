@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 
 // GET: Fetch all testimonials (reviews) or a single one by ID
 export async function GET(request: NextRequest) {
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     revalidatePath('/');
+    revalidateContent(CACHE_TAGS.reviews);
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error in testimonials POST:', error);
@@ -127,6 +130,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     revalidatePath('/');
+    revalidateContent(CACHE_TAGS.reviews);
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error in testimonials PATCH:', error);
@@ -158,6 +162,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     revalidatePath('/');
+    revalidateContent(CACHE_TAGS.reviews);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in testimonials DELETE:', error);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Image from 'next/image';
 import BookingWidget from '@/components/BookingWidget';
 import type { PickupLocationRow } from '@/lib/supabase/types';
 
@@ -79,10 +80,51 @@ export default function SeasonalHero({
 
   return (
     <section id="booking" className="relative overflow-hidden">
-      {/* Background photo */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('${backgroundImage}')` }}
+      {/*
+        Background photo.
+
+        This is the LCP element for the homepage, and it used to be a CSS
+        `background-image` on a plain div. The browser's preload scanner cannot
+        see a URL that only exists inside a stylesheet, so the largest image on
+        the page didn't start downloading until the CSS had been parsed and this
+        element laid out — a guaranteed late LCP on a mobile connection, and one
+        that no amount of recompressing the file can fix.
+
+        As a next/image with `priority`, it renders a real <img> with fetchpriority
+        high and a matching <link rel="preload"> in the document head, so it starts
+        downloading in the first round trip. `fill` + the parent's `relative`
+        reproduces the old bg-cover behaviour exactly; object-cover/object-center
+        replaces bg-center.
+
+        Deliberately NOT `unoptimized`, despite these being local /public files.
+        The source images are currently 355-467KB JPEGs at full desktop width.
+        Serving them unoptimized would push the largest of those to every 360px
+        phone — and 80% of this site's traffic is mobile — whereas the optimizer
+        emits a ~35-60KB WebP at the right width.
+
+        The transformation cost that buys is negligible and, crucially, bounded:
+        there are exactly four source images here (one per season) and the
+        deviceSizes list in next.config.mjs caps the variants, so this is on the
+        order of ~16 transformations per 30-day cache window against a 1,000/month
+        allowance. That is the opposite situation from Supabase Storage images,
+        which are unbounded and growing — those stay optimized too, but there the
+        reason is that Vercel's cache keeps their bytes off the 5GB Supabase
+        egress quota.
+
+        If these four files are ever re-encoded to ~120KB WebP, revisit: at that
+        point `unoptimized` becomes defensible, though a responsive srcset would
+        still win on mobile.
+
+        alt="" because the photo is decorative: the headline immediately below
+        carries the same meaning, so announcing it would just be noise.
+      */}
+      <Image
+        src={backgroundImage}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
       />
       {/* Scrim: darker on the left where the headline sits, lighter toward the widget */}
       <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/55 to-ink/25" />

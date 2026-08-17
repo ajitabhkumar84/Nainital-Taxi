@@ -1,16 +1,23 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Badge } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { Church, MapPin, Star, ArrowRight, Navigation, Sparkles } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { getTempleCategoriesWithTemples, getTemplesPageConfig } from "@/lib/supabase/queries_enhanced";
 import { DEFAULT_TEMPLES_PAGE_CONFIG } from "@/lib/supabase/types";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Sacred Temples of Kumaon | Nainital Taxi Services",
   description: "Explore 30+ sacred temples across Kumaon region including Nainital, Almora, Champawat. Book comfortable taxi services for your spiritual journey.",
   keywords: "Kumaon temples, Nainital temples, spiritual tourism, temple taxi service, Uttarakhand pilgrimage",
+  // Self-canonical. These listing pages are reachable with tracking query
+  // strings from our own ads (?utm_source=...), and without this Google treats
+  // each variant as a separate near-duplicate URL and splits the ranking
+  // signal. Relative — resolved against metadataBase in src/app/layout.tsx.
+  alternates: { canonical: "/temples" },
 };
 
 // Icon mapping for categories
@@ -38,7 +45,7 @@ export default async function TemplesPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <FloatingWhatsApp />
 
       {/* Hero Section */}
@@ -263,10 +270,12 @@ export default async function TemplesPage() {
                         {/* Image */}
                         <div className="h-56 relative overflow-hidden">
                           {temple.featured_image_url ? (
-                            <img
+                            <Image
                               src={temple.featured_image_url}
                               alt={temple.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              fill
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-sunshine/30 to-coral/10 flex items-center justify-center">

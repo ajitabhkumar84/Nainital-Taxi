@@ -123,4 +123,5 @@ export {
   // Admin settings
   getAdminSetting,
   getAllAdminSettings,
+  getVehicleCategoryImages,
 } from './queries_enhanced';

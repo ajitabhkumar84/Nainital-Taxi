@@ -7,7 +7,7 @@ import {
 } from "@/lib/multiDayRental";
 import { getSiteWhatsappNumber } from "@/lib/siteContact";
 import MultiDayRentalPageContent from "@/components/multi-day-rental/MultiDayRentalPageContent";
-import Header from "@/components/ui/Header";
+import HeaderServer from "@/components/ui/HeaderServer";
 // Direct path, not the ui barrel — see the note in FooterServer.tsx.
 import FooterServer from "@/components/ui/FooterServer";
 
@@ -33,7 +33,7 @@ export default async function MultiDayRentalLegacyPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <MultiDayRentalPageContent
         pageData={pageData}
         whatsappNumber={whatsappNumber}

@@ -2,16 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import { Destination } from '@/lib/supabase/types';
 
 /**
  * Destination content is rendered by the /destinations listing and every
  * /destinations/[slug] detail page; the homepage also shows popular
  * destinations. 'layout' scope covers the listing and all slugs in one call.
+ *
+ * The revalidateContent call is not optional alongside those: the pages read
+ * destinations through unstable_cache (getDestinations, getDestinationBySlug),
+ * so revalidatePath alone would re-render them against the same stale cache
+ * entry and the admin would see no change. See src/lib/revalidateContent.ts.
  */
 function revalidateDestinations() {
   revalidatePath('/destinations', 'layout');
   revalidatePath('/');
+  revalidateContent(CACHE_TAGS.destinations);
 }
 
 function generateSlug(name: string): string {

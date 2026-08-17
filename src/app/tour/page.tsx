@@ -1,16 +1,23 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { Clock, MapPin, Star, ArrowRight, Users, IndianRupee } from "lucide-react";
 import { getPackages, getAllPricingForPackage } from "@/lib/supabase/queries_enhanced";
 import { TourItinerary, hasHotelOption } from "@/lib/supabase/types";
 import PackageTypeBadge from "@/components/packages/PackageTypeBadge";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Tour Packages | Nainital Taxi - Taxi-Only & Taxi+Hotel Tours",
   description: "Explore our curated tour packages across Nainital and the Kumaon hills. Choose taxi-only service or taxi + hotel packages with accommodation included. Multi-day tours to Nainital, Ranikhet, Mukteshwar, Jim Corbett and more.",
   keywords: "Nainital tour packages, taxi tour package, hotel taxi package, Uttarakhand tours, Nainital holiday packages, hill station tours",
+  // Self-canonical. These listing pages are reachable with tracking query
+  // strings from our own ads (?utm_source=...), and without this Google treats
+  // each variant as a separate near-duplicate URL and splits the ranking
+  // signal. Relative — resolved against metadataBase in src/app/layout.tsx.
+  alternates: { canonical: "/tour" },
 };
 
 const CARD_GRADIENTS = [
@@ -48,7 +55,7 @@ export default async function TourPackagesPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
 
       {/* Hero Section — Colorful Gradient with Floating Shapes */}
       <section className="relative pt-20 pb-10 md:pt-32 md:pb-20 px-4 bg-gradient-to-br from-teal via-teal-400 to-coral overflow-hidden">
@@ -94,16 +101,19 @@ export default async function TourPackagesPage() {
                     <Link
                       key={pkg.id}
                       href={`/tour/${pkg.slug}`}
+                      prefetch={false}
                       className="block"
                     >
                       <div className={`bg-gradient-to-br ${CARD_GRADIENTS[idx % CARD_GRADIENTS.length]} rounded-2xl border-3 border-ink border-l-[6px] ${CARD_BORDERS[idx % CARD_BORDERS.length]} shadow-retro-sm overflow-hidden flex flex-col group`}>
                         {/* Image */}
                         <div className="h-56 relative overflow-hidden">
                           {pkg.image_url ? (
-                            <img
+                            <Image
                               src={pkg.image_url}
                               alt={pkg.title}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              fill
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-teal/30 to-coral/20 flex items-center justify-center">
@@ -180,15 +190,17 @@ export default async function TourPackagesPage() {
               {/* Desktop: 3-column grid */}
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {packagesWithPricing.map((pkg, idx) => (
-                  <Link key={pkg.id} href={`/tour/${pkg.slug}`}>
+                  <Link key={pkg.id} href={`/tour/${pkg.slug}`} prefetch={false}>
                     <div className={`bg-gradient-to-br ${CARD_GRADIENTS[idx % CARD_GRADIENTS.length]} rounded-2xl border-3 border-ink border-l-[6px] ${CARD_BORDERS[idx % CARD_BORDERS.length]} shadow-retro-sm overflow-hidden h-full flex flex-col group cursor-pointer hover:shadow-retro-lg hover:-translate-y-1 transition-all duration-300`}>
                       {/* Image */}
                       <div className="h-56 relative overflow-hidden">
                         {pkg.image_url ? (
-                          <img
+                          <Image
                             src={pkg.image_url}
                             alt={pkg.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            fill
+                            sizes="(max-width: 768px) 100vw, 33vw"
+                            className="object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-teal/30 to-coral/20 flex items-center justify-center">

@@ -1,4 +1,4 @@
-import { Header } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 // Direct path, not the ui barrel — see the note in FooterServer.tsx (async
 // server component; pulling it through the client-facing barrel would break
 // the build).
@@ -19,7 +19,7 @@ interface LegalPageLayoutProps {
 export default function LegalPageLayout({ title, lastUpdated, children }: LegalPageLayoutProps) {
   return (
     <>
-      <Header />
+      <HeaderServer />
 
       <div className="bg-lake border-b border-slate-200">
         <div className="container mx-auto max-w-[1200px] px-4 py-16 md:py-20">

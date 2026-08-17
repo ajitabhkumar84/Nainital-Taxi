@@ -1,12 +1,17 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import FleetContent from './FleetContent';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Our Fleet - Nainital Fun Taxi | Premium Vehicles for Your Journey',
   description: 'Choose from our handpicked fleet of well-maintained sedans, SUVs, and luxury vehicles. All cars come with AC, music system, and experienced drivers for your Nainital adventure.',
+  // Self-canonical — see the note in src/app/tour/page.tsx. /fleet is linked
+  // from every vehicle picker with campaign parameters attached.
+  alternates: { canonical: '/fleet' },
   openGraph: {
     title: 'Our Fleet - Nainital Fun Taxi',
     description: 'Premium vehicles for your hill station journey',
+    url: '/fleet',
     type: 'website',
   },
 };

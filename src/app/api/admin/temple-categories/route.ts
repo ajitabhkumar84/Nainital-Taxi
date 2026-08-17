@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
+import { revalidateContent } from "@/lib/revalidateContent";
+import { CACHE_TAGS } from "@/lib/cacheTags";
+
+// Categories are nested into the cached getTempleCategoriesWithTemples()
+// result, so they share the temples tag — a rename here goes stale on
+// /temples exactly the way a temple edit does.
+function revalidateTempleCategories() {
+  revalidatePath("/temples", "layout");
+  revalidateContent(CACHE_TAGS.temples);
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,6 +111,7 @@ export async function POST(request: NextRequest) {
 
     if (categoryError) throw categoryError;
 
+    revalidateTempleCategories();
     return NextResponse.json({
       success: true,
       data: category,
@@ -143,6 +155,7 @@ export async function PATCH(request: NextRequest) {
 
     if (categoryError) throw categoryError;
 
+    revalidateTempleCategories();
     return NextResponse.json({
       success: true,
       data: category,
@@ -200,6 +213,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error;
 
+    revalidateTempleCategories();
     return NextResponse.json({
       success: true,
       message: "Temple category deleted successfully",

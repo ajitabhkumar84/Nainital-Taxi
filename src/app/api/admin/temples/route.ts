@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
+import { revalidateContent } from "@/lib/revalidateContent";
+import { CACHE_TAGS } from "@/lib/cacheTags";
+
+/**
+ * Temple content is read through unstable_cache (getTemples,
+ * getTempleBySlug, getTempleCategoriesWithTemples, getFeaturedTemples), so a
+ * write here has to bust the tag as well as the rendered pages — otherwise the
+ * admin saves, the page re-renders, and it reads the same stale cache entry.
+ */
+function revalidateTemples() {
+  revalidatePath("/temples", "layout");
+  revalidatePath("/");
+  revalidateContent(CACHE_TAGS.temples);
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -230,6 +245,7 @@ export async function POST(request: NextRequest) {
       if (faqError) throw faqError;
     }
 
+    revalidateTemples();
     return NextResponse.json({
       success: true,
       data: temple,
@@ -320,6 +336,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    revalidateTemples();
     return NextResponse.json({
       success: true,
       data: temple,

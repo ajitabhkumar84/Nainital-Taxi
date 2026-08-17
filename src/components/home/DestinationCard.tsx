@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface DestinationCardProps {
   slug: string;
@@ -28,17 +29,40 @@ export default function DestinationCard({
     duration ? `${duration} from Nainital` : null,
   ].filter(Boolean);
 
+  // prefetch={false} below: this card renders once per destination, so a
+  // single grid is dozens of Links. Next prefetches every one that scrolls
+  // into view, and because every route in this app renders dynamically (the
+  // CSP nonce in the root layout opts the whole app out of static rendering),
+  // each prefetch is a real request that runs through middleware. Left on,
+  // scrolling this grid costs more Edge invocations than the rest of the
+  // session combined.
+  //
+  // Prefetch is kept ON for the header nav and the primary CTAs — few links,
+  // high intent, and there it buys genuinely faster navigation.
   return (
-    <Link href={`/destinations/${slug}`} className="group block">
+    <Link href={`/destinations/${slug}`} prefetch={false} className="group block">
       <div className="rounded-lg border border-slate-200 overflow-hidden bg-white shadow-sm transition-all group-hover:border-slate-300 group-hover:shadow-md">
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
           {hero_image_url && !imageFailed ? (
-            <img
+            // next/image rather than a raw <img>: these are Supabase Storage
+            // URLs, and a raw tag makes every visitor fetch the full-size
+            // original straight from Supabase — billed against the 5GB/month
+            // egress limit, which is the tightest quota this project has.
+            // Routing them through the optimizer means Vercel caches a resized
+            // WebP on its CDN and Supabase is hit roughly once per variant per
+            // cache window instead of once per pageview.
+            //
+            // `fill` reproduces the previous w-full/h-full behaviour inside the
+            // aspect-ratio box. `sizes` is what keeps the generated variants
+            // small — without it Next assumes 100vw and serves a desktop-width
+            // image to a phone showing a half-width card.
+            <Image
               src={hero_image_url}
               alt={name}
-              loading="lazy"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               onError={() => setImageFailed(true)}
-              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">

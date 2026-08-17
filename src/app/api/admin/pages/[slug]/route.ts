@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import { DEFAULT_PAGE_CONTENT, PageContent } from '@/lib/supabase/types';
 
 // Maps a page_slug to the public route to revalidate after a save.
@@ -85,6 +87,9 @@ export async function POST(
     if (publicPath) {
       revalidatePath(publicPath);
     }
+    // getPageContent() is cached across requests, so revalidating the path
+    // alone would re-render the page against the pre-save row.
+    revalidateContent(CACHE_TAGS.pageContent);
 
     return NextResponse.json(data);
   } catch (error) {

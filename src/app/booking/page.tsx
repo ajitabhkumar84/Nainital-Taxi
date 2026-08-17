@@ -1,6 +1,27 @@
+import type { Metadata } from 'next';
 import { getPickupLocations, getRoutesWithCategories } from '@/lib/supabase';
 import BookingPageClient from '@/components/booking/BookingPageClient';
 import type { TransferRoute } from '@/components/booking/TransferRouteSelector';
+
+/**
+ * /booking is listed in the sitemap at priority 0.9 — the second-highest URL on
+ * the site — but had no metadata at all, so Google indexed it under the root
+ * layout's generic default title with no canonical. For the page the whole
+ * funnel points at, that is the worst place to leave the defaults.
+ */
+export const metadata: Metadata = {
+  title: 'Book a Taxi in Nainital — Instant Fare & Confirmation',
+  description:
+    'Book your Nainital taxi online in under a minute. Airport and railway transfers from Kathgodam, Delhi and Pantnagar, plus sightseeing tours. See the fare before you confirm.',
+  alternates: { canonical: '/booking' },
+  openGraph: {
+    title: 'Book a Taxi in Nainital',
+    description:
+      'Book your Nainital taxi online in under a minute. Transparent fares, professional drivers, instant confirmation.',
+    url: '/booking',
+    type: 'website',
+  },
+};
 
 /**
  * Server shell for the booking flow.

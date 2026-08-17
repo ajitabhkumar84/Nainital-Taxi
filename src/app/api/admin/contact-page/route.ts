@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { CONTACT_PAGE_ID } from '@/lib/contactPage';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import {
   DEFAULT_CONTACT_PAGE_CONTENT,
   type ContactPageContent,
@@ -127,6 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     revalidatePath('/contact');
+    revalidateContent(CACHE_TAGS.contactPage);
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in POST /api/admin/contact-page:', error);

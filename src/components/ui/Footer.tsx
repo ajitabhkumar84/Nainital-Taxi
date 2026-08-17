@@ -89,6 +89,7 @@ export default function Footer({
                     <li key={link.id}>
                       <Link
                         href={link.href}
+                        prefetch={false}
                         className="font-body text-white/70 hover:text-teal transition-colors text-sm"
                         target={link.openInNewTab ? "_blank" : undefined}
                         rel={link.openInNewTab ? "noopener noreferrer" : undefined}

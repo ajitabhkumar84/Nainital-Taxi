@@ -1,4 +1,6 @@
 import { revalidatePath } from "next/cache";
+import { revalidateContent } from "@/lib/revalidateContent";
+import { CACHE_TAGS } from "@/lib/cacheTags";
 
 /**
  * Route changes affect the /rates browser and the homepage's "Fixed-fare
@@ -45,4 +47,15 @@ export function revalidateRoutePages() {
   } catch (error) {
     console.error("Revalidation failed (DB write succeeded):", error);
   }
+
+  // The paths above are now only half the job. getRoutesWithCategories(),
+  // getTransferRoutes() and getRoutesForDestinationSlug() are all cached
+  // across requests, so revalidating the routes without busting these tags
+  // would re-render every page listed above against the pre-edit route set —
+  // the exact "I saved it and nothing changed" symptom.
+  //
+  // routeCategories is included because getRoutesWithCategories() joins the
+  // two tables into one cache entry, so a category rename invalidates the same
+  // entry a route edit does.
+  revalidateContent(CACHE_TAGS.routes, CACHE_TAGS.routeCategories, CACHE_TAGS.pricing);
 }

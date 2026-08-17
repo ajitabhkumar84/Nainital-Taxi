@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import { PackageType } from '@/lib/supabase/types';
 
 /**
@@ -10,9 +12,16 @@ import { PackageType } from '@/lib/supabase/types';
  *
  * Price changes are already covered from the other direction — the pricing
  * route revalidates /destinations when the `pricing` table changes.
+ *
+ * The 'packages' tag additionally busts the cached reads behind the homepage
+ * grid, /tour, /tour/[name] and the sitemap — all of which now serve packages
+ * from unstable_cache rather than a live query.
  */
 function revalidatePackages() {
   revalidatePath('/destinations', 'layout');
+  revalidatePath('/tour', 'layout');
+  revalidatePath('/');
+  revalidateContent(CACHE_TAGS.packages);
 }
 
 function generateSlug(title: string): string {

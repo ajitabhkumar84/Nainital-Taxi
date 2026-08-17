@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import { Header, Button, Card, CardContent } from "@/components/ui";
+import { Button, Card, CardContent } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { MapPin, Clock, ArrowRight } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
@@ -10,6 +11,11 @@ export const metadata: Metadata = {
   title: "Destinations | Nainital Taxi - Explore Uttarakhand",
   description: "Discover beautiful destinations in Uttarakhand. Book taxi services to Kathgodam, Pantnagar, Bhimtal, Mukteshwar, Ranikhet, Jim Corbett and more.",
   keywords: "Nainital destinations, Uttarakhand taxi, Kathgodam taxi, Bhimtal tour, Mukteshwar trip, Ranikhet taxi",
+  // Self-canonical. These listing pages are reachable with tracking query
+  // strings from our own ads (?utm_source=...), and without this Google treats
+  // each variant as a separate near-duplicate URL and splits the ranking
+  // signal. Relative — resolved against metadataBase in src/app/layout.tsx.
+  alternates: { canonical: "/destinations" },
 };
 
 // Gradient colors for destination cards
@@ -24,7 +30,7 @@ export default async function DestinationsPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <FloatingWhatsApp />
 
       {/* Hero Section */}
@@ -53,7 +59,7 @@ export default async function DestinationsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {destinations.map((destination, index) => (
-                <Link key={destination.id} href={`/destinations/${destination.slug}`}>
+                <Link key={destination.id} href={`/destinations/${destination.slug}`} prefetch={false}>
                   <Card className="overflow-hidden group cursor-pointer hover:shadow-retro-lg transition-all h-full">
                     {/* Image/Emoji Area */}
                     <div

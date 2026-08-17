@@ -39,6 +39,61 @@ const nextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+
+    // ---------------------------------------------------------------------
+    // Image transformation budget
+    // ---------------------------------------------------------------------
+    // Vercel bills *transformations*: one per unique source image x width x
+    // format x quality, cached for 30 days. The defaults generate 8 deviceSizes
+    // + 8 imageSizes and negotiate both AVIF and WebP, so a single hero photo
+    // can cost well over a dozen transformations before anyone has seen it at
+    // more than one size.
+    //
+    // These four settings cut that by roughly 4x without any visible quality
+    // loss. They matter here because nearly every image on this site is an
+    // admin upload from Supabase Storage — an unbounded, growing set.
+    //
+    // Note this is the opposite of setting `unoptimized: true`, which is
+    // deliberately NOT used globally: Supabase-hosted images served unoptimized
+    // are fetched from Supabase by every visitor and count against the 5GB/month
+    // Supabase egress limit, which is by far the tighter of the two quotas.
+    // Letting Vercel optimize and cache them is what keeps those bytes off it.
+
+    // From the 8 defaults down to 4. 640 covers phones (~80% of this site's
+    // traffic), 828 large phones, 1200 tablets/laptops, 1920 desktop. Dropping
+    // 2048/3840 costs nothing visible — the source uploads are rarely that
+    // large to begin with.
+    deviceSizes: [640, 828, 1200, 1920],
+
+    // Only used by images with a `sizes` smaller than a viewport width —
+    // thumbnails and vehicle cards here. Two entries is enough for both.
+    imageSizes: [128, 256],
+
+    // WebP only. Serving AVIF as well doubles the transformation count per
+    // image for a marginal extra saving, and WebP is supported by every browser
+    // this audience uses.
+    formats: ['image/webp'],
+
+    // 31 days. Transformations are billed per cache window, so a longer TTL
+    // directly reduces recurring cost. Content changes go through an admin
+    // upload, which produces a new URL and therefore a new cache entry, so a
+    // long TTL cannot serve a stale image.
+    minimumCacheTTL: 2678400,
+  },
+
+  async redirects() {
+    return [
+      {
+        // /packages/[slug] previously redirected inside a page component,
+        // which meant a full server render on every hit and a 307 that passes
+        // no link equity. A 308 here is resolved before rendering and is
+        // permanent, so search engines transfer ranking to the canonical
+        // /tour/[slug] URL the sitemap already lists.
+        source: '/packages/:slug',
+        destination: '/tour/:slug',
+        permanent: true,
+      },
+    ];
   },
 
   async headers() {

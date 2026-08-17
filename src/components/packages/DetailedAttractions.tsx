@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { MapPin, Clock, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { DetailedAttraction } from "@/lib/supabase/types";
+import Image from "next/image";
 
 interface DetailedAttractionsProps {
   attractions: DetailedAttraction[];
@@ -62,10 +63,12 @@ export default function DetailedAttractions({
                   {/* Image + Number Badge */}
                   <div className={`relative ${isExpanded ? "h-48 md:h-auto md:w-64 flex-shrink-0" : "h-28 md:h-32"}`}>
                     {attraction.image_url ? (
-                      <img
+                      <Image
                         src={attraction.image_url}
                         alt={attraction.name}
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 25vw"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-teal/20 to-lake/30 flex items-center justify-center">

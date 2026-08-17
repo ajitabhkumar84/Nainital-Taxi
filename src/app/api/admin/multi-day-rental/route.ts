@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { MultiDayRentalPage, DEFAULT_MULTI_DAY_RENTAL_PAGE } from '@/lib/supabase/types';
 import { slugify, validatePageSlug } from '@/lib/slug';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 
 const FIXED_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -19,6 +21,7 @@ function revalidateMultiDayRentalPaths(oldSlug: string | null, newSlug: string |
   // The homepage's "Multi-Day Rentals" card now reads homepage_card_image_url
   // from this same row, so it needs to pick up edits too.
   revalidatePath('/');
+  revalidateContent(CACHE_TAGS.multiDayRental);
 }
 
 // GET - Fetch multi-day rental page configuration

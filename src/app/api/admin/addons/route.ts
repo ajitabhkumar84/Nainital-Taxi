@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
+
+// Addons are read by the public GET /api/addons during the booking flow.
+// That route is uncached today, but the tag is fired here so it stays correct
+// if the addon list is ever moved behind unstable_cache like the rest of the
+// content reads.
+function revalidateAddons() {
+  revalidateContent(CACHE_TAGS.addons);
+}
 
 function generateSlug(name: string): string {
   return name
@@ -202,6 +212,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    revalidateAddons();
     return NextResponse.json({ data: addon });
   } catch (error) {
     console.error('Error in addons POST:', error);
@@ -308,6 +319,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    revalidateAddons();
     return NextResponse.json({ data: addon });
   } catch (error) {
     console.error('Error in addons PATCH:', error);
@@ -352,6 +364,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    revalidateAddons();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in addons DELETE:', error);

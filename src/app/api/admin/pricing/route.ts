@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import { VehicleType, VEHICLE_TYPES, SEASON_NAMES, SeasonName } from '@/lib/supabase/types';
 
 // GET: Fetch everything the admin pricing page needs in one call — package
@@ -187,6 +189,15 @@ export async function POST(request: NextRequest) {
         revalidatePath('/rates');
         revalidatePath('/');
         revalidatePath('/destinations', 'layout');
+      }
+      // Both branches read through the same cached pricing helpers
+      // (getMinPricePerPackage, getAllPricingForPackage, getTransferRoutes,
+      // getRoutesWithCategories), so the tag is fired for either kind of
+      // update. Without it the paths above would re-render against the
+      // pre-edit prices — the most damaging thing on this site to get wrong,
+      // since a stale fare is one a customer will hold us to.
+      if (packageUpdates.length > 0 || routeUpdates.length > 0) {
+        revalidateContent(CACHE_TAGS.pricing);
       }
     } catch (revalidateError) {
       console.error('Error revalidating paths after pricing update:', revalidateError);

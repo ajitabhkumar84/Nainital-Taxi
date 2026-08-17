@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { ONE_WAY_TAXI_SETTINGS_ID } from '@/lib/oneWayTaxi';
+import { revalidateContent } from '@/lib/revalidateContent';
+import { CACHE_TAGS } from '@/lib/cacheTags';
 import {
   DEFAULT_ONE_WAY_TAXI_SETTINGS,
   type OneWayTaxiSettings,
@@ -22,6 +24,7 @@ const MIGRATION_HINT =
 function revalidateRatesPages() {
   try {
     revalidatePath('/rates', 'page');
+    revalidateContent(CACHE_TAGS.oneWayTaxi);
     revalidatePath('/', 'page');
   } catch (error) {
     console.error('Revalidation failed (DB write succeeded):', error);

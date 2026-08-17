@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { buildBookingUrl } from "@/lib/bookingLink";
-import { Header, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { Car, Star, Shield, UserCheck, Phone, Heart, Award, MapPin, ArrowRight } from "lucide-react";
 import DestinationCard from "@/components/home/DestinationCard";
@@ -21,6 +22,7 @@ import {
   PageSection,
 } from "@/lib/supabase";
 import { getMultiDayRentalPageData } from "@/lib/multiDayRental";
+import Image from "next/image";
 
 const TRUST_PILLAR_ICONS: Record<string, typeof UserCheck> = {
   "user-check": UserCheck,
@@ -81,7 +83,7 @@ export default async function Home() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
 
       {/* Seasonal Hero Section */}
       <SeasonalHero
@@ -145,11 +147,12 @@ export default async function Home() {
                 Falls back to a neutral placeholder until one is uploaded. */}
             {multiDayRentalPage?.homepage_card_image_url ? (
               <div className="aspect-video rounded-lg overflow-hidden border border-slate-200">
-                <img
+                <Image
                   src={multiDayRentalPage.homepage_card_image_url}
                   alt="Multi-day car rental in Kumaon"
-                  loading="lazy"
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
                 />
               </div>
             ) : (
@@ -352,9 +355,12 @@ export default async function Home() {
                 <div className="flex items-center gap-3">
                   {t.photos?.[0] && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={t.photos[0]}
                       alt={t.customer_name}
+                      width={36}
+                      height={36}
+                      sizes="36px"
                       className="w-9 h-9 rounded-full object-cover"
                     />
                   )}
@@ -382,10 +388,12 @@ export default async function Home() {
             {trustSection.image_url ? (
               <div className="aspect-[4/5] rounded-lg overflow-hidden border border-slate-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={trustSection.image_url}
                   alt={trustSection.heading}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 40vw"
+                  className="object-cover"
                 />
               </div>
             ) : (

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Header, Button } from '@/components/ui';
+import { Button } from '@/components/ui';
+import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from '@/components/ui/FooterServer';
 import { ContactHero, ContactForm, ContactInfo, ContactFAQ } from '@/components/contact';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
@@ -29,6 +30,18 @@ export async function generateMetadata(): Promise<Metadata> {
       'Get in touch with Nainital Taxi for bookings, inquiries, and quotes. Available 24/7 via phone, WhatsApp, or email.',
     keywords:
       'contact Nainital taxi, book taxi Nainital, Kathgodam taxi contact, Uttarakhand taxi booking, taxi inquiry, 24/7 taxi service',
+    // Self-canonical — see the note in src/app/tour/page.tsx. /contact is the
+    // most common ad landing page after the homepage, so it collects the most
+    // campaign query strings.
+    alternates: { canonical: '/contact' },
+    openGraph: {
+      title: content.seo_title || 'Contact Us - Nainital Taxi Services',
+      description:
+        content.seo_description ||
+        'Get in touch with Nainital Taxi for bookings, inquiries, and quotes. Available 24/7 via phone, WhatsApp, or email.',
+      url: '/contact',
+      type: 'website',
+    },
   };
 }
 
@@ -52,7 +65,7 @@ export default async function ContactPage() {
 
   return (
     <>
-      <Header />
+      <HeaderServer />
       <FloatingWhatsApp />
 
       <main className="mt-20">

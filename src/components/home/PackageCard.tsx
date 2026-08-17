@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import Image from 'next/image';
 
 interface PackageCardProps {
   slug: string;
@@ -40,15 +41,20 @@ export default function PackageCard({
 
   return (
     <div className="flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden transition-all hover:border-slate-300 hover:shadow-md">
-      <Link href={`/tour/${slug}`} className="group block">
+      {/* prefetch={false} — one Link per package in a long grid; see the note
+          in src/components/home/DestinationCard.tsx for why. */}
+      <Link href={`/tour/${slug}`} prefetch={false} className="group block">
         <div className="relative aspect-video overflow-hidden bg-slate-100">
           {imageUrl && !imageFailed ? (
-            <img
+            // See the note in src/components/home/DestinationCard.tsx — same
+            // Supabase-egress reasoning, same fill/sizes treatment.
+            <Image
               src={imageUrl}
               alt={title}
-              loading="lazy"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               onError={() => setImageFailed(true)}
-              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
