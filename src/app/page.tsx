@@ -144,9 +144,15 @@ export default async function Home() {
         <div className="container mx-auto max-w-[1200px]">
           <div className="grid gap-8 md:grid-cols-2 md:items-center">
             {/* Photo set via /admin/multi-day-rental → "Homepage Card Image".
-                Falls back to a neutral placeholder until one is uploaded. */}
+                Falls back to a neutral placeholder until one is uploaded.
+
+                `relative` on the wrapper below is load-bearing: next/image with
+                `fill` renders the img as position:absolute, so without a
+                positioned ancestor it escapes this box and lays itself out
+                against a distant one — the card then renders as an empty
+                bordered rectangle. */}
             {multiDayRentalPage?.homepage_card_image_url ? (
-              <div className="aspect-video rounded-lg overflow-hidden border border-slate-200">
+              <div className="relative aspect-video rounded-lg overflow-hidden border border-slate-200">
                 <Image
                   src={multiDayRentalPage.homepage_card_image_url}
                   alt="Multi-day car rental in Kumaon"
@@ -385,9 +391,10 @@ export default async function Home() {
       <section className="py-16 md:py-24 px-4 border-t border-slate-200">
         <div className="container mx-auto max-w-[1200px]">
           <div className="grid gap-10 md:grid-cols-[0.85fr_1fr] md:items-start">
+            {/* `relative` on the wrapper below is load-bearing — see the note
+                on the multi-day rental card above. */}
             {trustSection.image_url ? (
-              <div className="aspect-[4/5] rounded-lg overflow-hidden border border-slate-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div className="relative aspect-[4/5] rounded-lg overflow-hidden border border-slate-200">
                 <Image
                   src={trustSection.image_url}
                   alt={trustSection.heading}
