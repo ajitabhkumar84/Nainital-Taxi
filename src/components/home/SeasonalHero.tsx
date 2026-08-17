@@ -42,7 +42,7 @@ export default function SeasonalHero({
     // Winter: November (10) - February (1)
     if (month === 10 || month === 11 || month === 0 || month === 1) {
       return {
-        backgroundImage: '/images/hero/winter.jpg',
+        backgroundImage: '/images/hero/winter.webp',
         title: 'Escape to Snow-Kissed Hills',
         subtitle: 'Experience the magic of winter in the mountains',
       };
@@ -51,7 +51,7 @@ export default function SeasonalHero({
     // Spring: March (2) - April (3)
     if (month === 2 || month === 3) {
       return {
-        backgroundImage: '/images/hero/spring.jpg',
+        backgroundImage: '/images/hero/spring.webp',
         title: 'Blooming Mountain Paradise',
         subtitle: 'Witness nature\'s colorful awakening',
       };
@@ -60,7 +60,7 @@ export default function SeasonalHero({
     // Summer: May (4) - July (6)
     if (month === 4 || month === 5 || month === 6) {
       return {
-        backgroundImage: '/images/hero/summer.jpg',
+        backgroundImage: '/images/hero/summer.webp',
         title: 'Your Perfect Summer Getaway',
         subtitle: 'Beat the heat in cool mountain air',
       };
@@ -68,7 +68,7 @@ export default function SeasonalHero({
 
     // Monsoon: August (7) - October (9)
     return {
-      backgroundImage: '/images/hero/monsoon.jpg',
+      backgroundImage: '/images/hero/monsoon.webp',
       title: 'Magical Monsoon Mountains',
       subtitle: 'Embrace the beauty of misty peaks',
     };
@@ -96,24 +96,18 @@ export default function SeasonalHero({
         reproduces the old bg-cover behaviour exactly; object-cover/object-center
         replaces bg-center.
 
-        Deliberately NOT `unoptimized`, despite these being local /public files.
-        The source images are currently 355-467KB JPEGs at full desktop width.
-        Serving them unoptimized would push the largest of those to every 360px
-        phone — and 80% of this site's traffic is mobile — whereas the optimizer
-        emits a ~35-60KB WebP at the right width.
+        Deliberately NOT `unoptimized`, despite these being local /public files
+        already in WebP at 65-165KB. Unoptimized would send the full desktop-width
+        file to every 360px phone, and 80% of this site's traffic is mobile; the
+        optimizer emits a ~20KB WebP at the right width instead. A responsive
+        srcset is worth more here than the handful of transformations it costs.
 
-        The transformation cost that buys is negligible and, crucially, bounded:
-        there are exactly four source images here (one per season) and the
-        deviceSizes list in next.config.mjs caps the variants, so this is on the
-        order of ~16 transformations per 30-day cache window against a 1,000/month
-        allowance. That is the opposite situation from Supabase Storage images,
-        which are unbounded and growing — those stay optimized too, but there the
-        reason is that Vercel's cache keeps their bytes off the 5GB Supabase
-        egress quota.
-
-        If these four files are ever re-encoded to ~120KB WebP, revisit: at that
-        point `unoptimized` becomes defensible, though a responsive srcset would
-        still win on mobile.
+        That cost is bounded: four source images (one per season), with the
+        deviceSizes list in next.config.mjs capping the variants — on the order of
+        ~16 transformations per 30-day cache window against a 1,000/month
+        allowance. Supabase Storage images stay optimized too, but for a different
+        reason: there, Vercel's cache is what keeps their bytes off the 5GB
+        Supabase egress quota.
 
         alt="" because the photo is decorative: the headline immediately below
         carries the same meaning, so announcing it would just be noise.

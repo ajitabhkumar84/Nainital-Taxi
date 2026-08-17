@@ -79,10 +79,28 @@ export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
  *
  * This is a *safety net*, not the primary freshness mechanism — admin saves
  * bust the relevant tag immediately via revalidateContent(). The TTL only
- * matters for edits made directly in the Supabase table editor, which never go
- * through an API route and so never fire a tag.
+ * matters when a tag never fires, which happens in exactly one situation worth
+ * planning for: rows edited **directly in the Supabase table editor**. Those
+ * bypass the API routes entirely, so nothing invalidates them and the site
+ * keeps serving the old value until the TTL expires.
  *
- * 10 minutes: long enough that a burst of traffic costs ~one query per tag,
- * short enough that a hand-edited row self-corrects well within a working day.
+ * 300s in production matches the TTL the pre-existing cached config reads
+ * already use (src/lib/branding.ts, src/lib/footerConfig.ts,
+ * src/lib/trackingScripts.ts), so the whole app has one staleness ceiling
+ * rather than two.
+ *
+ * 1s in development because the cost/benefit inverts locally: there is no
+ * free-tier traffic to protect, and a cache that outlives an edit turns
+ * ordinary content work into "I saved it and nothing changed" debugging. Kept
+ * at 1 rather than 0 so the code path stays identical to production and
+ * per-render deduping still works.
+ *
+ * NOTE: this TTL cannot help across *processes*. unstable_cache persists to
+ * .next/cache/fetch-cache on disk, so a `next build && next start` server has
+ * its own cache that a `next dev` server's revalidateTag will never reach. If
+ * a local production build is serving stale content after an admin save,
+ * `rm -rf .next/cache` is the fix. On Vercel this does not arise: the admin
+ * routes and the public pages are the same deployment sharing one Data Cache.
  */
-export const CONTENT_CACHE_TTL = 600;
+export const CONTENT_CACHE_TTL =
+  process.env.NODE_ENV === 'production' ? 300 : 1;

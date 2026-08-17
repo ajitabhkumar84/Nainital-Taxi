@@ -28,7 +28,7 @@ import { Destination, TransferContent } from "@/lib/supabase/types";
 
 // Used when a destination has no uploaded hero image. Local rather than a
 // remote stock URL so the LCP image never depends on a third-party host.
-const FALLBACK_HERO = "/images/hero/summer.jpg";
+const FALLBACK_HERO = "/images/hero/summer.webp";
 
 /**
  * The FAQs shown when the linked transfer package has no admin-authored ones.
