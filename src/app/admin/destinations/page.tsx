@@ -8,16 +8,151 @@ import {
   Eye,
   Edit2,
   Trash2,
-  ChevronUp,
-  ChevronDown,
+  GripVertical,
   MapPin,
   Star,
   Grid3X3,
   List,
   RefreshCw,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { Destination } from "@/lib/supabase/types";
+
+interface SortableDestinationRowProps {
+  destination: Destination;
+  disabled: boolean;
+  onToggleActive: (dest: Destination) => void;
+  onTogglePopular: (dest: Destination) => void;
+  onDelete: (dest: Destination) => void;
+}
+
+function SortableDestinationRow({
+  destination: dest,
+  disabled,
+  onToggleActive,
+  onTogglePopular,
+  onDelete,
+}: SortableDestinationRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: dest.id,
+    disabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: "relative",
+    zIndex: isDragging ? 50 : "auto",
+    background: isDragging ? "white" : undefined,
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style} className="border-b border-ink/10 hover:bg-sunrise/20">
+      <td className="px-2 py-3 w-10">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          disabled={disabled}
+          aria-label={`Reorder ${dest.name}`}
+          className={cn(
+            "p-2 rounded-lg border-2 border-ink/10 text-ink/40 touch-none transition-colors",
+            disabled
+              ? "cursor-not-allowed opacity-30"
+              : "cursor-grab active:cursor-grabbing hover:text-ink hover:border-ink/30"
+          )}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{dest.emoji || "🏔️"}</span>
+          <div>
+            <div className="font-display text-ink">{dest.name}</div>
+            <div className="text-sm text-ink/60 font-body">/{dest.slug}</div>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3 hidden md:table-cell">
+        <span className="text-ink/70 font-body">
+          {dest.distance_from_nainital ? `${dest.distance_from_nainital} km` : "-"}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => onToggleActive(dest)}
+            className={cn(
+              "px-2 py-1 rounded-lg text-xs font-body font-semibold transition-colors",
+              dest.is_active ? "bg-teal/20 text-teal" : "bg-ink/10 text-ink/50"
+            )}
+          >
+            {dest.is_active ? "Active" : "Inactive"}
+          </button>
+          <button
+            onClick={() => onTogglePopular(dest)}
+            className={cn(
+              "p-1 rounded-lg transition-colors",
+              dest.is_popular ? "bg-sunshine text-ink" : "bg-ink/10 text-ink/30 hover:text-ink/60"
+            )}
+            title={dest.is_popular ? "Remove from popular" : "Mark as popular"}
+          >
+            <Star className="w-4 h-4" fill={dest.is_popular ? "currentColor" : "none"} />
+          </button>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-center gap-1">
+          {/* View */}
+          <Link
+            href={`/destinations/${dest.slug}`}
+            target="_blank"
+            className="p-2 hover:bg-lake/20 rounded-lg transition-colors"
+            title="View public page"
+          >
+            <Eye className="w-4 h-4 text-teal" />
+          </Link>
+
+          {/* Edit */}
+          <Link
+            href={`/admin/destinations/${dest.id}`}
+            className="p-2 hover:bg-sunshine/30 rounded-lg transition-colors"
+            title="Edit destination"
+          >
+            <Edit2 className="w-4 h-4 text-ink" />
+          </Link>
+
+          {/* Delete */}
+          <button
+            onClick={() => onDelete(dest)}
+            className="p-2 hover:bg-coral/20 rounded-lg transition-colors"
+            title="Delete destination"
+          >
+            <Trash2 className="w-4 h-4 text-coral" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export default function DestinationsAdminPage() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -25,6 +160,13 @@ export default function DestinationsAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [filter, setFilter] = useState<"all" | "active" | "popular">("all");
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  const sensors = useSensors(
+    // 8px threshold so a click on the row doesn't accidentally start a drag.
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const fetchDestinations = useCallback(async () => {
     setLoading(true);
@@ -107,33 +249,44 @@ export default function DestinationsAdminPage() {
     }
   };
 
-  const handleReorder = async (destId: string, direction: "up" | "down") => {
-    const currentIndex = destinations.findIndex((d) => d.id === destId);
-    if (currentIndex === -1) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= destinations.length) return;
+    const oldIndex = destinations.findIndex((d) => d.id === active.id);
+    const newIndex = destinations.findIndex((d) => d.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = [...destinations];
-    [reordered[currentIndex], reordered[newIndex]] = [reordered[newIndex], reordered[currentIndex]];
-
-    // Update display orders
-    const updates = reordered.map((d, idx) => ({
-      id: d.id,
-      display_order: idx,
+    // Renumber the whole list rather than swapping a pair — normalises any
+    // pre-existing gaps or duplicate display_order values in one pass.
+    const previous = destinations;
+    const reordered = arrayMove(destinations, oldIndex, newIndex).map((dest, index) => ({
+      ...dest,
+      display_order: index,
     }));
 
-    setDestinations(reordered.map((d, idx) => ({ ...d, display_order: idx })));
+    setDestinations(reordered);
+    setSavingOrder(true);
 
-    // Save to database
-    for (const update of updates) {
-      await fetch("/api/admin/destinations", {
-        method: "PATCH",
+    try {
+      const response = await fetch("/api/admin/destinations/reorder", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(update),
+        body: JSON.stringify({
+          updates: reordered.map((dest, index) => ({ id: dest.id, display_order: index })),
+        }),
       });
+
+      if (!response.ok) throw new Error("Failed to reorder destinations");
+    } catch (error) {
+      console.error("Error reordering destinations:", error);
+      setDestinations(previous);
+      alert("Failed to save the new order");
+      await fetchDestinations();
+    } finally {
+      setSavingOrder(false);
     }
   };
 
@@ -148,6 +301,12 @@ export default function DestinationsAdminPage() {
       dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dest.slug.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+  // Reordering only makes sense against the full, unfiltered list — display_order
+  // is a single global order, not scoped to a filter. filteredDestinations ===
+  // destinations exactly when this is true, which is what makes it safe for
+  // handleDragEnd (above) to key off the full `destinations` array.
+  const reorderingAllowed = filter === "all" && searchQuery === "";
 
   const stats = {
     total: destinations.length,
@@ -258,111 +417,58 @@ export default function DestinationsAdminPage() {
           <p className="text-ink/60 font-body">No destinations found</p>
         </div>
       ) : viewMode === "list" ? (
-        <div className="bg-white rounded-xl border-3 border-ink overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-sunrise/50 border-b-3 border-ink">
-              <tr>
-                <th className="px-4 py-3 text-left font-display text-ink">Destination</th>
-                <th className="px-4 py-3 text-left font-display text-ink hidden md:table-cell">Distance</th>
-                <th className="px-4 py-3 text-center font-display text-ink">Status</th>
-                <th className="px-4 py-3 text-center font-display text-ink">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDestinations.map((dest, index) => (
-                <tr key={dest.id} className="border-b border-ink/10 hover:bg-sunrise/20">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{dest.emoji || "🏔️"}</span>
-                      <div>
-                        <div className="font-display text-ink">{dest.name}</div>
-                        <div className="text-sm text-ink/60 font-body">/{dest.slug}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-ink/70 font-body">
-                      {dest.distance_from_nainital ? `${dest.distance_from_nainital} km` : "-"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleToggleActive(dest)}
-                        className={cn(
-                          "px-2 py-1 rounded-lg text-xs font-body font-semibold transition-colors",
-                          dest.is_active
-                            ? "bg-teal/20 text-teal"
-                            : "bg-ink/10 text-ink/50"
-                        )}
-                      >
-                        {dest.is_active ? "Active" : "Inactive"}
-                      </button>
-                      <button
-                        onClick={() => handleTogglePopular(dest)}
-                        className={cn(
-                          "p-1 rounded-lg transition-colors",
-                          dest.is_popular
-                            ? "bg-sunshine text-ink"
-                            : "bg-ink/10 text-ink/30 hover:text-ink/60"
-                        )}
-                        title={dest.is_popular ? "Remove from popular" : "Mark as popular"}
-                      >
-                        <Star className="w-4 h-4" fill={dest.is_popular ? "currentColor" : "none"} />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      {/* Reorder */}
-                      <button
-                        onClick={() => handleReorder(dest.id, "up")}
-                        disabled={index === 0}
-                        className="p-1 hover:bg-ink/10 rounded-lg transition-colors disabled:opacity-30"
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleReorder(dest.id, "down")}
-                        disabled={index === filteredDestinations.length - 1}
-                        className="p-1 hover:bg-ink/10 rounded-lg transition-colors disabled:opacity-30"
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-ink/60 font-body px-1">
+            <GripVertical className="w-4 h-4" />
+            {reorderingAllowed ? (
+              <span>Drag a row by its handle to reorder. This order is what visitors see on the homepage.</span>
+            ) : (
+              <span>Clear the search and set filter to &quot;All&quot; to drag-and-drop reorder destinations.</span>
+            )}
+            {savingOrder && (
+              <span className="inline-flex items-center gap-1 text-ink/80">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Saving order...
+              </span>
+            )}
+          </div>
 
-                      {/* View */}
-                      <Link
-                        href={`/destinations/${dest.slug}`}
-                        target="_blank"
-                        className="p-2 hover:bg-lake/20 rounded-lg transition-colors"
-                        title="View public page"
-                      >
-                        <Eye className="w-4 h-4 text-teal" />
-                      </Link>
-
-                      {/* Edit */}
-                      <Link
-                        href={`/admin/destinations/${dest.id}`}
-                        className="p-2 hover:bg-sunshine/30 rounded-lg transition-colors"
-                        title="Edit destination"
-                      >
-                        <Edit2 className="w-4 h-4 text-ink" />
-                      </Link>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDelete(dest)}
-                        className="p-2 hover:bg-coral/20 rounded-lg transition-colors"
-                        title="Delete destination"
-                      >
-                        <Trash2 className="w-4 h-4 text-coral" />
-                      </button>
-                    </div>
-                  </td>
+          <div className="bg-white rounded-xl border-3 border-ink overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-sunrise/50 border-b-3 border-ink">
+                <tr>
+                  <th className="px-2 py-3 w-10" />
+                  <th className="px-4 py-3 text-left font-display text-ink">Destination</th>
+                  <th className="px-4 py-3 text-left font-display text-ink hidden md:table-cell">Distance</th>
+                  <th className="px-4 py-3 text-center font-display text-ink">Status</th>
+                  <th className="px-4 py-3 text-center font-display text-ink">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={destinations.map((d) => d.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <tbody>
+                    {filteredDestinations.map((dest) => (
+                      <SortableDestinationRow
+                        key={dest.id}
+                        destination={dest}
+                        disabled={!reorderingAllowed || savingOrder}
+                        onToggleActive={handleToggleActive}
+                        onTogglePopular={handleTogglePopular}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </DndContext>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -293,7 +293,9 @@ export default async function Home() {
           <div className="flex items-end justify-between mb-10">
             <div>
               <h2 className="text-[26px] md:text-3xl font-display font-semibold text-ink mb-2">
-                {sectionsMap.destinations?.heading || "Where we go"}
+                <Link href="/destinations" className="hover:underline">
+                  {sectionsMap.destinations?.heading || "Where we go"}
+                </Link>
               </h2>
               <p className="text-base text-slate-500">
                 {sectionsMap.destinations?.subheading || "Popular destinations across Nainital and Kumaon."}
@@ -326,6 +328,17 @@ export default async function Home() {
               </p>
             )}
           </div>
+
+          {destinations.length > 0 && (
+            <div className="mt-8 text-center">
+              <Link
+                href="/destinations"
+                className="text-sm font-medium text-sunshine hover:text-sunshine-500"
+              >
+                View all destinations →
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
