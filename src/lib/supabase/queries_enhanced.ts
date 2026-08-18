@@ -92,7 +92,7 @@ export async function getSeasonForDate(date: string): Promise<{
     .gte('end_date', date)
     .order('name', { ascending: false }) // 'Season' comes before 'Off-Season' alphabetically (descending)
     .limit(1)
-    .single();
+    .maybeSingle(); // most dates fall outside every season range — .single() 406'd on those
 
   if (error || !seasonData) {
     // Default to Off-Season - try to find any Off-Season record
@@ -102,7 +102,7 @@ export async function getSeasonForDate(date: string): Promise<{
       .eq('is_active', true)
       .eq('name', 'Off-Season')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (offSeasonData) {
       return offSeasonData as { id: string; name: 'Off-Season' | 'Season'; description: string | null };

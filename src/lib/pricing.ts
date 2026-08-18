@@ -34,7 +34,7 @@ async function resolveSeason(date: string): Promise<SeasonResult> {
     .gte('end_date', date)
     .order('name', { ascending: false }) // 'Season' comes before 'Off-Season'
     .limit(1)
-    .single();
+    .maybeSingle(); // most dates fall outside every season range — .single() 406'd on those
 
   if (!seasonError && seasonData) {
     return seasonData as SeasonResult;
@@ -47,7 +47,7 @@ async function resolveSeason(date: string): Promise<SeasonResult> {
     .eq('is_active', true)
     .eq('name', 'Off-Season')
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return offSeasonData ? (offSeasonData as SeasonResult) : { id: '', name: 'Off-Season' };
 }

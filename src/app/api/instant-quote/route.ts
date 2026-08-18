@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       .gte('end_date', date)
       .order('name', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // most dates fall outside every season range — .single() 406'd on those
 
     let seasonName = 'Off-Season';
     if (seasonData) {

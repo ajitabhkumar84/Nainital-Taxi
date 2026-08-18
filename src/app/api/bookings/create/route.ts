@@ -70,7 +70,7 @@ async function resolveSeasonName(
     .gte('end_date', date)
     .order('name', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle(); // most dates fall outside every season range — .single() 406'd on those
 
   return (data?.name as 'Off-Season' | 'Season') || 'Off-Season';
 }

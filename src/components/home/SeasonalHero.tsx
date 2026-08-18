@@ -117,6 +117,14 @@ export default function SeasonalHero({
 
         alt="" because the photo is decorative: the headline immediately below
         carries the same meaning, so announcing it would just be noise.
+
+        sizes="100vw" is correct here, not a bug — this section has no max-width
+        container, so the image genuinely spans the full viewport at every
+        breakpoint. If Chrome DevTools logs "was preloaded ... but not used within
+        a few seconds" for this image, that's a known heuristic false positive for
+        the fill + priority + sizes="100vw" combination (the preload IS what's
+        painted; Chrome's usage timer just doesn't always detect it in time) —
+        don't "fix" this value in response to that warning.
       */}
       <Image
         src={backgroundImage}
