@@ -6,7 +6,6 @@ import Image from "next/image";
 import {
   Plus,
   Search,
-  Eye,
   Edit2,
   Trash2,
   ChevronUp,
@@ -701,16 +700,6 @@ export default function FleetAdminPage() {
                       >
                         <Star className="w-4 h-4" fill={vehicle.is_featured ? "currentColor" : "none"} />
                       </button>
-
-                      {/* View on Fleet page */}
-                      <Link
-                        href="/fleet"
-                        target="_blank"
-                        className="p-2 hover:bg-lake/20 rounded-lg transition-colors"
-                        title="View fleet page"
-                      >
-                        <Eye className="w-4 h-4 text-teal" />
-                      </Link>
 
                       {/* Edit */}
                       <Link

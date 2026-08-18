@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { VehicleType } from '@/store/bookingStore';
 import { getVehicleTypeName } from '@/lib/pricing';
-import { getAdminSetting } from '@/lib/supabase';
 
 const DEFAULT_VEHICLE_LABELS: Record<VehicleType, string> = {
   sedan: getVehicleTypeName('sedan'),
@@ -40,7 +39,12 @@ export function useVehicleLabels(): UseVehicleLabelsReturn {
 
     try {
       setIsLoading(true);
-      const value = await getAdminSetting('vehicle_category_labels');
+      // Fetched via a route handler rather than importing getAdminSetting
+      // directly — getAdminSetting is unstable_cache-wrapped, which throws
+      // "incrementalCache missing" when invoked from a Client Component.
+      const response = await fetch('/api/vehicle-labels');
+      if (!response.ok) throw new Error('Failed to fetch vehicle labels');
+      const { value } = await response.json();
       const parsed = typeof value === 'string' ? JSON.parse(value) : value;
 
       // Merge over defaults so an admin overriding one category doesn't

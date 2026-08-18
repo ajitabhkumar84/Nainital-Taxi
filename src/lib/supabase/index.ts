@@ -116,6 +116,9 @@ export {
   getPopularDestinations,
   getDestinationBySlug,
 
+  // Routes (SEO landing pages)
+  getRouteBySlug,
+
   // Waitlist
   addToWaitlist,
   getWaitlistForDate,

@@ -30,6 +30,7 @@ const getSitemapContent = unstable_cache(
   async (): Promise<{
     destinations: SlugRow[];
     packages: SlugRow[];
+    routes: SlugRow[];
     multiDayRentalPage: MultiDayRow;
   }> => {
     // Cast through `any`: the generated Database type models only a subset of
@@ -37,7 +38,7 @@ const getSitemapContent = unstable_cache(
     // rows to `never`. Same escape hatch the query layer uses — the row shapes
     // are pinned by the explicit return type above instead.
     /* eslint-disable @typescript-eslint/no-explicit-any */
-    const [destinationsResult, packagesResult, multiDayResult] = await Promise.all([
+    const [destinationsResult, packagesResult, routesResult, multiDayResult] = await Promise.all([
       (supabase.from as any)('destinations')
         .select('slug, updated_at')
         .eq('is_active', true) as Promise<{ data: SlugRow[] | null }>,
@@ -45,6 +46,10 @@ const getSitemapContent = unstable_cache(
         .select('slug, updated_at')
         .eq('is_active', true)
         .eq('type', 'tour') as Promise<{ data: SlugRow[] | null }>,
+      (supabase.from as any)('routes')
+        .select('slug, updated_at')
+        .eq('is_active', true)
+        .eq('show_as_route_page', true) as Promise<{ data: SlugRow[] | null }>,
       (supabase.from as any)('multi_day_rental_page')
         .select('page_slug, updated_at')
         .eq('id', '00000000-0000-0000-0000-000000000001')
@@ -56,19 +61,20 @@ const getSitemapContent = unstable_cache(
     return {
       destinations: destinationsResult.data || [],
       packages: packagesResult.data || [],
+      routes: routesResult.data || [],
       multiDayRentalPage: multiDayResult.data,
     };
   },
   ['sitemap-content'],
   {
-    tags: [CACHE_TAGS.destinations, CACHE_TAGS.packages, CACHE_TAGS.multiDayRental],
+    tags: [CACHE_TAGS.destinations, CACHE_TAGS.packages, CACHE_TAGS.routes, CACHE_TAGS.multiDayRental],
     revalidate: CONTENT_CACHE_TTL,
   }
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_URL;
-  const { destinations, packages, multiDayRentalPage } = await getSitemapContent();
+  const { destinations, packages, routes, multiDayRentalPage } = await getSitemapContent();
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -89,12 +95,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/fleet`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
     },
     {
       url: `${baseUrl}/rates`,
@@ -145,26 +145,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Transfer routes are deliberately NOT listed here.
-  //
-  // There was a block that emitted `/tour/{route.name}` for every active
-  // route. It never produced a single URL: `routes` has no `name` column (the
-  // pair lives in pickup_location/drop_location), so the query errored, the
-  // result came back null, and the .map() ran over an empty array — silently,
-  // because the error was never checked.
-  //
-  // Fixing the column would not have helped, because there is no per-route
-  // page to point at:
-  //   - /tour/[name] resolves a PACKAGE slug (packages, type='tour'), not a
-  //     route — a route slug 404s there.
-  //   - /[slug] only serves the multi-day-rental page and notFound()s the rest.
-  //   - Routes surface on /rates (already listed above as a static route), and
-  //     a route's "View Details" link goes to its linked destination page,
-  //     whose URL destinationRoutes already emits.
-  // So routes contribute no URLs of their own, and adding one would list a
-  // 404. If per-route landing pages are built later (there is an unused
-  // RouteLandingPage.tsx waiting for a page to host it), emit
-  // `${baseUrl}/{route.slug}` here off routes.slug.
+  // Routes get their own /routes/{slug} SEO landing page only when explicitly
+  // opted in via show_as_route_page — see the comment on getRouteBySlug in
+  // queries_enhanced.ts. Ordinary routes (the general pricing-table rows on
+  // /rates, and auto-generated reverse routes) contribute no sitemap entry of
+  // their own; they surface only via /rates and, if linked, their
+  // destination's page (destinationRoutes above already emits that URL).
+  const routeRoutes: MetadataRoute.Sitemap = routes.map((route) => ({
+    url: `${baseUrl}/routes/${route.slug}`,
+    lastModified: route.updated_at ? new Date(route.updated_at) : new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
   // Multi-day rental page's URL is admin-configurable (page_slug) — the live
   // value is pulled above rather than hardcoding "/multi-day-rental".
@@ -179,5 +171,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ]
     : [];
 
-  return [...staticRoutes, ...destinationRoutes, ...packageRoutes, ...multiDayRentalRoutes];
+  return [...staticRoutes, ...destinationRoutes, ...packageRoutes, ...routeRoutes, ...multiDayRentalRoutes];
 }

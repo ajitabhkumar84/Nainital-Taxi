@@ -900,6 +900,52 @@ export const getDestinationBySlug = cache(
 );
 
 /**
+ * Backs the /routes/[slug] SEO landing pages (WordPress migration:
+ * /haridwar/, /delhi-taxi/, etc. -> /routes/haridwar, /routes/delhi, ...).
+ *
+ * Deliberately gated on `show_as_route_page` in addition to `is_active`: a
+ * route can be real and bookable (is_active) without being meant to have its
+ * own public page — auto-generated reverse routes and ordinary pricing-table
+ * rows must not silently become indexable just because they exist. Both flags
+ * true is required for the page to render; see revalidateRoutePages() for the
+ * companion revalidatePath("/routes/[slug]", "page") call.
+ *
+ * Same cache() + unstable_cache() pairing as getDestinationBySlug — the outer
+ * cache() collapses generateMetadata + the page component into one lookup per
+ * render, the inner unstable_cache() caches across requests, tagged so
+ * revalidateRoutePages() (already called from every admin routes write) busts
+ * it with no new plumbing.
+ */
+export const getRouteBySlug = cache(
+  unstable_cache(
+    async (slug: string): Promise<(Route & { pricing: RoutePricing[] }) | null> => {
+      const { data: route, error } = await supabase
+        .from('routes')
+        .select('*, pricing:route_pricing(*)')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .eq('show_as_route_page', true)
+        .single();
+
+      if (error || !route) {
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching route by slug:', error);
+        }
+        return null;
+      }
+
+      const typedRoute = route as Route & { pricing: RoutePricing[] };
+      return {
+        ...typedRoute,
+        pricing: (typedRoute.pricing || []).filter((p) => p.is_active),
+      };
+    },
+    ['route-by-slug'],
+    { tags: [CACHE_TAGS.routes, CACHE_TAGS.pricing], revalidate: CONTENT_CACHE_TTL }
+  )
+);
+
+/**
  * Get all pricing for a package (both Season and Off-Season, all vehicle types)
  * Used for destination pages to display pricing tables
  */

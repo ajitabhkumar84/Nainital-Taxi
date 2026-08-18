@@ -35,6 +35,10 @@ import { CACHE_TAGS } from "@/lib/cacheTags";
  * destination_slug and rendered there by DestinationPricingTable
  * (getRoutesForDestinationSlug()) — revalidating the dynamic segment pattern
  * busts every destination page's Full Route Cache entry, not just one slug.
+ *
+ * A route with show_as_route_page=true also has its own /routes/[slug] SEO
+ * landing page (getRouteBySlug()) — same dynamic-segment revalidation as
+ * destinations, for the same reason.
  */
 export function revalidateRoutePages() {
   try {
@@ -44,6 +48,7 @@ export function revalidateRoutePages() {
     revalidatePath("/quote", "page");
     revalidatePath("/booking", "page");
     revalidatePath("/destinations/[slug]", "page");
+    revalidatePath("/routes/[slug]", "page");
   } catch (error) {
     console.error("Revalidation failed (DB write succeeded):", error);
   }

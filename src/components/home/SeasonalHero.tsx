@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import Image from 'next/image';
 import BookingWidget from '@/components/BookingWidget';
 import type { PickupLocationRow } from '@/lib/supabase/types';
+import type { Package } from '@/lib/supabase';
 
 interface SeasonConfig {
   backgroundImage: string;
@@ -21,6 +22,10 @@ interface SeasonalHeroProps {
   // BookingWidget — arrives as part of the initial render payload despite
   // this being a client component, so there's no post-mount fetch/flicker.
   pickupLocations: PickupLocationRow[];
+  // Server-fetched getPackages('tour') result, also passed straight through
+  // to BookingWidget — see BookingWidgetProps.tourPackages for why this
+  // can't be fetched client-side instead.
+  tourPackages: Package[];
 }
 
 const TRUST_FIGURES = [
@@ -35,6 +40,7 @@ export default function SeasonalHero({
   overrideTitle,
   overrideSubtitle,
   pickupLocations,
+  tourPackages,
 }: SeasonalHeroProps) {
   const seasonConfig = useMemo<SeasonConfig>(() => {
     const month = new Date().getMonth(); // 0-11
@@ -146,7 +152,7 @@ export default function SeasonalHero({
 
           {/* Booking widget */}
           <div>
-            <BookingWidget pickupLocations={pickupLocations} />
+            <BookingWidget pickupLocations={pickupLocations} tourPackages={tourPackages} />
           </div>
         </div>
       </div>

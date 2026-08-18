@@ -57,6 +57,7 @@ const navEntries: NavEntry[] = [
     children: [
       { href: "/admin/pages/home", label: "Home Page", icon: <Home className="w-5 h-5" /> },
       { href: "/admin/pages/contact", label: "Contact Us Page", icon: <Mail className="w-5 h-5" /> },
+      { href: "/admin/pages/destinations", label: "Destinations Page", icon: <MapPin className="w-5 h-5" /> },
       // Add future static pages here, e.g. About Us, ...
     ],
   },

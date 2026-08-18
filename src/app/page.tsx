@@ -91,6 +91,7 @@ export default async function Home() {
         overrideTitle={pageContent.hero_title}
         overrideSubtitle={pageContent.hero_subtitle}
         pickupLocations={pickupLocations}
+        tourPackages={tourPackages}
       />
 
       {/* Trust Figures Bar */}

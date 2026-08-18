@@ -7,12 +7,13 @@ import { revalidateContent } from '@/lib/revalidateContent';
 import { CACHE_TAGS } from '@/lib/cacheTags';
 
 /**
- * The fleet page and the vehicle cards on tour/destination pricing grids read
- * vehicles through unstable_cache (getVehicles, getFeaturedVehicles), so a
- * write here must bust the tag or the fleet keeps showing a retired vehicle.
+ * The vehicle cards on tour/destination pricing grids read vehicles through
+ * unstable_cache (getVehicles, getFeaturedVehicles), so a write here must bust
+ * the tag or they keep showing a retired vehicle. (The public /fleet page
+ * that used to read getVehicles() directly has been removed — the `vehicles`
+ * table still backs /admin/fleet and these pricing-grid cards.)
  */
 function revalidateVehicles() {
-  revalidatePath('/fleet');
   revalidatePath('/');
   revalidateContent(CACHE_TAGS.vehicles);
 }

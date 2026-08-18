@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Input, Select, Label } from "@/components/ui";
 import { Calendar, MapPin, Users, Car, Loader2, MessageCircle } from "lucide-react";
-import { getPackages, getPrice } from "@/lib/supabase";
+import { getPrice } from "@/lib/supabase";
 import { getVehicleCapacity, getAvailabilityForDate } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing, PickupLocationRow } from "@/lib/supabase/types";
@@ -32,16 +32,21 @@ interface BookingWidgetProps {
   // client-side fetch, no fallback constant, no flicker on this
   // conversion-critical widget.
   pickupLocations: PickupLocationRow[];
+  // Server-fetched via getPackages('tour') by the same callers as
+  // pickupLocations above. This used to be fetched here directly on mount,
+  // but getPackages is unstable_cache-wrapped — calling it from a Client
+  // Component throws "Invariant: incrementalCache missing in
+  // unstable_cache" — so it now arrives as a prop instead.
+  tourPackages: Package[];
 }
 
-export default function BookingWidget({ pickupLocations }: BookingWidgetProps) {
+export default function BookingWidget({ pickupLocations, tourPackages }: BookingWidgetProps) {
   const router = useRouter();
   const { config: siteConfig } = useSiteConfig();
   const { labels: vehicleLabels } = useVehicleLabels();
   const phoneNumber =
     siteConfig?.header?.phoneNumber || DEFAULT_SITE_CONFIG.header.phoneNumber;
   const [activeTab, setActiveTab] = useState<"tours" | "transfers">("tours");
-  const [packages, setPackages] = useState<Package[]>([]);
   const [routes, setRoutes] = useState<(Route & { pricing?: RoutePricing[] })[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingPrice, setCheckingPrice] = useState(false);
@@ -78,27 +83,21 @@ export default function BookingWidget({ pickupLocations }: BookingWidgetProps) {
   // actually bookable.
   const [isValidatingAvailability, setIsValidatingAvailability] = useState(false);
 
-  // Load packages and routes from database
+  // Load transfer routes from the API. Tour packages arrive as a prop (see
+  // BookingWidgetProps.tourPackages above) rather than being fetched here.
   useEffect(() => {
-    async function loadData() {
+    async function loadRoutes() {
       try {
-        const [allPackages, routesResponse] = await Promise.all([
-          getPackages(),
-          fetch("/api/routes?withPricing=true").then((r) => r.json()),
-        ]);
-        setPackages(allPackages);
+        const routesResponse = await fetch("/api/routes?withPricing=true").then((r) => r.json());
         if (routesResponse.success) {
           setRoutes(routesResponse.data || []);
         }
       } catch (error) {
-        console.error("Failed to load data:", error);
+        console.error("Failed to load routes:", error);
       }
     }
-    loadData();
+    loadRoutes();
   }, []);
-
-  // Filter packages by type
-  const tourPackages = packages.filter((p) => p.type === "tour");
 
   // Get drop locations based on selected pickup
   const getDropLocations = () => {
@@ -139,7 +138,7 @@ export default function BookingWidget({ pickupLocations }: BookingWidgetProps) {
     return VEHICLE_OPTIONS.filter((v) => availableVehicleTypes.has(v.value));
   };
 
-  const selectedTourPackage = packages.find((p) => p.id === tourPackage);
+  const selectedTourPackage = tourPackages.find((p) => p.id === tourPackage);
   const tourPassengerCount = parseInt(tourPassengers, 10) || 1;
   const tourVehicleOptions = VEHICLE_OPTIONS.filter(
     (v) => getVehicleCapacity(v.value) >= tourPassengerCount

@@ -5,7 +5,6 @@ import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input, Select } from '@/components/ui';
 import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
 import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
-import { getPackageById } from '@/lib/supabase';
 import { formatTime, formatDate, getMinBookingDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
@@ -109,9 +108,17 @@ export default function Step2TripDetails() {
   useEffect(() => {
     if (packageSlug || !packageId || bookingType !== 'tour') return;
     let cancelled = false;
-    getPackageById(packageId).then((pkg) => {
-      if (!cancelled && pkg?.slug) setResolvedSlug(pkg.slug);
-    });
+    // Fetched via a route handler rather than importing getPackageById
+    // directly — getPackageById is unstable_cache-wrapped, which throws
+    // "incrementalCache missing" when invoked from a Client Component.
+    fetch(`/api/packages/${packageId}`)
+      .then((r) => r.json())
+      .then(({ data: pkg }) => {
+        if (!cancelled && pkg?.slug) setResolvedSlug(pkg.slug);
+      })
+      .catch((error) => {
+        console.error('Error resolving package slug:', error);
+      });
     return () => {
       cancelled = true;
     };

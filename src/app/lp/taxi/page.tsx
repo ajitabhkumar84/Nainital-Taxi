@@ -85,7 +85,7 @@ export default async function TaxiLandingPage() {
               Get Your Exact Fare in 30 Seconds
             </h2>
             <div className="mt-6">
-              <BookingWidget pickupLocations={pickupLocations} />
+              <BookingWidget pickupLocations={pickupLocations} tourPackages={tourPackages} />
             </div>
           </div>
         </section>

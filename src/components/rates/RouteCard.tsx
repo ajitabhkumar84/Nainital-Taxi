@@ -47,7 +47,15 @@ export default function RouteCard({ route, vehicleLabels }: RouteCardProps) {
     dropoff: route.drop_location,
   });
 
-  const showViewDetails = !!route.destination_slug;
+  // Prefer the linked /destinations/[slug] page (richer tourist content) when
+  // set; otherwise fall back to this route's own /routes/[slug] SEO landing
+  // page when the admin has opted it in and it's actually live — a route with
+  // show_as_route_page=true but is_active=false 404s, so it must not be linked.
+  const detailsHref = route.destination_slug
+    ? `/destinations/${route.destination_slug}`
+    : route.show_as_route_page && route.is_active
+    ? `/routes/${route.slug}`
+    : null;
   const bookingEnabled = route.enable_online_booking;
 
   return (
@@ -83,9 +91,9 @@ export default function RouteCard({ route, vehicleLabels }: RouteCardProps) {
       )}
 
       <div className="flex flex-col sm:flex-row gap-2 mt-1 pt-3 border-t border-slate-200">
-        {showViewDetails && (
+        {detailsHref && (
           <Button variant="outline" size="sm" asChild className="min-h-[44px]">
-            <Link href={`/destinations/${route.destination_slug}`}>View Details</Link>
+            <Link href={detailsHref}>View Details</Link>
           </Button>
         )}
         {bookingEnabled ? (

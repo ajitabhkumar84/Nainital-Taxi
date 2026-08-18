@@ -93,6 +93,48 @@ const nextConfig = {
         destination: '/tour/:slug',
         permanent: true,
       },
+
+      // ----------------------------------------------------------------------
+      // WordPress -> Next.js migration (nainitaltaxi.in). `source` values omit
+      // the trailing slash the WordPress URLs actually used (e.g. /haridwar/)
+      // deliberately: Next.js normalizes trailing-slash requests against the
+      // `trailingSlash` config (unset here, so default `false`) before
+      // matching redirects. Spot-check both slash forms against staging before
+      // relying on this for the real cutover — see the migration audit notes.
+      // ----------------------------------------------------------------------
+
+      // Confirmed tour/package redirects
+      { source: '/mukteshwar-tour-itinerary', destination: '/tour/mukteshwar-day-tour', permanent: true },
+      { source: '/lake-tour-itinerary', destination: '/tour/lake-tour-kainchi-dham', permanent: true },
+      { source: '/nainital-city-tour', destination: '/tour/nainital-darshan', permanent: true },
+      { source: '/car-rental-nainital', destination: '/taxi-rental', permanent: true },
+      { source: '/innova-crysta-rental', destination: '/taxi-rental', permanent: true },
+
+      // Cruft retirement — thin/stale content with no direct replacement
+      { source: '/wedding-taxi-rental', destination: '/taxi-rental', permanent: true },
+      { source: '/blog', destination: '/', permanent: true },
+
+      // One-way taxi info page -> its modern equivalent
+      { source: '/one-way-taxi-services', destination: '/rates', permanent: true },
+
+      // New /routes/[slug] landing pages (10 old URLs -> 8 new pages;
+      // /kathgodam + /railway-station and /ranikhet-taxi + /ranikheet-sightseeing
+      // each consolidate to one page). These 8 routes must exist in the
+      // `routes` table with is_active=true before cutover — see
+      // supabase/add_route_landing_page_fields.sql, which seeds them inactive.
+      { source: '/haridwar', destination: '/routes/haridwar', permanent: true },
+      { source: '/kathgodam', destination: '/routes/kathgodam', permanent: true },
+      { source: '/railway-station', destination: '/routes/kathgodam', permanent: true },
+      { source: '/delhi-taxi', destination: '/routes/delhi', permanent: true },
+      { source: '/pantnagar-airport', destination: '/routes/pantnagar-airport', permanent: true },
+      { source: '/ranikhet-taxi', destination: '/routes/ranikhet', permanent: true },
+      { source: '/ranikheet-sightseeing', destination: '/routes/ranikhet', permanent: true },
+      { source: '/almora', destination: '/routes/almora', permanent: true },
+      { source: '/kausani', destination: '/routes/kausani', permanent: true },
+      { source: '/dehradun', destination: '/routes/dehradun', permanent: true },
+
+      // Retired new-site page — /fleet's public-facing role is now /taxi-rental
+      { source: '/fleet', destination: '/taxi-rental', permanent: true },
     ];
   },
 

@@ -26,6 +26,7 @@ import {
 } from "@/lib/supabase/types";
 import { toCanonicalPickupLocation } from "@/lib/pickupLocations";
 import { generateRouteSlug } from "@/lib/routeReverse";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 // What the server sends back on a 409 when the linked return route's prices
 // have been hand-edited and no longer match what's about to be saved.
@@ -101,6 +102,12 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
   // SEO
   const [metaTitle, setMetaTitle] = useState(initialData?.meta_title || "");
   const [metaDescription, setMetaDescription] = useState(initialData?.meta_description || "");
+
+  // /routes/[slug] SEO landing page
+  const [heroImageUrl, setHeroImageUrl] = useState(initialData?.hero_image_url || "");
+  const [showAsRoutePage, setShowAsRoutePage] = useState(
+    initialData?.show_as_route_page ?? false
+  );
 
   // Pricing - Initialize with existing pricing or empty structure
   const initializePricing = (): Partial<RoutePricing>[] => {
@@ -281,6 +288,8 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
       enable_online_booking: enableOnlineBooking,
       meta_title: metaTitle || null,
       meta_description: metaDescription || null,
+      hero_image_url: heroImageUrl || null,
+      show_as_route_page: showAsRoutePage,
       pricing: pricing.filter((p) => p.price && p.price > 0),
     };
   };
@@ -558,7 +567,23 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
             />
             <span className="font-body">Show on Destination Pages</span>
           </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showAsRoutePage}
+              onChange={(e) => setShowAsRoutePage(e.target.checked)}
+              className="w-5 h-5 rounded border-2 border-ink accent-coral"
+            />
+            <span className="font-body">Show as dedicated SEO landing page (/routes/{slug || "..."})</span>
+          </label>
         </div>
+        {showAsRoutePage && (!isActive) && (
+          <p className="text-xs text-coral font-body mt-2 ml-1">
+            This route is not Active, so /routes/{slug || "..."} will 404 until you tick
+            &ldquo;Active&rdquo; above.
+          </p>
+        )}
 
         {/* Reverse route: either this row generates one, or it IS one. */}
         <div className="mt-4 pt-4 border-t-2 border-ink/10">
@@ -643,6 +668,22 @@ export default function RouteForm({ initialData, onSubmit, isSubmitting }: Route
             shows only &ldquo;Book Now&rdquo;.
           </p>
         </div>
+
+        {showAsRoutePage && (
+          <div className="mt-4">
+            <ImageUploader
+              value={heroImageUrl}
+              onChange={setHeroImageUrl}
+              folder="routes/hero"
+              label="Route Page Hero Image"
+              recommendedSize="1920 x 1080"
+              aspectRatio="16:9"
+            />
+            <p className="text-xs text-ink/50 mt-1">
+              Optional — /routes/{slug || "..."} shows a seasonal default image until you upload one.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* SEO */}

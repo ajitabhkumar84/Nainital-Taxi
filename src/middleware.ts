@@ -12,6 +12,23 @@ export const config = {
 };
 
 /**
+ * WordPress migration cruft with no replacement anywhere on the new site —
+ * generic theme demo content (portfolio post type), taxonomy-archive bloat,
+ * and one dead nostalgia blog post. next.config.mjs `redirects()` can only
+ * emit 3xx, so these are handled here instead: a real 410 tells search
+ * engines the resource is gone (rather than moved), which drops it from the
+ * index faster than a redirect or a disallow would. Deliberately NOT added to
+ * robots.ts's disallow list for the same reason — a disallowed URL doesn't
+ * get recrawled, which would slow down exactly the deindexing a 410 is for.
+ */
+const GONE_PATTERNS: RegExp[] = [
+  /^\/portfolio-item\//,
+  /^\/portfolio_entries\//,
+  /^\/category\//,
+  /^\/hotel-rates-in-nainital-during-1980s\/?$/,
+];
+
+/**
  * Two responsibilities live here:
  *  1. Per-request CSP nonce injection (site-wide).
  *  2. The auth gate for the admin UI, every /api/admin/* route, and the
@@ -24,6 +41,10 @@ export const config = {
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (GONE_PATTERNS.some((pattern) => pattern.test(pathname))) {
+    return new NextResponse(null, { status: 410 });
+  }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = buildCsp(nonce);

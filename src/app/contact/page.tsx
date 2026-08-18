@@ -125,24 +125,6 @@ export default async function ContactPage() {
             </h2>
             <p className="text-xl text-white/80 font-body mb-8">{content.cta_subheading}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/fleet">
-                <Button variant="primary" size="lg">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
-                  </svg>
-                  View Our Fleet
-                </Button>
-              </Link>
               <Link href="/">
                 <Button variant="secondary" size="lg">
                   <svg

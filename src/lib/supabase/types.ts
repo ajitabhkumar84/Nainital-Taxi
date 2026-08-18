@@ -412,6 +412,14 @@ export interface Route {
   meta_title?: string | null;
   meta_description?: string | null;
 
+  // /routes/[slug] SEO landing page (WordPress migration: /haridwar/,
+  // /delhi-taxi/, etc.). hero_image_url falls back to a seasonal default when
+  // null. show_as_route_page is a separate opt-in from is_active — see the
+  // comment on getRouteBySlug in queries_enhanced.ts for why a route needs
+  // both true before it gets a public page.
+  hero_image_url?: string | null;
+  show_as_route_page: boolean;
+
   // Set on an auto-generated return route, pointing at the primary route it
   // mirrors. NULL on ordinary routes and on ones the admin has unlinked.
   // Only pricing / is_active / enable_online_booking are kept in sync — see
@@ -1761,7 +1769,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
       { id: '2', href: '/destinations', label: 'Destinations', isActive: true, displayOrder: 1 },
       { id: '3', href: '/tour', label: 'Tour Packages', isActive: true, displayOrder: 2 },
       { id: '4', href: '/temples', label: 'Temples', isActive: true, displayOrder: 3 },
-      { id: '5', href: '/fleet', label: 'Fleet', isActive: true, displayOrder: 4 },
+      { id: '5', href: '/taxi-rental', label: 'Taxi Rental', isActive: true, displayOrder: 4 },
       { id: '6', href: '/about', label: 'About', isActive: true, displayOrder: 5 },
     ],
     ctaPrimary: {
@@ -1797,7 +1805,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
           { id: 'ql-2', href: '/destinations', label: 'Destinations', isActive: true, displayOrder: 1 },
           { id: 'ql-3', href: '/tour', label: 'Tour Packages', isActive: true, displayOrder: 2 },
           { id: 'ql-4', href: '/temples', label: 'Temples', isActive: true, displayOrder: 3 },
-          { id: 'ql-5', href: '/fleet', label: 'Our Fleet', isActive: true, displayOrder: 4 },
+          { id: 'ql-5', href: '/taxi-rental', label: 'Taxi Rental', isActive: true, displayOrder: 4 },
         ],
         displayOrder: 0,
         isActive: true,

@@ -10,6 +10,7 @@ import { DEFAULT_PAGE_CONTENT, PageContent } from '@/lib/supabase/types';
 // Extend this as more pages get their own page_content row.
 const PUBLIC_PATH_BY_SLUG: Record<string, string> = {
   home: '/',
+  destinations: '/destinations',
 };
 
 // GET - Fetch a page's CMS content (auto-creates with defaults if missing)

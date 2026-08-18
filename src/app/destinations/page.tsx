@@ -5,18 +5,33 @@ import HeaderServer from "@/components/ui/HeaderServer";
 import FooterServer from "@/components/ui/FooterServer";
 import { MapPin, Clock, ArrowRight } from "lucide-react";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
-import { getDestinations } from "@/lib/supabase/queries_enhanced";
+import { getDestinations, getPageContent } from "@/lib/supabase/queries_enhanced";
 
-export const metadata: Metadata = {
-  title: "Destinations | Nainital Taxi - Explore Uttarakhand",
-  description: "Discover beautiful destinations in Uttarakhand. Book taxi services to Kathgodam, Pantnagar, Bhimtal, Mukteshwar, Ranikhet, Jim Corbett and more.",
-  keywords: "Nainital destinations, Uttarakhand taxi, Kathgodam taxi, Bhimtal tour, Mukteshwar trip, Ranikhet taxi",
-  // Self-canonical. These listing pages are reachable with tracking query
-  // strings from our own ads (?utm_source=...), and without this Google treats
-  // each variant as a separate near-duplicate URL and splits the ranking
-  // signal. Relative — resolved against metadataBase in src/app/layout.tsx.
-  alternates: { canonical: "/destinations" },
-};
+const DEFAULT_SEO_TITLE = "Destinations | Nainital Taxi - Explore Uttarakhand";
+const DEFAULT_SEO_DESCRIPTION =
+  "Discover beautiful destinations in Uttarakhand. Book taxi services to Kathgodam, Pantnagar, Bhimtal, Mukteshwar, Ranikhet, Jim Corbett and more.";
+
+// Generate metadata for SEO — sourced from the admin-editable page_content
+// row for slug 'destinations' (see /admin/pages/destinations), falling back
+// to the copy below when left blank. Same pattern as src/app/page.tsx.
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPageContent("destinations");
+  const title = content.seo_title?.trim() || DEFAULT_SEO_TITLE;
+  const description = content.seo_description?.trim() || DEFAULT_SEO_DESCRIPTION;
+
+  return {
+    // `absolute` bypasses the root layout's "%s | Nainital Taxi" template —
+    // the custom/default title above is already the complete, brand-inclusive title.
+    title: { absolute: title },
+    description,
+    keywords: "Nainital destinations, Uttarakhand taxi, Kathgodam taxi, Bhimtal tour, Mukteshwar trip, Ranikhet taxi",
+    // Self-canonical. These listing pages are reachable with tracking query
+    // strings from our own ads (?utm_source=...), and without this Google treats
+    // each variant as a separate near-duplicate URL and splits the ranking
+    // signal. Relative — resolved against metadataBase in src/app/layout.tsx.
+    alternates: { canonical: "/destinations" },
+  };
+}
 
 // Gradient colors for destination cards
 const gradientColors = [
