@@ -77,7 +77,10 @@ export default function EditRoutePage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update route");
+        // `details` carries the actual server-side failure (e.g. a Postgres
+        // error message) — fall back to the generic `error` field, then a
+        // static message, only if the server didn't send anything specific.
+        throw new Error(errorData.details || errorData.error || "Failed to update route");
       }
 
       const result = await response.json();
@@ -88,7 +91,11 @@ export default function EditRoutePage() {
         throw error;
       }
       console.error("Error updating route:", error);
-      alert("Failed to update route. Please try again.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to update route. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }

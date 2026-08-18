@@ -28,7 +28,12 @@ function toPricingInsert(rows: any[], routeId: string) {
 }
 
 async function replacePricing(routeId: string, pricing: unknown[]) {
-  await supabase.from("route_pricing").delete().eq("route_id", routeId);
+  const { error: deleteError } = await supabase
+    .from("route_pricing")
+    .delete()
+    .eq("route_id", routeId);
+  if (deleteError) throw deleteError;
+
   if (pricing.length > 0) {
     const { error } = await supabase
       .from("route_pricing")
@@ -54,31 +59,37 @@ async function findExistingReverse(primary: {
   pickup_location: string;
   drop_location: string;
 }) {
-  const { data: linked } = await supabase
+  const { data: linked, error: linkedError } = await supabase
     .from("routes")
     .select("*")
     .eq("reverse_of_route_id", primary.id)
     .maybeSingle();
+  // A failed lookup must not be mistaken for "no existing reverse" — that
+  // would fall through to inserting a brand-new reverse route, duplicating
+  // one that may already exist.
+  if (linkedError) throw linkedError;
   if (linked) return linked;
 
   // limit(1) rather than maybeSingle(): nothing stops an admin having created
   // two routes for the same pair by hand, and maybeSingle() errors outright on
   // more than one row. Adopting the first is better than failing the save.
-  const { data: byPair } = await supabase
+  const { data: byPair, error: byPairError } = await supabase
     .from("routes")
     .select("*")
     .eq("pickup_location", primary.drop_location)
     .eq("drop_location", primary.pickup_location)
     .neq("id", primary.id)
     .limit(1);
+  if (byPairError) throw byPairError;
   if (byPair && byPair.length > 0) return byPair[0];
 
-  const { data: bySlug } = await supabase
+  const { data: bySlug, error: bySlugError } = await supabase
     .from("routes")
     .select("*")
     .eq("slug", generateRouteSlug(primary.drop_location, primary.pickup_location))
     .neq("id", primary.id)
     .limit(1);
+  if (bySlugError) throw bySlugError;
   return bySlug && bySlug.length > 0 ? bySlug[0] : null;
 }
 
@@ -142,10 +153,13 @@ async function syncReverseRoute(
   // Uphill and downhill fares differ often enough in hill-station transport
   // that silently overwriting would be the wrong default.
   if (pricing) {
-    const { data: currentPricing } = await supabase
+    const { data: currentPricing, error: currentPricingError } = await supabase
       .from("route_pricing")
       .select("*")
       .eq("route_id", existing.id);
+    // A failed fetch must not read as "no existing pricing" — that would
+    // silently skip the overwrite-confirmation gate this block exists for.
+    if (currentPricingError) throw currentPricingError;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!confirmOverwrite && pricingDiffers(currentPricing as any[], pricing as any[])) {
@@ -230,28 +244,43 @@ export async function GET(request: NextRequest) {
       //     as the return of X" notice has no X to render.
       // At most one is ever populated — the routes_reverse_not_self check and
       // the unique partial index rule out a row being both.
-      const { data: linkedReverse } = await supabase
+      // Non-fatal: these only drive an informational banner in the edit
+      // form ("auto-generated as return of X" / "keeping X in sync"). Failing
+      // the whole route fetch over a secondary lookup would make the route
+      // un-editable exactly when something's wrong, so log and degrade
+      // gracefully instead of throwing.
+      const { data: linkedReverse, error: linkedReverseError } = await supabase
         .from("routes")
         .select(PARTNER_COLUMNS)
         .eq("reverse_of_route_id", id)
         .maybeSingle();
+      if (linkedReverseError) {
+        console.error("Error looking up linked reverse route:", linkedReverseError);
+      }
 
       const parentId = (route as { reverse_of_route_id?: string | null })?.reverse_of_route_id;
       let reverseParent = null;
       if (parentId) {
-        const { data } = await supabase
+        const { data, error: reverseParentError } = await supabase
           .from("routes")
           .select(PARTNER_COLUMNS)
           .eq("id", parentId)
           .maybeSingle();
+        if (reverseParentError) {
+          console.error("Error looking up reverse-route parent:", reverseParentError);
+        }
         reverseParent = data || null;
       }
 
       if (withPricing) {
-        const { data: pricing } = await supabase
+        const { data: pricing, error: pricingFetchError } = await supabase
           .from("route_pricing")
           .select("*")
           .eq("route_id", id);
+        // Fatal, unlike the lookups above: a failed fetch would otherwise
+        // render as "this route has no pricing" in the edit form — if
+        // unnoticed and saved, that overwrites real prices with nothing.
+        if (pricingFetchError) throw pricingFetchError;
 
         return NextResponse.json({
           success: true,
@@ -416,11 +445,15 @@ export async function PATCH(request: NextRequest) {
     // A generated return route can't have a return route of its own — that
     // would be the primary, and the pair would sync in a loop.
     if (createReverse) {
-      const { data: target } = await supabase
+      const { data: target, error: targetError } = await supabase
         .from("routes")
         .select("reverse_of_route_id")
         .eq("id", id)
         .maybeSingle();
+      // A failed check must not be mistaken for "not a reverse route" — that
+      // would silently bypass the guard below and could create a
+      // reverse-of-reverse loop.
+      if (targetError) throw targetError;
 
       if ((target as { reverse_of_route_id?: string | null })?.reverse_of_route_id) {
         return NextResponse.json(
@@ -446,8 +479,14 @@ export async function PATCH(request: NextRequest) {
 
     // Update pricing if provided
     if (pricing) {
-      // Delete existing pricing
-      await supabase.from("route_pricing").delete().eq("route_id", id);
+      // Delete existing pricing. A failed delete must not be silently
+      // ignored — stale prices could otherwise survive alongside (or
+      // instead of) the new ones inserted below.
+      const { error: deletePricingError } = await supabase
+        .from("route_pricing")
+        .delete()
+        .eq("route_id", id);
+      if (deletePricingError) throw deletePricingError;
 
       // Insert new pricing
       if (pricing.length > 0) {
