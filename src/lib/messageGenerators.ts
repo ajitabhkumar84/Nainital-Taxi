@@ -50,7 +50,7 @@ export function generateEmailSubject(booking: BookingState): string {
  * Generate email body for booking request
  */
 export function generateEmailBody(booking: BookingState): string {
-  const body = `Hello Nainital Fun Taxi Team,
+  const body = `Hello Nainital Taxi Team,
 
 I would like to make a booking with the following details:
 

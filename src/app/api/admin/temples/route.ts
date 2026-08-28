@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 import { revalidateContent } from "@/lib/revalidateContent";
 import { CACHE_TAGS } from "@/lib/cacheTags";
 
@@ -16,11 +16,6 @@ function revalidateTemples() {
   revalidateContent(CACHE_TAGS.temples);
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 /**
  * GET /api/admin/temples
  * Fetch all temples (admin only)
@@ -32,6 +27,7 @@ const supabase = createClient(
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const slug = searchParams.get("slug");
@@ -190,6 +186,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const body = await request.json();
     const { pricing, faqs, ...templeData } = body;
 
@@ -269,6 +266,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const body = await request.json();
     const { id, updates, pricing, faqs } = body;
 
@@ -360,6 +358,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
 

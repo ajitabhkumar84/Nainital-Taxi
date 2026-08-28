@@ -1,24 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a Supabase client with the service role key for admin operations
-// This bypasses Row Level Security (RLS)
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  // Use service role key if available, otherwise fall back to anon key
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 // GET: Fetch availability for a date range
 export async function GET(request: NextRequest) {
@@ -34,7 +15,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase
       .from('availability')
       .select('*')
@@ -69,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     const { data, error } = await supabase
       .from('availability')

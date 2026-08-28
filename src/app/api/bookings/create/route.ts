@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import {
   calculateAdvanceAmount,
   validatePhone,
@@ -12,19 +13,6 @@ import {
 } from '@/lib/notifications';
 import { SelectedAddon } from '@/lib/supabase/types';
 import { isBookingAllowed } from '@/lib/supabase';
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key =
-    serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-      ? serviceRoleKey
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 interface CreateBookingRequest {
   customerName: string;
@@ -233,7 +221,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = getAdminSupabaseClient();
 
     // Server-side price authority: body.totalAmount is never read from here on.
     // We resolve the season, then look up the real price against whichever

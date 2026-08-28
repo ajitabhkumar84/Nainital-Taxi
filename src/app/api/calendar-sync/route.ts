@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   CalendarEvent,
   CalendarSyncResult,
@@ -14,18 +14,13 @@ import {
   getSyncDateRange,
 } from "@/lib/google-calendar";
 
-// Initialize Supabase client with service role for admin operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 // Google Calendar configuration
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     // Check if Google Calendar is configured
     if (!GOOGLE_CALENDAR_ID || !GOOGLE_API_KEY) {
       return NextResponse.json({
@@ -140,6 +135,7 @@ export async function POST(request: NextRequest) {
 // GET request returns sync status
 export async function GET() {
   try {
+    const supabase = getAdminSupabaseClient();
     // Get last sync timestamp
     const { data: lastSyncSetting } = await supabase
       .from("admin_settings")

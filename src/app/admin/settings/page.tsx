@@ -28,11 +28,16 @@ interface AdminSettings {
 
 const DEFAULT_SETTINGS: AdminSettings = {
   fleet_size: 10,
-  upi_id: "gokumaon@upi",
+  // Must match the UPI ID rendered on the payment step and encoded in the QR
+  // image at public/nainital-upi.jpg — see UPI_ID in
+  // src/components/booking/Step4Payment.tsx. These are only in sync by
+  // convention, so change all three together or customers see one handle and
+  // scan another.
+  upi_id: "gokumaon@ptyes",
   whatsapp_number: "8445206116",
   business_phone: "8445206116",
   business_email: "taxinainital@gmail.com",
-  business_name: "Nainital Fun Taxi",
+  business_name: "Nainital Taxi",
   booking_advance_days: 90,
   min_booking_hours: 4,
 };
