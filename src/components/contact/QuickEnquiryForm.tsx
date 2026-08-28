@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 interface QuickEnquiryFormProps {
   onClose?: () => void;
@@ -60,6 +63,11 @@ export default function QuickEnquiryForm({ onClose }: QuickEnquiryFormProps) {
     if (formData.name) whatsappMessage += `Name: ${formData.name}\n`;
     if (formData.phone) whatsappMessage += `Phone: ${formData.phone}\n`;
     if (formData.message) whatsappMessage += `\nMessage: ${formData.message}`;
+
+    capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+      placement: CTA_PLACEMENTS.mobileEnquiryModal,
+      context: 'form_prefilled',
+    });
 
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(whatsappUrl, '_blank');

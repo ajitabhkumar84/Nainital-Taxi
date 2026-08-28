@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Phone, MessageCircle, Send, X } from 'lucide-react';
 import QuickEnquiryForm from './QuickEnquiryForm';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 export default function MobileEnquiryBar() {
   const [isVisible, setIsVisible] = useState(false);
@@ -26,10 +29,17 @@ export default function MobileEnquiryBar() {
   }, []);
 
   const handleCallClick = () => {
+    capture(ANALYTICS_EVENTS.contactCallClicked, {
+      placement: CTA_PLACEMENTS.mobileBar,
+    });
     window.location.href = 'tel:+918445206116';
   };
 
   const handleWhatsAppClick = () => {
+    capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+      placement: CTA_PLACEMENTS.mobileBar,
+    });
+
     const phoneNumber = '918445206116';
     const message = encodeURIComponent(
       "Hi! I'm interested in booking a taxi in Nainital. Can you help me?"

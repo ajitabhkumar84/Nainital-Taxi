@@ -2,6 +2,8 @@
 
 import { Phone, Mail, MapPin, MessageCircle, Clock, Calendar, Award, Shield, Heart, Star } from 'lucide-react';
 import type { ContactCardKey, ContactCardLabels, ContactHourItem } from '@/lib/supabase/types';
+import { captureContactClick } from '@/lib/analytics/capture';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 // Icon vocabulary offered by the operating-hours editor in
 // src/components/admin/ContactPageForm.tsx — keep the two in sync.
@@ -83,6 +85,8 @@ export default function ContactInfo({
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
+              data-analytics-cta="whatsapp"
+              onClick={() => captureContactClick(whatsappUrl, CTA_PLACEMENTS.contactPage, 'whatsapp_card')}
               className="block bg-white rounded-2xl shadow-retro p-6 hover:shadow-retro-lg hover:-translate-y-1 transition-all border-3 border-ink group"
             >
               <div className="flex items-start">
@@ -108,6 +112,8 @@ export default function ContactInfo({
             {/* Phone Card */}
             <a
               href={`tel:${phoneNumber}`}
+              data-analytics-cta="call"
+              onClick={() => captureContactClick(`tel:${phoneNumber}`, CTA_PLACEMENTS.contactPage, 'phone_card')}
               className="block bg-white rounded-2xl shadow-retro p-6 hover:shadow-retro-lg hover:-translate-y-1 transition-all border-3 border-ink group"
             >
               <div className="flex items-start">

@@ -17,6 +17,9 @@ import {
 } from '@/lib/pricing';
 import { getMinBookingDate, formatDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import BlockedDateNotice from './BlockedDateNotice';
 import TransferRouteSelector, { TransferRoute } from './TransferRouteSelector';
@@ -197,6 +200,13 @@ export default function Step1PackageSelection({
     setRoute(route.id, `Transfer: ${nextPickup} to ${nextDropoff}`);
     setPickedInline(true);
     setError('');
+
+    capture(ANALYTICS_EVENTS.bookingRouteSelected, {
+      route_id: route.id,
+      pickup_location: nextPickup,
+      dropoff_location: nextDropoff,
+      booking_type: 'transfer',
+    });
   };
 
   async function fetchPackages() {
@@ -228,6 +238,12 @@ export default function Step1PackageSelection({
     setSelectedPackageData(pkg);
     setIsEditing(false);
     setError('');
+
+    capture(ANALYTICS_EVENTS.bookingPackageSelected, {
+      package_id: pkg.id,
+      package_slug: pkg.slug,
+      booking_type: 'tour',
+    });
   };
 
   const selectedVehiclePriceMissing =
@@ -240,9 +256,30 @@ export default function Step1PackageSelection({
           ? 'Please select a pick-up and drop-off location, a date, and a vehicle type with an available price'
           : 'Please select a package, a date, and a vehicle type with an available price'
       );
+
+      // Report *which* field was missing rather than the rendered copy: the
+      // message is one of two sentences covering four different causes, so the
+      // string alone cannot tell us what to fix in the UI.
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 1,
+        reason: !packageId && !routeId
+          ? 'no_package_or_route'
+          : !vehicleType
+            ? 'no_vehicle'
+            : !tripDate
+              ? 'no_date'
+              : 'price_unavailable',
+      });
       return;
     }
     setError('');
+
+    capture(ANALYTICS_EVENTS.bookingStepCompleted, {
+      ...bookingProperties(useBookingStore.getState()),
+      step: 1,
+    });
+
     nextStep();
   };
 
@@ -461,6 +498,20 @@ export default function Step1PackageSelection({
                 const selectVehicle = () => {
                   if (isPriceUnavailable) return;
                   setVehicleType(vehicle.type);
+
+                  // The price comes from local `pricesByVehicle`, not the
+                  // store: on step 1 the store's calculatedPrice is still null
+                  // (Step 2's availability check is what writes it), so this is
+                  // the only point in the funnel where the fare the customer
+                  // actually saw when choosing a vehicle is observable.
+                  capture(ANALYTICS_EVENTS.bookingVehicleSelected, {
+                    vehicle_type: vehicle.type,
+                    price_shown: priceResult?.price ?? null,
+                    season_name: priceResult?.seasonName ?? null,
+                    booking_type: bookingType,
+                    package_id: packageId,
+                    route_id: routeId,
+                  });
                 };
                 return (
                   <div
@@ -528,7 +579,20 @@ export default function Step1PackageSelection({
                             )}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                            data-analytics-cta="whatsapp"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // A route we have no price for. The customer
+                              // wanted this trip and the site could not quote
+                              // it — worth sizing separately from ordinary
+                              // WhatsApp traffic.
+                              capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+                                placement: CTA_PLACEMENTS.bookingStep1,
+                                context: 'price_unavailable',
+                                route_id: routeId,
+                                vehicle_type: vehicle.type,
+                              });
+                            }}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20BA59] px-3 py-1.5 rounded-lg transition-colors"
                           >
                             <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />

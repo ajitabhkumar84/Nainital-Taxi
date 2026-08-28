@@ -7,6 +7,8 @@ import { Car, Calendar, MapPin, IndianRupee, Phone, MessageCircle, Check, AlertC
 import Link from "next/link";
 import { buildBookingUrl } from "@/lib/bookingLink";
 import type { VehicleType } from "@/store/bookingStore";
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 
 interface Route {
   id: string;
@@ -111,6 +113,13 @@ export default function InstantQuotePage() {
       }
 
       setQuoteResult(data.data);
+
+      capture(ANALYTICS_EVENTS.quoteRequested, {
+        route_id: selectedRoute,
+        vehicle_type: selectedVehicle,
+        trip_date: selectedDate,
+        price_total: data.data?.price ?? null,
+      });
     } catch (err) {
       setError('Failed to get quote. Please try again.');
       console.error(err);

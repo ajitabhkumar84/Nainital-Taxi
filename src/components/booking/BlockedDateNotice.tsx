@@ -8,6 +8,8 @@ import {
   type AvailabilityInquiryRoute,
 } from '@/lib/messageGenerators';
 import { DEFAULT_BLOCKED_MESSAGE } from '@/lib/availabilityMessages';
+import { CallCTA, WhatsAppCTA } from '@/components/analytics/ContactCTA';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 export interface BlockedDateNoticeProps extends AvailabilityInquiryRoute {
   /** ISO date string (YYYY-MM-DD) the user picked, if any. */
@@ -50,18 +52,33 @@ export default function BlockedDateNotice({
       </p>
       <p className="text-gray-700">{message || DEFAULT_BLOCKED_MESSAGE}</p>
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 mt-4">
-        <a href={telHref} className="w-full sm:w-auto">
+        {/* One instrumentation point covering four render sites: the two
+            BookingWidget date pickers and steps 1 and 2. `context` records
+            that this lead came from a blocked date rather than ordinary
+            browsing — these are customers who wanted to book and could not,
+            which is the most valuable leak on the site to be able to size. */}
+        <CallCTA
+          href={telHref}
+          placement={CTA_PLACEMENTS.blockedDateNotice}
+          context={date ?? undefined}
+          className="w-full sm:w-auto"
+        >
           <Button variant="outline" size="md" className="w-full">
             <Phone className="w-4 h-4 mr-2" />
             Call Us
           </Button>
-        </a>
-        <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+        </CallCTA>
+        <WhatsAppCTA
+          href={whatsappHref}
+          placement={CTA_PLACEMENTS.blockedDateNotice}
+          context={date ?? undefined}
+          className="w-full sm:w-auto"
+        >
           <Button variant="whatsapp" size="md" className="w-full">
             <MessageCircle className="w-4 h-4 mr-2" />
             WhatsApp Us
           </Button>
-        </a>
+        </WhatsAppCTA>
       </div>
     </div>
   );

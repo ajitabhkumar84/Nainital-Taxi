@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { MessageCircle, X } from "lucide-react";
+import { capture } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 
 interface FloatingWhatsAppProps {
   /** Contextual message based on current page */
@@ -47,6 +50,13 @@ export default function FloatingWhatsApp({
   }, []);
 
   const handleWhatsAppClick = () => {
+    // Explicit capture: this is a <button> calling window.open, so it never
+    // produces an anchor click for the delegated listener to see.
+    capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+      placement: CTA_PLACEMENTS.floatingWidget,
+      context: routeName || packageName || destinationName || null,
+    });
+
     const phoneNumber = "918445206116";
 
     // Generate contextual message

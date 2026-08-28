@@ -5,6 +5,8 @@ import { AddonWithPrice, SelectedAddon } from '@/lib/supabase/types';
 import { useBookingStore } from '@/store/bookingStore';
 import AddonCard from './AddonCard';
 import { Gift, Sparkles } from 'lucide-react';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 
 interface AddonSelectorProps {
   packageId?: string;
@@ -82,6 +84,18 @@ export default function AddonSelector({
       };
       addAddon(selectedAddon);
     }
+
+    // `stage` separates the in-flow upsell on step 2 from the post-booking one
+    // on the confirmation screen — they convert very differently and lumping
+    // them together hides that.
+    capture(ANALYTICS_EVENTS.bookingAddonToggled, {
+      addon_id: addon.id,
+      addon_name: addon.name,
+      addon_price: addon.price,
+      action: isSelected ? 'removed' : 'added',
+      stage,
+      season_name: seasonName,
+    });
   };
 
   const formatPrice = (price: number) => {

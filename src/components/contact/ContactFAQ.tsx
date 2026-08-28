@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { ChevronDown, MessageCircle, Phone } from 'lucide-react';
 import type { ContactFaqItem } from '@/lib/supabase/types';
+import { captureContactClick } from '@/lib/analytics/capture';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 interface ContactFAQProps {
   heading?: string;
@@ -90,6 +92,8 @@ export default function ContactFAQ({
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
+              data-analytics-cta="whatsapp"
+              onClick={() => captureContactClick(whatsappUrl, CTA_PLACEMENTS.contactFaq)}
               className="inline-flex items-center justify-center bg-whatsapp text-white px-6 py-3 rounded-xl font-display font-bold border-3 border-ink shadow-retro hover:shadow-retro-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
             >
               <MessageCircle className="w-5 h-5 mr-2" />
@@ -97,6 +101,8 @@ export default function ContactFAQ({
             </a>
             <a
               href={`tel:${phoneNumber}`}
+              data-analytics-cta="call"
+              onClick={() => captureContactClick(`tel:${phoneNumber}`, CTA_PLACEMENTS.contactFaq)}
               className="inline-flex items-center justify-center bg-teal text-white px-6 py-3 rounded-xl font-display font-bold border-3 border-ink shadow-retro hover:shadow-retro-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
             >
               <Phone className="w-5 h-5 mr-2" />

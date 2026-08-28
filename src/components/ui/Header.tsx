@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import Button from "./Button";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { HeaderConfig, DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
+import { captureContactClick } from "@/lib/analytics/capture";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 
 interface HeaderProps {
   config?: HeaderConfig;
@@ -70,7 +72,13 @@ export default function Header({ config: propConfig }: HeaderProps) {
           <div className="hidden lg:flex items-center space-x-4">
             {/* Secondary CTA (usually Call/Phone) */}
             {headerConfig.ctaSecondary.isActive && (
-              <a href={headerConfig.ctaSecondary.href}>
+              <a
+                href={headerConfig.ctaSecondary.href}
+                data-analytics-cta="config"
+                onClick={() =>
+                  captureContactClick(headerConfig.ctaSecondary.href, CTA_PLACEMENTS.header, 'desktop')
+                }
+              >
                 <Button variant={headerConfig.ctaSecondary.variant} size="sm">
                   {SecondaryIcon && <SecondaryIcon className="w-4 h-4 mr-2" />}
                   {headerConfig.ctaSecondary.text}
@@ -121,7 +129,13 @@ export default function Header({ config: propConfig }: HeaderProps) {
               ))}
               <div className="flex flex-col space-y-2 pt-4">
                 {headerConfig.ctaSecondary.isActive && (
-                  <a href={headerConfig.ctaSecondary.href}>
+                  <a
+                    href={headerConfig.ctaSecondary.href}
+                    data-analytics-cta="config"
+                    onClick={() =>
+                      captureContactClick(headerConfig.ctaSecondary.href, CTA_PLACEMENTS.header, 'mobile_menu')
+                    }
+                  >
                     <Button variant={headerConfig.ctaSecondary.variant} size="md" className="w-full">
                       {SecondaryIcon && <SecondaryIcon className="w-4 h-4 mr-2" />}
                       {headerConfig.ctaSecondary.text}

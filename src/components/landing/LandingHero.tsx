@@ -2,6 +2,8 @@ import Image from 'next/image';
 import { Phone, MessageCircle } from 'lucide-react';
 import type { LandingThemeTokens } from './themes';
 import type { LandingPageConfig } from '@/lib/supabase/types';
+import { CallCTA, WhatsAppCTA } from '@/components/analytics/ContactCTA';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 interface LandingHeroProps {
   theme: LandingThemeTokens;
@@ -43,22 +45,22 @@ export default function LandingHero({ theme, hero, telHref, whatsappHref }: Land
         </p>
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <a
+          <CallCTA
             href={telHref}
+            placement={CTA_PLACEMENTS.landingHero}
             className={`flex min-h-[56px] flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold shadow-retro-lg transition sm:flex-none sm:px-10 ${theme.ctaCall}`}
           >
             <Phone className="h-6 w-6" />
             Call Now — Instant Booking
-          </a>
-          <a
+          </CallCTA>
+          <WhatsAppCTA
             href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
+            placement={CTA_PLACEMENTS.landingHero}
             className={`flex min-h-[56px] flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold shadow-retro-lg transition sm:flex-none sm:px-10 ${theme.ctaWhatsApp}`}
           >
             <MessageCircle className="h-6 w-6" />
             Book on WhatsApp
-          </a>
+          </WhatsAppCTA>
         </div>
 
         <p className="mt-4 text-xs text-white/70">

@@ -11,6 +11,9 @@ import type { PickupLocationRow } from '@/lib/supabase/types';
 import Step2TripDetails from '@/components/booking/Step2TripDetails';
 import Step3ContactInfo from '@/components/booking/Step3ContactInfo';
 import Step4Payment from '@/components/booking/Step4Payment';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { BOOKING_STEP_NAMES, bookingProperties } from '@/lib/analytics/properties';
 
 export interface BookingPageClientProps {
   // Fetched server-side in src/app/booking/page.tsx and drilled down to
@@ -38,6 +41,38 @@ function BookingPageContent({ pickupLocations, transferRoutes }: BookingPageClie
     const firstField = stepContentRef.current?.querySelector<HTMLElement>('input, select, textarea');
     firstField?.focus({ preventScroll: true });
   }, [currentStep]);
+
+  /**
+   * The funnel's backbone: one event per step actually shown to the user.
+   *
+   * Gated on `ready` on purpose. This component mounts with the Zustand
+   * default currentStep=1 and only receives the real step once
+   * useBookingEntry's patch lands — so without the guard every deep-linked
+   * arrival (which starts at step 2) would first emit a step-1 view for a
+   * screen the visitor never saw, inflating the top of the funnel and making
+   * step 1 -> 2 drop-off look far worse than it is.
+   *
+   * Reaching step 4 is also the "completed the wizard, payment screen with the
+   * UPI QR is up" milestone. It is emitted here rather than inside
+   * Step4Payment because that component renders either the payment form or the
+   * post-submission confirmation screen depending on state, and this fires for
+   * the former.
+   */
+  useEffect(() => {
+    if (!ready) return;
+
+    const props = {
+      ...bookingProperties(useBookingStore.getState()),
+      step: currentStep,
+      step_name: BOOKING_STEP_NAMES[currentStep] ?? String(currentStep),
+    };
+
+    capture(ANALYTICS_EVENTS.bookingStepViewed, props);
+
+    if (currentStep === 4) {
+      capture(ANALYTICS_EVENTS.bookingPaymentViewed, props);
+    }
+  }, [currentStep, ready]);
 
   // Until the entry contract has been applied, currentStep is still the
   // Zustand default of 1 — rendering before `ready` would flash the full
