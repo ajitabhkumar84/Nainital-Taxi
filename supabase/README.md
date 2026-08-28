@@ -27,6 +27,11 @@ bundles ten of them (route categories, ticker, trust section, multi-day rental,
 add-ons, temples, admin audit log, reverse route links) plus the two RLS
 hardening passes, and is safe to run once as a single script.
 
+Then `harden_rls_audit_2026_08.sql`, the third RLS pass. On an existing
+database this is the one to run now — it closes three holes found in the
+2026-08-28 audit (see below). On a fresh bootstrap the source scripts already
+carry the fix, and running it is a harmless no-op.
+
 Finally, run `verify_launch_readiness.sql` — see below.
 
 ## Adding schema
@@ -57,6 +62,27 @@ so it is safe to run against production and safe to re-run. It reports:
 
 Anything not reporting `PASS` in sections 1–3 is a security gate and needs
 attention before shipping. Run it after any schema change.
+
+Section 2 returns exactly one benign row by design (`bookings` /
+`Users create bookings`, whose `auth.uid() = user_id` check refuses anon
+inserts). Any *other* row there is a launch blocker.
+
+### The 2026-08-28 audit
+
+Cross-referencing every `CREATE TABLE` in this directory against every
+`ENABLE ROW LEVEL SECURITY` turned up three holes, all fixed by
+`harden_rls_audit_2026_08.sql`:
+
+| Table | Problem |
+|---|---|
+| `addon_routes` | RLS never enabled. Created in `migrations/add_route_id_support.sql`, so it missed the sweep that hardened its `addon_packages` / `addon_destinations` siblings. |
+| `tour_trust_section` | RLS never enabled. Its `trust_section` sibling was hardened; this one was created in a separate file and missed. |
+| `multi_day_rental_page` | RLS on, but an UPDATE policy with no `TO` clause — which means `PUBLIC`. The anon key could rewrite the whole page. Dropped; admin writes use the service-role key and bypass RLS anyway. |
+
+The pattern in all three: a table created in a *different file* from its
+siblings misses the hardening pass written for that group. When you add a table
+that belongs to an existing feature, enable RLS **in the same file that creates
+it** rather than relying on a later sweep.
 
 ## Core tables
 

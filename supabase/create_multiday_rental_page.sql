@@ -111,17 +111,24 @@ ON CONFLICT (id) DO NOTHING;
 -- Enable RLS
 ALTER TABLE multi_day_rental_page ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies: Public can read, authenticated users can manage (for admin)
+-- RLS Policies: public read only.
 CREATE POLICY "Public can view multi-day rental page"
   ON multi_day_rental_page
   FOR SELECT
   USING (true);
 
-CREATE POLICY "Authenticated users can update multi-day rental page"
-  ON multi_day_rental_page
-  FOR UPDATE
-  USING (true)
-  WITH CHECK (true);
+-- 2026-08-28 audit: there used to be an UPDATE policy here named
+-- "Authenticated users can update multi-day rental page", defined as
+-- FOR UPDATE USING (true) WITH CHECK (true). Despite the name it had no TO
+-- clause, and a policy with no TO clause applies to PUBLIC — so together with
+-- Supabase's default UPDATE grant to anon it let the public anon key (which
+-- ships in every page's JS bundle) rewrite this entire page.
+--
+-- It was also doing nothing useful: this row is only ever written by
+-- /api/admin/multi-day-rental through getAdminSupabaseClient(), and the
+-- service-role key bypasses RLS. Dropped rather than narrowed for that reason.
+-- harden_rls_audit_2026_08.sql drops it on databases that already ran this
+-- file.
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_multi_day_rental_page_published ON multi_day_rental_page(is_published);

@@ -25,3 +25,19 @@ CREATE INDEX IF NOT EXISTS idx_addon_routes_route ON addon_routes(route_id);
 
 COMMENT ON COLUMN bookings.route_id IS 'Set for route-based transfer bookings (routes/route_pricing tables); package_id stays null for these rows.';
 COMMENT ON TABLE addon_routes IS 'Maps addons to specific transfer routes';
+
+-- ============================================================================
+-- Row Level Security for addon_routes
+-- ============================================================================
+-- Added 2026-08-28. addon_routes mirrors addon_packages / addon_destinations,
+-- both of which are locked down in harden_rls_new_tables.sql — but because
+-- this table is created here rather than in create_addons_schema.sql, it was
+-- missed and stayed writable by the public anon key.
+--
+-- Read publicly (/api/addons resolves route-specific addons with an anon-key
+-- client), so it gets the same unfiltered public SELECT policy as its two
+-- sibling junction tables. Writes go through the admin routes on the
+-- service-role key, which bypasses RLS.
+ALTER TABLE addon_routes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read" ON addon_routes;
+CREATE POLICY "Public read" ON addon_routes FOR SELECT USING (true);

@@ -55,3 +55,22 @@ VALUES (
   true
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- Row Level Security
+-- ============================================================================
+-- Added 2026-08-28. This table originally shipped without RLS, which meant the
+-- public anon key could rewrite the "Why Families Trust Us" block on every tour
+-- package page. Its sibling table trust_section was hardened in
+-- harden_rls_new_tables.sql; this one was created in a separate file and missed.
+--
+-- Read publicly via the anon-key singleton (getTourTrustSection in
+-- queries_enhanced.ts), so it needs a public SELECT policy rather than a bare
+-- lockout. Writes go through /api/admin/tour-trust-section on the service-role
+-- key, which bypasses RLS, so no write policy is needed.
+--
+-- harden_rls_audit_2026_08.sql applies the same change to databases that
+-- already ran this file.
+ALTER TABLE tour_trust_section ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read" ON tour_trust_section;
+CREATE POLICY "Public read" ON tour_trust_section FOR SELECT USING (is_published = true);

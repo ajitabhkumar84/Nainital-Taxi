@@ -50,7 +50,22 @@ ORDER BY rowsecurity ASC, tablename;
 -- reachable by anon would let anyone with the public key modify site content
 -- straight from a browser console.
 --
--- Expect: zero rows. Any row returned is a launch blocker.
+-- Expect: exactly ONE row, and only this one:
+--
+--   bookings | Users create bookings | INSERT | {public}
+--
+-- That one is benign and expected. Its WITH CHECK is auth.uid() = user_id,
+-- and auth.uid() is NULL for the anon role, so the comparison evaluates to
+-- NULL and the insert is refused. It is listed here because this query matches
+-- on role rather than on whether the qualifier is actually satisfiable.
+--
+-- ANY OTHER ROW IS A LAUNCH BLOCKER. Do not skim past this section because it
+-- is "expected to return something" — that is exactly how the finding below
+-- survived. The 2026-08-28 audit found multi_day_rental_page carrying
+-- "Authenticated users can update multi-day rental page" (FOR UPDATE, no TO
+-- clause, therefore PUBLIC), which let the anon key rewrite that whole page.
+-- This query would have caught it the day it shipped; nobody had run the file.
+-- See harden_rls_audit_2026_08.sql.
 SELECT
   '2. anon write policy' AS check_name,
   tablename,

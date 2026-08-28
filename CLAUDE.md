@@ -218,12 +218,23 @@ Conventions when adding schema:
 
 - Write a new descriptively-named `.sql` file in `supabase/`; do not edit
   `schema_enhanced.sql` retroactively.
-- **New public-schema tables get RLS enabled with explicit policies.** Supabase
-  grants anon + authenticated full CRUD by default, and the anon key ships in
-  every page's JS bundle. `harden_rls.sql` exists because four tables shipped
-  without it and the anon key could write to them in production.
+- **New public-schema tables get RLS enabled with explicit policies, in the
+  same file that creates the table.** Supabase grants anon + authenticated full
+  CRUD by default, and the anon key ships in every page's JS bundle. There have
+  been three hardening passes now (`harden_rls.sql`,
+  `harden_rls_new_tables.sql`, `harden_rls_audit_2026_08.sql`) and every table
+  they caught failed the same way: it was created in a *different file* from
+  its siblings and so missed the sweep written for that group. Don't rely on a
+  later sweep.
+- **A policy with no `TO` clause applies to `PUBLIC`, not to authenticated
+  users** — regardless of what the policy is named. That is how
+  `multi_day_rental_page` ended up with an UPDATE policy the anon key could
+  use. Write policies are almost never needed here at all: admin writes use the
+  service-role key, which bypasses RLS entirely.
 - `supabase/verify_launch_readiness.sql` is a read-only audit (RLS coverage,
-  anon write access, indexes, DB size). Run it after schema changes.
+  anon write access, indexes, DB size). Run it after schema changes. Section 2
+  returns one benign `bookings` row by design; anything else there is a
+  blocker.
 
 Admin writes use the service-role key and bypass RLS, so adding RLS never
 breaks the admin panel — it only blocks the public anon key.
