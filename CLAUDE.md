@@ -248,15 +248,35 @@ open. `RESEND_API_KEY`, `FROM_EMAIL`, `ADMIN_EMAIL` for booking emails.
 - Server components by default; `"use client"` only where interactivity needs
   it. The admin panel is almost entirely client-side.
 
+## Documentation
+
+Three files, and they are the only ones kept current:
+
+- **`CLAUDE.md`** (this file) — the invariants above.
+- **`README.md`** — what the project is, setup, env vars, commands, deploy.
+- **`supabase/README.md`** — DB bootstrap order, schema conventions, the
+  pricing model.
+
+The ~15 root-level `*.md` files that used to sit alongside these
+(`master-plan.md`, `QUICKSTART.md`, `MIGRATION_GUIDE.md`, the `*_SUMMARY.md`
+and `*_SETUP.md` reports) were deleted in Aug 2026. They were completion
+reports and design docs last touched in Dec 2025 / Jan 2026, and several
+actively contradicted the code — they are in git history if ever needed.
+Don't reintroduce that pattern: a doc describing what a change did belongs in
+the commit message, not a new root-level markdown file.
+
 ## Known repo debt (do not be surprised by it)
 
-- `package.json` is still named `"temp-app"`.
-- `README.md` is untouched `create-next-app` boilerplate.
-- The ~15 root-level `*.md` documents (`master-plan.md`, `QUICKSTART.md`,
-  `MIGRATION_GUIDE.md`, the `*_SUMMARY.md` files) were last updated in
-  Dec 2025 / Jan 2026 and describe an earlier state of the app. **Trust the
-  code and this file over them.**
-- Two large PNG screenshots and a JPG are committed at the repo root.
 - `images.unsplash.com` is still allowed in the CSP because some
   `destinations`/`packages`/`vehicles` rows hold Unsplash placeholder URLs.
   Remove it once real photography replaces them.
+- The UPI ID appears in three places that disagree:
+  `Step4Payment.tsx` hardcodes `gokumaon@ptyes` (matching the QR image at
+  `public/nainital-upi.jpg`), `/admin/settings` defaults to `gokumaon@upi`,
+  and the unused `NEXT_PUBLIC_UPI_ID` in `.env.example` says `gokumaon@paytm`.
+  The rendered QR and the copyable text agree with each other, so checkout is
+  correct today — but confirm the intended handle with the owner before
+  touching any of them.
+- `.env.example` documents integrations no code reads (Razorpay, PhonePe,
+  WhatsApp Business, Cloudinary, Sentry, Web3Forms). See the env section above
+  for what is actually referenced.
