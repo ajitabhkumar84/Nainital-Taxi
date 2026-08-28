@@ -157,10 +157,19 @@ generated type models only a subset of tables; `as any` casts on
 `supabase.from(...)` for unmodelled tables are an established escape hatch
 here, not an accident.
 
-Note: 29 API routes use `getAdminSupabaseClient()`, but 7 older ones
-(`admin/routes`, `admin/temples`, `admin/temple-categories`, `availability`,
-`bookings/*`, `calendar-sync`) still construct a service-role client inline.
-Prefer the helper in new code; converting an existing one is a fine drive-by.
+**Every** route needing service-role access now goes through
+`getAdminSupabaseClient()`; no handler builds one inline. Call it inside the
+handler (usually the first line of the `try`), not at module scope — it throws
+when `SUPABASE_SERVICE_ROLE_KEY` is missing, and at module scope that throw
+happens at import time and breaks the build rather than returning a 500.
+
+Three public-read routes (`/api/addons`, `/api/instant-quote`, `/api/routes`)
+still build their own **anon** client, and that is deliberate. They query
+tables the generated `Database` type does not model (`addons`, `addon_*`,
+`routes`), so switching them to the typed `supabase` singleton collapses every
+row to `never` and produces ~20 type errors. Converting them would mean
+sprinkling the `(supabase.from as any)(...)` cast that `sitemap.ts` uses —
+churn for no benefit. Leave them, or fix the generated types first.
 
 ### 8. Images
 

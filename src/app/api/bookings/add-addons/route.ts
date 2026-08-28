@@ -1,17 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey && serviceRoleKey !== 'your-service-role-key-here'
-    ? serviceRoleKey
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 /**
  * POST /api/bookings/add-addons
@@ -42,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getAdminClient();
+    const supabase = getAdminSupabaseClient();
 
     // Verify booking exists
     const { data: booking, error: bookingError } = await supabase

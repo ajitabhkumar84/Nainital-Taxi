@@ -22,6 +22,12 @@ import Link from 'next/link';
 import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
 
+// The live UPI handle. Hardcoded rather than read from admin_settings.upi_id
+// because it must match the QR code baked into public/nainital-upi.jpg below —
+// an admin editing the settings field would change the text a customer copies
+// without changing the code they scan, sending the two to different accounts.
+// Changing the handle therefore means replacing that image too, and updating
+// the DEFAULT_SETTINGS fallback in src/app/admin/settings/page.tsx.
 const UPI_ID = 'gokumaon@ptyes';
 const WHATSAPP_NUMBER = '8445206116';
 

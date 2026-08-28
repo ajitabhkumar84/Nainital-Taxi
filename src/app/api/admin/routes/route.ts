@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 import { revalidateRoutePages } from "@/lib/revalidateRoutePages";
 import {
   buildReverseRouteInsert,
@@ -7,11 +8,6 @@ import {
   generateRouteSlug,
   pricingDiffers,
 } from "@/lib/routeReverse";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const PARTNER_COLUMNS = "id, slug, pickup_location, drop_location";
 
@@ -27,7 +23,11 @@ function toPricingInsert(rows: any[], routeId: string) {
   });
 }
 
-async function replacePricing(routeId: string, pricing: unknown[]) {
+async function replacePricing(
+  supabase: SupabaseClient,
+  routeId: string,
+  pricing: unknown[]
+) {
   const { error: deleteError } = await supabase
     .from("route_pricing")
     .delete()
@@ -54,11 +54,14 @@ async function replacePricing(routeId: string, pricing: unknown[]) {
  * admin built by hand: we adopt and link that row instead of failing on the
  * `slug UNIQUE` constraint or creating a near-duplicate.
  */
-async function findExistingReverse(primary: {
-  id: string;
-  pickup_location: string;
-  drop_location: string;
-}) {
+async function findExistingReverse(
+  supabase: SupabaseClient,
+  primary: {
+    id: string;
+    pickup_location: string;
+    drop_location: string;
+  }
+) {
   const { data: linked, error: linkedError } = await supabase
     .from("routes")
     .select("*")
@@ -128,12 +131,13 @@ interface ReverseSyncResult {
  * is no longer true, and the pair would resolve to two unrelated routes.
  */
 async function syncReverseRoute(
+  supabase: SupabaseClient,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   primary: any,
   pricing: unknown[] | null | undefined,
   { confirmOverwrite }: { confirmOverwrite: boolean }
 ): Promise<ReverseSyncResult> {
-  const existing = await findExistingReverse(primary);
+  const existing = await findExistingReverse(supabase, primary);
 
   if (!existing) {
     const { data: created, error } = await supabase
@@ -144,7 +148,7 @@ async function syncReverseRoute(
     if (error) throw error;
 
     if (pricing && pricing.length > 0) {
-      await replacePricing((created as { id: string }).id, pricing);
+      await replacePricing(supabase, (created as { id: string }).id, pricing);
     }
     return {};
   }
@@ -207,7 +211,7 @@ async function syncReverseRoute(
   if (updateError) throw updateError;
 
   if (pricing) {
-    await replacePricing(existing.id, pricing);
+    await replacePricing(supabase, existing.id, pricing);
   }
   return { warning };
 }
@@ -221,6 +225,7 @@ async function syncReverseRoute(
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const withPricing = searchParams.get("withPricing") === "true";
@@ -340,6 +345,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const body = await request.json();
     const { pricing, create_reverse: createReverse, ...routeData } = body;
 
@@ -383,7 +389,7 @@ export async function POST(request: NextRequest) {
         // replacing that route's fares would be data loss with no undo. On
         // create there is no confirmation UI to fall back to (the route is
         // already committed), so we adopt it, leave its prices alone, and say so.
-        const result = await syncReverseRoute(route, pricing, { confirmOverwrite: false });
+        const result = await syncReverseRoute(supabase, route, pricing, { confirmOverwrite: false });
         if (result.confirmation) {
           const { pickup_location, drop_location } = result.confirmation.reverse;
           warning =
@@ -426,6 +432,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const body = await request.json();
     const {
       id,
@@ -510,7 +517,7 @@ export async function PATCH(request: NextRequest) {
     let warning: string | undefined;
 
     if (createReverse) {
-      const result = await syncReverseRoute(route, pricing, {
+      const result = await syncReverseRoute(supabase, route, pricing, {
         confirmOverwrite: !!confirmOverwriteReverse,
       });
 
@@ -564,6 +571,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getAdminSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
 
