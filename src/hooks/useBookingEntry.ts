@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useBookingStore, BookingEntryPatch, BookingStep } from '@/store/bookingStore';
 import { parseBookingEntry } from '@/lib/bookingLink';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 
 /**
  * Applies the /booking URL entry contract to the store exactly once per
@@ -50,6 +52,23 @@ export function useBookingEntry(): { ready: boolean } {
     if (parsed.passengers) patch.passengerCount = parsed.passengers;
 
     applyEntry(patch);
+
+    // The top of the funnel. Reports how much of the booking was already
+    // decided by the link the visitor arrived on, which is what distinguishes
+    // a warm arrival from /rates (route + vehicle prefilled, lands on step 2)
+    // from a cold /booking visit that has to walk all four steps.
+    capture(ANALYTICS_EVENTS.bookingEntry, {
+      landing_step: currentStep,
+      booking_type: parsed.packageType ?? null,
+      package_id: parsed.packageId ?? null,
+      route_id: parsed.routeId ?? null,
+      vehicle_type: parsed.vehicle ?? null,
+      has_date: Boolean(parsed.date),
+      has_pickup: Boolean(parsed.pickup),
+      prefilled_field_count: Object.keys(patch).length - 1, // minus currentStep
+      is_deep_link: currentStep === 2,
+    });
+
     setReady(true);
   }, [searchParams, applyEntry]);
 

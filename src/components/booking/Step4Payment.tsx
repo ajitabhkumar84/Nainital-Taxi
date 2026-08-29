@@ -21,6 +21,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 // The live UPI handle. Hardcoded rather than read from admin_settings.upi_id
 // because it must match the QR code baked into public/nainital-upi.jpg below —
@@ -78,10 +81,47 @@ export default function Step4Payment() {
     }
   }, [booking.isBookingComplete, booking.bookingId, booking.advanceAmount, booking.confirmedTotalAmount]);
 
+  /**
+   * The end of the funnel: the confirmation screen prompting the customer to
+   * send their payment screenshot on WhatsApp.
+   *
+   * This needs its own event rather than a pageview because it shares the
+   * ?step=4 URL with the pre-submission payment form — nothing in the URL
+   * distinguishes "looking at the QR" from "booking placed". Keyed on the
+   * booking id so it fires once per booking, including when the screen is
+   * restored from the persisted store on a remount, which is a real view.
+   */
+  useEffect(() => {
+    if (!isBookingCreated || !createdBookingId) return;
+
+    capture(ANALYTICS_EVENTS.bookingConfirmationViewed, {
+      ...bookingProperties(useBookingStore.getState()),
+      booking_id: createdBookingId,
+      price_total: createdTotalAmount,
+      price_advance: createdAdvanceAmount,
+    });
+    // createdTotalAmount/createdAdvanceAmount are set in the same tick as the
+    // two below, so keying on the id alone avoids a duplicate emission.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBookingCreated, createdBookingId]);
+
   const copyToClipboard = async (text: string, field: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
+
+      // Copying the UPI handle is the strongest signal we have that the
+      // customer is actually about to pay — there is no payment gateway
+      // callback to tell us, so this and the screenshot share are the only
+      // observable steps between "booking created" and money arriving.
+      if (field === 'upi') {
+        capture(ANALYTICS_EVENTS.paymentUpiCopied, {
+          ...bookingProperties(booking),
+          booking_id: createdBookingId,
+          price_advance: confirmedAdvance,
+        });
+      }
+
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
       alert('Failed to copy. Please copy manually.');
@@ -94,6 +134,16 @@ export default function Step4Payment() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+
+    capture(ANALYTICS_EVENTS.bookingSubmitted, {
+      ...bookingProperties(booking),
+      price_total_estimate: totalAmount,
+      price_advance_estimate: advanceAmount,
+    });
+
+    // Set when the failure has already been reported with an HTTP status, so
+    // the catch below does not double-report it as a network error.
+    let failureReported = false;
 
     try {
       const response = await fetch('/api/bookings/create', {
@@ -126,6 +176,16 @@ export default function Step4Payment() {
       const data = await response.json();
 
       if (!response.ok) {
+        capture(ANALYTICS_EVENTS.bookingFailed, {
+          ...bookingProperties(booking),
+          error_status: response.status,
+          // 409 is the availability guard refusing a blocked date — a distinct
+          // funnel outcome from a genuine server error, and the one worth
+          // alerting on because it means the customer did everything right.
+          reason: response.status === 409 ? 'blocked_date' : 'api_error',
+        });
+        failureReported = true;
+
         // A blocked-date 409 from the availability guard is a distinct,
         // expected condition (not a generic server failure) — surface a
         // clearer message pointing the user back to date selection.
@@ -140,6 +200,18 @@ export default function Step4Payment() {
       // Update store with the authoritative result (server-computed, not booking.calculatedPrice)
       booking.setBookingResult(data.bookingId, data.advanceAmount, data.totalAmount);
 
+      // THE CONVERSION. Amounts come from the API response, never from the
+      // client-side estimate above: /api/bookings/create recomputes price
+      // server-side and body.totalAmount is never trusted, so the estimate can
+      // legitimately differ from what the customer is actually charged.
+      capture(ANALYTICS_EVENTS.bookingCreated, {
+        ...bookingProperties(booking),
+        booking_id: data.bookingId,
+        price_total: data.totalAmount,
+        price_advance: data.advanceAmount,
+        price_remaining: data.totalAmount - data.advanceAmount,
+      });
+
       // Update local state
       setCreatedBookingId(data.bookingId);
       setCreatedAdvanceAmount(data.advanceAmount);
@@ -147,6 +219,13 @@ export default function Step4Payment() {
       setIsBookingCreated(true);
     } catch (error) {
       console.error('Booking creation error:', error);
+      if (!failureReported) {
+        capture(ANALYTICS_EVENTS.bookingFailed, {
+          ...bookingProperties(booking),
+          error_status: null,
+          reason: 'network_error',
+        });
+      }
       setSubmitError(
         error instanceof Error ? error.message : 'Failed to create booking. Please try again.'
       );
@@ -187,6 +266,19 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
   };
 
   const handleWhatsAppShare = () => {
+    // The true final step. A booking is only confirmed once the customer sends
+    // proof of the UPI transfer, so the gap between booking_created and this
+    // event is the "paid but never told us" cohort worth chasing.
+    capture(ANALYTICS_EVENTS.paymentScreenshotShared, {
+      ...bookingProperties(booking),
+      booking_id: createdBookingId,
+      price_advance: confirmedAdvance,
+    });
+    capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+      placement: CTA_PLACEMENTS.bookingConfirmation,
+      context: 'payment_screenshot',
+    });
+
     const link = `https://wa.me/91${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage()}`;
     window.open(link, '_blank');
   };
@@ -196,6 +288,12 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
       `Booking Confirmation - ${createdBookingId || booking.packageTitle}`
     );
     const body = generateWhatsAppMessage();
+
+    capture(ANALYTICS_EVENTS.paymentDetailsEmailed, {
+      ...bookingProperties(booking),
+      booking_id: createdBookingId,
+    });
+
     window.location.href = `mailto:bookings@nainitaltaxi.in?subject=${subject}&body=${body}`;
   };
 

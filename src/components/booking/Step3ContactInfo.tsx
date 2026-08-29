@@ -4,6 +4,9 @@ import { useBookingStore } from '@/store/bookingStore';
 import { Button, Input } from '@/components/ui';
 import { validatePhone } from '@/lib/booking';
 import { ArrowRight, ArrowLeft, User, Mail, MessageSquare } from 'lucide-react';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { bookingProperties } from '@/lib/analytics/properties';
 
 export default function Step3ContactInfo() {
   const {
@@ -23,9 +26,17 @@ export default function Step3ContactInfo() {
 
   const isInternational = customerCountryCode !== '91';
 
+  // Contact details are PII and never travel as event properties — see the
+  // note at the top of src/lib/analytics/properties.ts. The events below carry
+  // only the shape of the failure (which field, which format), never a value.
   const handleNext = () => {
     if (!customerName || !customerPhone) {
       alert('Please fill in all required fields');
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 3,
+        reason: !customerName ? 'no_name' : 'no_phone',
+      });
       return;
     }
 
@@ -35,6 +46,11 @@ export default function Step3ContactInfo() {
           ? 'Please enter a valid phone number, including your country code'
           : 'Please enter a valid 10-digit phone number'
       );
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 3,
+        reason: 'invalid_phone',
+      });
       return;
     }
 
@@ -43,9 +59,19 @@ export default function Step3ContactInfo() {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(customerEmail)) {
         alert('Please enter a valid email address');
+        capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+          ...bookingProperties(useBookingStore.getState()),
+          step: 3,
+          reason: 'invalid_email',
+        });
         return;
       }
     }
+
+    capture(ANALYTICS_EVENTS.bookingStepCompleted, {
+      ...bookingProperties(useBookingStore.getState()),
+      step: 3,
+    });
 
     nextStep();
   };

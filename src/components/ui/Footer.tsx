@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Shield, Phone, MessageCircle, Instagram, Facebook, Twitter, Youtube, Linkedin } from "lucide-react";
 import Button from "./Button";
 import { FooterConfig, ContactConfig, DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
+import { captureContactClick } from "@/lib/analytics/capture";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 
 interface FooterProps {
   config?: FooterConfig;
@@ -108,6 +110,8 @@ export default function Footer({
             <div className="space-y-3 mb-6">
               <a
                 href={`tel:${contact.phone}`}
+                data-analytics-cta="call"
+                onClick={() => captureContactClick(`tel:${contact.phone}`, CTA_PLACEMENTS.footer)}
                 className="flex items-center gap-2 text-white hover:text-teal transition-colors text-base font-semibold tabular-nums"
               >
                 <Phone className="w-4 h-4" />
@@ -117,6 +121,10 @@ export default function Footer({
                 href={`https://wa.me/${contact.whatsapp.replace(/\+/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-analytics-cta="whatsapp"
+                onClick={() =>
+                  captureContactClick(`https://wa.me/${contact.whatsapp}`, CTA_PLACEMENTS.footer)
+                }
                 className="flex items-center gap-2 text-white/70 hover:text-teal transition-colors text-sm font-body"
               >
                 <MessageCircle className="w-4 h-4 text-whatsapp" />
@@ -139,7 +147,12 @@ export default function Footer({
             {activeCtaButtons.length > 0 && (
               <div className="flex flex-col gap-2">
                 {activeCtaButtons.map((btn) => (
-                  <a key={btn.id} href={btn.href}>
+                  <a
+                    key={btn.id}
+                    href={btn.href}
+                    data-analytics-cta="config"
+                    onClick={() => captureContactClick(btn.href, CTA_PLACEMENTS.footer, btn.text)}
+                  >
                     <Button variant={btn.variant} size="sm" className="w-full">
                       {btn.icon === 'phone' && <Phone className="w-4 h-4 mr-2" />}
                       {btn.icon === 'whatsapp' && <MessageCircle className="w-4 h-4 mr-2" />}

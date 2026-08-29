@@ -5,6 +5,7 @@ import "./globals.css";
 import { generateLocalBusinessSchema } from "@/lib/structuredData";
 import { SITE_URL } from "@/lib/siteUrl";
 import GlobalContactWidgets from "@/components/GlobalContactWidgets";
+import PostHogProvider from "@/components/analytics/PostHogProvider";
 import { getTrackingConfig } from "@/lib/trackingScripts";
 import { getFaviconUrl } from "@/lib/branding";
 import {
@@ -108,8 +109,14 @@ export default async function RootLayout({
       <TrackingGtm tracking={trackingConfig} nonce={nonce} />
       <body className={`${interTight.variable} ${nunito.variable}`}>
         <TrackingBodyStart tracking={trackingConfig} />
-        {children}
-        <GlobalContactWidgets />
+        {/* Inside <body>, not a sibling of it — the GTM/GA components above
+            and below own that position and the comment on TrackingGtm explains
+            why it matters. PostHogProvider renders children unchanged, so
+            nesting it here costs nothing. */}
+        <PostHogProvider>
+          {children}
+          <GlobalContactWidgets />
+        </PostHogProvider>
         <TrackingBodyEnd tracking={trackingConfig} nonce={nonce} />
       </body>
       {/* GoogleAnalytics must likewise be a direct sibling of <body>. */}

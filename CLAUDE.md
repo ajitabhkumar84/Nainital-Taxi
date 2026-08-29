@@ -180,7 +180,38 @@ that pushes every image byte onto the Supabase 5GB/month egress limit, which is
 the tighter quota. Admin uploads go to the Supabase Storage `images` bucket via
 `/api/admin/upload`.
 
-### 9. SEO details that are easy to break
+### 9. Analytics: PostHog, manual events only
+
+`src/lib/analytics/` is the whole surface. **Never import `posthog-js` directly**
+outside `capture.ts` and `PostHogProvider.tsx` — everything else calls
+`capture(ANALYTICS_EVENTS.x, props)`, which fails silent and no-ops when
+`NEXT_PUBLIC_POSTHOG_KEY` is unset (the normal state locally). Analytics must
+never be able to break a booking.
+
+- **Event names live in `src/lib/analytics/events.ts`**, never as string
+  literals at call sites — same reasoning as `CACHE_TAGS`.
+- **No PII, ever.** `customerName` / `customerPhone` / `customerEmail` must not
+  leave the browser as properties. `bookingProperties()` sends derived booleans
+  (`has_email`, `is_international`) instead. Do not "just add" a name field.
+- **No `package_title`.** For transfers it is a synthesized free-text string
+  (`"Transfer: X to Y"`) that shreds cardinality. Send `package_id` / `route_id`.
+- **Events are proxied through `/ingest`** (rewrite in `next.config.mjs`), so
+  `connect-src 'self'` already covers them and **the CSP needs no change**. If
+  you ever point `NEXT_PUBLIC_POSTHOG_HOST` at a real PostHog host, you must add
+  it to `connect-src` in `csp.ts` or every event is blocked silently.
+- **autocapture and session replay are off on purpose** — cost (every event is a
+  Vercel invocation through the proxy) and privacy (replay would record the
+  booking form). Enabling replay also needs `worker-src 'self' blob:` in the CSP.
+- **Pageviews are manual.** The wizard drives steps through raw
+  `history.pushState`, and step 4 pre-submit shares a URL with the confirmation
+  screen, so URL-based funnels are unreliable by construction. Use the events.
+- Contact CTAs: prefer `<CallCTA>`/`<WhatsAppCTA>` (client leaves, so server
+  components can render them). `ContactClickListener` catches any unmigrated
+  anchor as `placement: 'unmigrated'` — filtering that in PostHog is the
+  migration backlog. It cannot see `<button>`-based CTAs; those need an explicit
+  `capture()` in their handler.
+
+### 10. SEO details that are easy to break
 
 - `SITE_URL` in `src/lib/siteUrl.ts` is a **hardcoded constant**, not
   `NEXT_PUBLIC_SITE_URL` — that var is `localhost:3000` locally and reading it
@@ -195,7 +226,7 @@ the tighter quota. Admin uploads go to the Supabase Storage `images` bucket via
   than a redirect, and they are deliberately *not* in `robots.ts` disallow, so
   they keep getting recrawled).
 
-### 10. Misc traps
+### 11. Misc traps
 
 - `src/components/ui/FooterServer.tsx` is **not** exported from the `ui/index.ts`
   barrel — that barrel is imported by client components, and pulling an async

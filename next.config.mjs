@@ -81,6 +81,48 @@ const nextConfig = {
     minimumCacheTTL: 2678400,
   },
 
+  // PostHog's paths are slash-sensitive; Next's default trailing-slash
+  // normalisation would rewrite /ingest/decide/ into a redirect the SDK does
+  // not follow, and events would silently stop arriving.
+  skipTrailingSlashRedirect: true,
+
+  /**
+   * PostHog reverse proxy.
+   *
+   * Analytics is served from our own origin rather than posthog.com for two
+   * reasons:
+   *
+   *  1. CSP. src/lib/security/csp.ts uses 'strict-dynamic' and an explicit
+   *     connect-src allowlist. Same-origin requests are already covered by
+   *     `connect-src 'self'`, so this needs no CSP change at all — whereas
+   *     direct ingestion would mean allowlisting PostHog's hosts by hand, the
+   *     way every other vendor in that file had to be.
+   *  2. Ad blockers drop requests to posthog.com outright. On a consumer
+   *     travel site that silently under-counts the funnel by a fifth or more,
+   *     which is worse than useless — it looks like real data.
+   *
+   * The cost is that every event becomes a Vercel function invocation and
+   * counts against bandwidth. That is why autocapture and session replay are
+   * both off (see src/components/analytics/PostHogProvider.tsx): event volume
+   * stays proportional to real user actions rather than every click.
+   *
+   * Two upstreams are required. The assets host serves the SDK's own bundles
+   * (recorder, surveys, toolbar); the ingest host takes the events. Pointing
+   * both at the ingest host is a common mistake and breaks asset loading.
+   */
+  async rewrites() {
+    return [
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://us.i.posthog.com/:path*',
+      },
+    ];
+  },
+
   async redirects() {
     return [
       {

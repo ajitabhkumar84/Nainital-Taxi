@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { User, MapPin, Car, Send, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 interface ContactFormProps {
   formTitle?: string;
@@ -55,6 +58,10 @@ export default function ContactForm({
       const result = await response.json();
 
       if (response.ok && result.success) {
+        // No form field values here — the contact form collects name, phone
+        // and email, none of which belong in an analytics payload.
+        capture(ANALYTICS_EVENTS.contactFormSubmitted, {});
+
         form.reset();
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 5000);
@@ -100,6 +107,11 @@ export default function ContactForm({
     whatsappMessage += `Passengers: ${passengers}\n`;
     whatsappMessage += `Vehicle: ${vehicle}\n`;
     if (message) whatsappMessage += `\nAdditional Info: ${message}`;
+
+    capture(ANALYTICS_EVENTS.contactWhatsappClicked, {
+      placement: CTA_PLACEMENTS.contactForm,
+      context: 'form_prefilled',
+    });
 
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(whatsappUrl, '_blank');

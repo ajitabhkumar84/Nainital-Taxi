@@ -15,6 +15,9 @@ import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 import { resolvePickupAliases, toCanonicalPickupLocation } from "@/lib/pickupLocations";
 import { findRouteForPair } from "@/lib/routeReverse";
 import BlockedDateNotice from "@/components/booking/BlockedDateNotice";
+import { capture } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
@@ -325,6 +328,17 @@ export default function BookingWidget({ pickupLocations, tourPackages }: Booking
       return;
     }
 
+    // Entry into the booking funnel from the homepage/LP widget. Paired with
+    // booking_entry on the /booking side, this shows how many widget
+    // submissions actually arrive — i.e. whether the handoff itself leaks.
+    capture(ANALYTICS_EVENTS.bookingCtaClicked, {
+      placement: CTA_PLACEMENTS.bookingWidget,
+      booking_type: 'tour',
+      package_id: tourPackage,
+      vehicle_type: tourVehicle,
+      trip_date: tourDate,
+    });
+
     router.push(
       buildBookingUrl({
         packageId: tourPackage,
@@ -363,6 +377,16 @@ export default function BookingWidget({ pickupLocations, tourPackages }: Booking
       alert("Please select a vehicle that fits your passenger count");
       return;
     }
+
+    capture(ANALYTICS_EVENTS.bookingCtaClicked, {
+      placement: CTA_PLACEMENTS.bookingWidget,
+      booking_type: 'transfer',
+      route_id: selectedRoute.id,
+      vehicle_type: transferVehicle,
+      trip_date: transferDate,
+      pickup_location: transferFrom,
+      dropoff_location: transferTo,
+    });
 
     router.push(
       buildBookingUrl({

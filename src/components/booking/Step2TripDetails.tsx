@@ -11,6 +11,9 @@ import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { generateAvailabilityInquiryWhatsAppLink } from '@/lib/messageGenerators';
 import AddonSelector from './AddonSelector';
 import BlockedDateNotice from './BlockedDateNotice';
+import { capture } from '@/lib/analytics/capture';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
+import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
 // Hourly pickup-time options within our staffed window. Both flows cut off
 // at 3 PM (15:00) so the trip has daylight to complete; tours additionally
@@ -143,6 +146,17 @@ export default function Step2TripDetails() {
       if (availabilityData) {
         setAvailability(availabilityData.status, availabilityData.carsAvailable);
         setBlockedMessage(availabilityData.message);
+
+        if (
+          availabilityData.status === 'sold_out' ||
+          availabilityData.status === 'blocked'
+        ) {
+          capture(ANALYTICS_EVENTS.bookingUnavailable, {
+            reason: availabilityData.status,
+            trip_date: date,
+            cars_available: availabilityData.carsAvailable ?? null,
+          });
+        }
       }
 
       // Get price — routeId and packageId are mutually exclusive
@@ -151,8 +165,30 @@ export default function Step2TripDetails() {
         : await getPackagePrice(packageId!, vehicleType, date);
       if (priceData) {
         setCalculatedPrice(priceData.price, priceData.seasonId, priceData.seasonName);
+
+        // The first authoritative price in the funnel. Step 1 only ever showed
+        // a per-vehicle quote from local state; this is the figure the rest of
+        // the booking is built on, so revenue analysis anchors here.
+        capture(ANALYTICS_EVENTS.bookingPriceResolved, {
+          price_total: priceData.price,
+          season_name: priceData.seasonName,
+          vehicle_type: vehicleType,
+          package_id: packageId,
+          route_id: routeId,
+          trip_date: date,
+        });
       } else {
         setPriceError(true);
+
+        // No price row for this package/vehicle/season combination. A silent
+        // dead end for the customer, so it needs to be visible to us.
+        capture(ANALYTICS_EVENTS.bookingUnavailable, {
+          reason: 'no_price',
+          vehicle_type: vehicleType,
+          package_id: packageId,
+          route_id: routeId,
+          trip_date: date,
+        });
       }
     } catch (error) {
       console.error('Error checking availability and price:', error);
@@ -188,8 +224,17 @@ export default function Step2TripDetails() {
     (dropoffLocation || '').toLowerCase().includes('nainital');
 
   const handleNext = () => {
+    // Every failure branch below reports before returning. These are surfaced
+    // to the user with alert() rather than an error state var, so unlike step 1
+    // there is nothing rendered we could observe after the fact — the event is
+    // the only record that the customer was stopped here.
     if (!tripDate || !tripTime || !pickupLocation) {
       alert('Please fill in all required fields');
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 2,
+        reason: !tripDate ? 'no_date' : !tripTime ? 'no_time' : 'no_pickup',
+      });
       return;
     }
 
@@ -197,18 +242,38 @@ export default function Step2TripDetails() {
     if (passengerInput === '' || isNaN(parsedPassengerCount) || parsedPassengerCount < 1) {
       setPassengerInput('1');
       setPassengerCount(1);
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 2,
+        reason: 'invalid_passenger_count',
+      });
       return;
     }
 
     if (availabilityStatus === 'sold_out' || availabilityStatus === 'blocked') {
       alert('This date is not available. Please contact us or choose another date.');
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 2,
+        reason: availabilityStatus === 'sold_out' ? 'sold_out' : 'blocked_date',
+      });
       return;
     }
 
     if (capacityExceeded) {
       alert('This vehicle is too small for your passenger count. Please go back and choose a larger vehicle.');
+      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+        ...bookingProperties(useBookingStore.getState()),
+        step: 2,
+        reason: 'capacity_exceeded',
+      });
       return;
     }
+
+    capture(ANALYTICS_EVENTS.bookingStepCompleted, {
+      ...bookingProperties(useBookingStore.getState()),
+      step: 2,
+    });
 
     nextStep();
   };
@@ -375,6 +440,13 @@ export default function Step2TripDetails() {
                 </a>
                 <a
                   href={`tel:${siteConfig.contact.phone.replace(/\s/g, '')}`}
+                  data-analytics-cta="call"
+                  onClick={() =>
+                    capture(ANALYTICS_EVENTS.contactCallClicked, {
+                      placement: CTA_PLACEMENTS.bookingStep2,
+                      context: 'sold_out',
+                    })
+                  }
                   className="flex items-center gap-2 px-4 py-2 bg-[#4D96FF] text-white rounded-xl font-bold hover:bg-[#3D86EF] transition-colors"
                 >
                   <Phone className="w-4 h-4" />
