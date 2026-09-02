@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { useBookingEntry } from '@/hooks/useBookingEntry';
 import { useBookingStepUrlSync } from '@/hooks/useBookingStepUrlSync';
-import { CheckCircle2, Shield, Star, Users, Award, Lock } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import Step1PackageSelection from '@/components/booking/Step1PackageSelection';
 import type { TransferRoute } from '@/components/booking/TransferRouteSelector';
 import type { PickupLocationRow } from '@/lib/supabase/types';
@@ -22,6 +22,15 @@ export interface BookingPageClientProps {
   transferRoutes: TransferRoute[];
 }
 
+/**
+ * One line, four facts. This replaces the step-1 promotional hero (an h1, a
+ * subtitle and four 40px trust tiles) plus the trust row that used to repeat at
+ * the bottom of every step — together about 290px of non-functional height on
+ * the most conversion-critical page on the site. The same claims survive at the
+ * same font size; only the packaging is gone.
+ */
+const TRUST_POINTS = ['4.8/5 rated', '1500+ travellers', 'Verified drivers', '15+ years'];
+
 // Wrapper component to handle URL params
 function BookingPageContent({ pickupLocations, transferRoutes }: BookingPageClientProps) {
   const { ready } = useBookingEntry();
@@ -36,6 +45,12 @@ function BookingPageContent({ pickupLocations, transferRoutes }: BookingPageClie
   // then focus the new step's first field so the user can start typing
   // right away; preventScroll avoids the browser re-scrolling to it and
   // undoing the jump to the top.
+  //
+  // Since the two-column redesign the scrollTo is close to a no-op on desktop
+  // (there is nothing left to scroll) but still matters on mobile. The focus
+  // query resolves inside StepShell's form column only — StepShell keeps its
+  // own ref there deliberately, so this can never focus a control in the
+  // sticky rail.
   useEffect(() => {
     window.scrollTo(0, 0);
     const firstField = stepContentRef.current?.querySelector<HTMLElement>('input, select, textarea');
@@ -93,196 +108,119 @@ function BookingPageContent({ pickupLocations, transferRoutes }: BookingPageClie
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-4 sm:pt-6 pb-16">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Header — full promotional banner only on step 1; steps 2-4 get a
-            compact title + a single trust cue so the flow doesn't repeat a
-            full hero section on every step. */}
-        {currentStep === 1 ? (
-          <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
-              Book Your Ride
-            </h1>
-            <p className="text-lg text-[#636E72] mb-6">
-              Complete your booking in 4 easy steps
-            </p>
-
-            {/* Trust Signals */}
-            <div className="flex flex-wrap justify-center gap-6 mt-8">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-                <div className="w-10 h-10 bg-teal/20 rounded-full flex items-center justify-center">
-                  <Star className="w-5 h-5 text-teal fill-teal" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold">4.8/5 Rating</div>
-                  <div className="text-xs text-gray-500">Best Service</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-                <div className="w-10 h-10 bg-whatsapp/20 rounded-full flex items-center justify-center">
-                  <Users className="w-5 h-5 text-whatsapp" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold">1500+ Happy</div>
-                  <div className="text-xs text-gray-500">Customers</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-                <div className="w-10 h-10 bg-coral/20 rounded-full flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-coral" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold">100% Safe</div>
-                  <div className="text-xs text-gray-500">Verified Drivers</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2D3436]">
-                <div className="w-10 h-10 bg-sunshine/30 rounded-full flex items-center justify-center">
-                  <Award className="w-5 h-5 text-ink" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold">15+ Years</div>
-                  <div className="text-xs text-gray-500">Experience</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#2D3436]">
+    <BookingFrame>
+      {/*
+        Header and step indicator share one row. Previously these were two
+        stacked blocks (a centred title card, then a full-width 4-node stepper
+        with labels and descriptions) totalling ~218px before the form started.
+      */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-ink truncate">
               {steps[currentStep - 1].title}
-            </h2>
-            <p className="text-xs sm:text-sm text-[#636E72] mt-0.5 mb-1">
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500">
               {steps[currentStep - 1].description}
             </p>
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-              <Lock className="w-3 h-3" />
-              Secure Checkout
-            </div>
           </div>
-        )}
 
-        {/* Step Indicator */}
-        <div className="mb-6 sm:mb-8">
-          <div className="max-w-4xl mx-auto">
-            {/* Desktop Step Indicator */}
-            <div className="hidden md:flex items-center justify-between relative">
-              {/* Progress Line */}
-              <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 -z-10">
+          {/* Desktop step pills */}
+          <div className="hidden md:flex items-center gap-1.5 shrink-0">
+            {steps.map((step) => (
+              <div key={step.number} className="flex items-center gap-1.5">
                 <div
-                  className="h-full bg-[#4D96FF] transition-all duration-500"
-                  style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
-                />
-              </div>
-
-              {/* Steps */}
-              {steps.map((step) => (
-                <div key={step.number} className="flex flex-col items-center">
-                  <div
-                    className={`
-                      w-10 h-10 rounded-full flex items-center justify-center
-                      font-bold text-base transition-all duration-300
-                      border-4 border-white shadow-lg
-                      ${
-                        step.number < currentStep
-                          ? 'bg-[#4D96FF] text-white'
-                          : step.number === currentStep
-                          ? 'bg-[#FFD93D] text-[#2D3436] animate-pulse'
-                          : 'bg-white text-gray-400'
-                      }
-                    `}
-                  >
-                    {step.number < currentStep ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      step.number
-                    )}
-                  </div>
-                  <div className="mt-2 text-center">
-                    <div
-                      className={`
-                        font-bold text-sm
-                        ${step.number === currentStep ? 'text-[#2D3436]' : 'text-gray-500'}
-                      `}
-                    >
-                      {step.title}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {step.description}
-                    </div>
-                  </div>
+                  className={`
+                    w-7 h-7 rounded-full flex items-center justify-center
+                    text-xs font-bold transition-colors
+                    ${
+                      step.number < currentStep
+                        ? 'bg-sunshine text-white'
+                        : step.number === currentStep
+                        ? 'bg-ink text-white'
+                        : 'bg-slate-100 text-slate-400'
+                    }
+                  `}
+                  aria-current={step.number === currentStep ? 'step' : undefined}
+                  title={step.title}
+                >
+                  {step.number < currentStep ? <Check className="w-4 h-4" /> : step.number}
                 </div>
-              ))}
-            </div>
-
-            {/* Mobile Step Indicator */}
-            <div className="md:hidden">
-              <div className="flex items-center justify-center gap-2 mb-2.5">
-                {steps.map((step) => (
+                {step.number < steps.length && (
                   <div
-                    key={step.number}
-                    className={`
-                      flex-1 h-1.5 rounded-full transition-all duration-300
-                      ${
-                        step.number <= currentStep
-                          ? step.number === currentStep
-                            ? 'bg-[#FFD93D]'
-                            : 'bg-[#4D96FF]'
-                          : 'bg-gray-200'
-                      }
-                    `}
+                    className={`w-4 h-px ${
+                      step.number < currentStep ? 'bg-sunshine' : 'bg-slate-200'
+                    }`}
                   />
-                ))}
+                )}
               </div>
-              {currentStep === 1 ? (
-                <div className="text-center">
-                  <div className="text-sm font-bold text-[#2D3436]">
-                    Step {currentStep} of {steps.length}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {steps[currentStep - 1].title}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-xs font-semibold text-gray-500">
-                  Step {currentStep} of {steps.length}
-                </div>
-              )}
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Step Content */}
-        <div className="max-w-4xl mx-auto">
-          <div ref={stepContentRef} className="bg-white rounded-3xl shadow-2xl border-4 border-[#2D3436] p-8 md:p-12">
-            {currentStep === 1 && (
-              <Step1PackageSelection
-                pickupLocations={pickupLocations}
-                transferRoutes={transferRoutes}
-              />
-            )}
-            {currentStep === 2 && <Step2TripDetails />}
-            {currentStep === 3 && <Step3ContactInfo />}
-            {currentStep === 4 && <Step4Payment />}
-          </div>
+        {/* Mobile progress bars + trust strip */}
+        <div className="md:hidden mt-2.5 flex items-center gap-1.5">
+          {steps.map((step) => (
+            <div
+              key={step.number}
+              className={`
+                flex-1 h-1 rounded-full transition-colors
+                ${step.number <= currentStep ? 'bg-sunshine' : 'bg-slate-200'}
+              `}
+            />
+          ))}
+          <span className="text-xs font-semibold text-slate-500 shrink-0 ml-1">
+            {currentStep}/{steps.length}
+          </span>
         </div>
 
-        {/* Trust Signals */}
-        <div className="mt-12 text-center">
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span>Secure Booking</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span>Instant Confirmation</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span>24/7 Support</span>
-            </div>
-          </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1 font-semibold text-slate-600">
+            <Lock className="w-3 h-3" />
+            Secure checkout
+          </span>
+          {TRUST_POINTS.map((point) => (
+            <span key={point} className="flex items-center gap-2">
+              <span className="text-slate-300">&middot;</span>
+              {point}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Step Content */}
+      <div ref={stepContentRef}>
+        {currentStep === 1 && (
+          <Step1PackageSelection
+            pickupLocations={pickupLocations}
+            transferRoutes={transferRoutes}
+          />
+        )}
+        {currentStep === 2 && <Step2TripDetails />}
+        {currentStep === 3 && <Step3ContactInfo />}
+        {currentStep === 4 && <Step4Payment />}
+      </div>
+    </BookingFrame>
+  );
+}
+
+/**
+ * Page chrome shared by the wizard and its loading skeleton. They must stay
+ * visually identical: a deep-linked arrival renders the skeleton until the
+ * entry patch lands, and any difference in card styling shows up as a flash
+ * when `ready` flips.
+ *
+ * `min-h-[100dvh]` rather than `min-h-screen`: on iOS `100vh` is the *unshrunk*
+ * viewport height and overshoots once the browser chrome collapses, which
+ * leaves a dead strip under the fixed action bar. `pb-28` clears that bar on
+ * mobile; desktop has no bar and only needs a normal gutter.
+ */
+function BookingFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-[100dvh] bg-lake pt-3 pb-28 lg:pb-6">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-retro-lg p-4 sm:p-5 lg:p-6">
+          {children}
         </div>
       </div>
     </div>
@@ -292,27 +230,20 @@ function BookingPageContent({ pickupLocations, transferRoutes }: BookingPageClie
 // Loading fallback for Suspense
 function BookingLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF8E7] via-[#FFF0D4] to-[#E8F4F8] pt-4 sm:pt-6 pb-16">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#2D3436] mb-3">
-            Book Your Ride
-          </h1>
-          <p className="text-lg text-[#636E72]">Loading booking form...</p>
-        </div>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl border-4 border-[#2D3436] p-8 md:p-12 animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3 mb-8"></div>
-            <div className="space-y-4">
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
-            </div>
+    <BookingFrame>
+      <div className="animate-pulse">
+        <div className="h-7 bg-slate-200 rounded w-1/3 mb-2" />
+        <div className="h-4 bg-slate-200 rounded w-1/4 mb-6" />
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
+          <div className="space-y-4">
+            <div className="h-11 bg-slate-200 rounded-md" />
+            <div className="h-11 bg-slate-200 rounded-md" />
+            <div className="h-11 bg-slate-200 rounded-md" />
           </div>
+          <div className="hidden lg:block h-48 bg-slate-200 rounded-2xl" />
         </div>
       </div>
-    </div>
+    </BookingFrame>
   );
 }
 

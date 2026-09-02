@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
-import { Button, Input, Select } from '@/components/ui';
-import { ArrowRight, ArrowLeft, Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Pencil } from 'lucide-react';
+import { Input, Select } from '@/components/ui';
+import { Calendar, Users, MapPin, Phone, MessageCircle, ExternalLink, Plus, Check } from 'lucide-react';
 import { getPackagePrice, getRoutePrice, getAvailabilityForDate, formatPrice, getVehicleCapacity, getVehicleTypeName } from '@/lib/pricing';
 import { formatTime, formatDate, getMinBookingDate } from '@/lib/booking';
 import { useVehicleLabels } from '@/hooks/useVehicleLabels';
@@ -11,6 +11,8 @@ import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { generateAvailabilityInquiryWhatsAppLink } from '@/lib/messageGenerators';
 import AddonSelector from './AddonSelector';
 import BlockedDateNotice from './BlockedDateNotice';
+import StepShell from './StepShell';
+import { FIELD_LABEL } from './fieldStyles';
 import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
@@ -52,6 +54,7 @@ export default function Step2TripDetails() {
     calculatedPrice,
     seasonName,
     routeContext,
+    selectedAddons,
     addonsTotal,
     nextStep,
     prevStep,
@@ -64,6 +67,12 @@ export default function Step2TripDetails() {
   const [priceError, setPriceError] = useState(false);
   const [hasAddons, setHasAddons] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  const dateRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLSelectElement>(null);
+  const passengerRef = useRef<HTMLInputElement>(null);
+  const pickupRef = useRef<HTMLInputElement>(null);
 
   // Tours don't start until the park/gate opens; transfers can be picked up
   // earlier for airport/rail connections. Both cut off at 3 PM.
@@ -78,6 +87,12 @@ export default function Step2TripDetails() {
   useEffect(() => {
     setPassengerInput(String(passengerCount));
   }, [passengerCount]);
+
+  // Clear a standing validation message once the user touches anything it
+  // could have been about.
+  useEffect(() => {
+    setError(null);
+  }, [tripDate, tripTime, pickupLocation, passengerInput, vehicleType]);
 
   const handlePassengerChange = (value: string) => {
     if (value === '') {
@@ -223,18 +238,41 @@ export default function Step2TripDetails() {
     isNainitalPickup ||
     (dropoffLocation || '').toLowerCase().includes('nainital');
 
+  /**
+   * Report the failure, say what is wrong, and take the user to where it is
+   * wrong. The message renders in the sticky rail / fixed action bar, which on
+   * a phone can be nowhere near the field — so the scroll is what makes the
+   * inline message actionable. This replaces alert(), which blocked the main
+   * thread and dismissed the iOS keyboard.
+   *
+   * The capture() call is unchanged in name, properties and `reason` values.
+   */
+  const failWith = (
+    message: string,
+    reason: string,
+    field?: React.RefObject<HTMLElement>
+  ) => {
+    setError(message);
+    capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+      ...bookingProperties(useBookingStore.getState()),
+      step: 2,
+      reason,
+    });
+    field?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    field?.current?.focus({ preventScroll: true });
+  };
+
   const handleNext = () => {
-    // Every failure branch below reports before returning. These are surfaced
-    // to the user with alert() rather than an error state var, so unlike step 1
-    // there is nothing rendered we could observe after the fact — the event is
-    // the only record that the customer was stopped here.
     if (!tripDate || !tripTime || !pickupLocation) {
-      alert('Please fill in all required fields');
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 2,
-        reason: !tripDate ? 'no_date' : !tripTime ? 'no_time' : 'no_pickup',
-      });
+      failWith(
+        !tripDate
+          ? 'Please choose a travel date.'
+          : !tripTime
+            ? 'Please choose a pickup time.'
+            : 'Please tell us where to pick you up.',
+        !tripDate ? 'no_date' : !tripTime ? 'no_time' : 'no_pickup',
+        !tripDate ? dateRef : !tripTime ? timeRef : pickupRef
+      );
       return;
     }
 
@@ -242,34 +280,30 @@ export default function Step2TripDetails() {
     if (passengerInput === '' || isNaN(parsedPassengerCount) || parsedPassengerCount < 1) {
       setPassengerInput('1');
       setPassengerCount(1);
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 2,
-        reason: 'invalid_passenger_count',
-      });
+      // Previously this branch silently self-healed with no message at all, so
+      // the field changed under the user with no explanation.
+      failWith('Please enter at least 1 passenger.', 'invalid_passenger_count', passengerRef);
       return;
     }
 
     if (availabilityStatus === 'sold_out' || availabilityStatus === 'blocked') {
-      alert('This date is not available. Please contact us or choose another date.');
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 2,
-        reason: availabilityStatus === 'sold_out' ? 'sold_out' : 'blocked_date',
-      });
+      failWith(
+        'This date is not available. Please contact us or choose another date.',
+        availabilityStatus === 'sold_out' ? 'sold_out' : 'blocked_date'
+      );
       return;
     }
 
     if (capacityExceeded) {
-      alert('This vehicle is too small for your passenger count. Please go back and choose a larger vehicle.');
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 2,
-        reason: 'capacity_exceeded',
-      });
+      failWith(
+        'This vehicle is too small for your passenger count. Go back and choose a larger vehicle.',
+        'capacity_exceeded',
+        passengerRef
+      );
       return;
     }
 
+    setError(null);
     capture(ANALYTICS_EVENTS.bookingStepCompleted, {
       ...bookingProperties(useBookingStore.getState()),
       step: 2,
@@ -281,13 +315,11 @@ export default function Step2TripDetails() {
   const getAvailabilityColor = () => {
     switch (availabilityStatus) {
       case 'available':
-        return 'bg-green-50 border-green-500 text-green-700';
+        return 'bg-green-50 border-green-300 text-green-800';
       case 'limited':
-        return 'bg-yellow-50 border-yellow-500 text-yellow-700';
+        return 'bg-amber-50 border-amber-300 text-amber-800';
       case 'sold_out':
-        return 'bg-red-50 border-red-500 text-red-700';
-      case 'blocked':
-        return 'bg-gray-50 border-gray-500 text-gray-700';
+        return 'bg-red-50 border-red-300 text-red-800';
       default:
         return '';
     }
@@ -308,364 +340,328 @@ export default function Step2TripDetails() {
     }
   };
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-[#2D3436] mb-2">
-          Trip Details
-        </h2>
-        <p className="text-gray-600">
-          When and where do you want to go?
-        </p>
-      </div>
+  const total = calculatedPrice !== null ? calculatedPrice + addonsTotal : null;
 
-      {/* Booking Summary */}
-      {(packageId || routeId) && vehicleType && (
-        <div className="p-3 sm:p-4 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7] flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-0.5">
-              Your Trip
-            </div>
-            <div className="font-bold text-sm sm:text-base text-[#2D3436] leading-snug break-words">
-              {packageTitle}
-            </div>
-            <div className="text-xs text-gray-600 mt-1">
-              {vehicleLabels[vehicleType] ?? getVehicleTypeName(vehicleType)}
-            </div>
-            {resolvedSlug && bookingType === 'tour' && (
+  /**
+   * Add-ons are collapsed by default.
+   *
+   * AddonSelector renders a 2-column grid of ~120px cards; six add-ons is
+   * ~390px, which on its own pushes the required fields off a 768px screen. An
+   * optional upsell displacing required fields is backwards, so it lives behind
+   * a disclosure — but the summary line has to say whether any are *selected*,
+   * not just available, or a collapsed section would hide the fact that the
+   * customer already added ₹300 of extras.
+   *
+   * AddonSelector stays mounted (details/summary hides its body without
+   * unmounting) so onAvailabilityChange still fires and `hasAddons` is correct.
+   */
+  const addonSummary =
+    selectedAddons.length > 0
+      ? `${selectedAddons.length} selected · +${formatPrice(addonsTotal)}`
+      : 'Add extras';
+
+  return (
+    <StepShell
+      rail={{
+        summary: [
+          Boolean(packageTitle) && {
+            label: 'Trip',
+            value: (
+              <>
+                {packageTitle}
+                {resolvedSlug && bookingType === 'tour' && (
+                  <a
+                    href={`/tour/${resolvedSlug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 ml-1.5 text-xs font-semibold text-sunshine hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Details
+                  </a>
+                )}
+              </>
+            ),
+            onEdit: prevStep,
+          },
+          Boolean(vehicleType) && {
+            label: 'Vehicle',
+            value: vehicleLabels[vehicleType!] ?? getVehicleTypeName(vehicleType!),
+            onEdit: prevStep,
+          },
+          Boolean(tripDate) && {
+            label: 'Date',
+            value: formatDate(tripDate!),
+            onEdit: prevStep,
+          },
+        ],
+        price: {
+          label: addonsTotal > 0 ? 'Total trip cost' : 'Estimated price',
+          amount: isBlocked || priceError ? null : total,
+          loading: fetchingPrice || checkingAvailability,
+          placeholder: priceError
+            ? 'No price for this combination'
+            : 'Select a date to see your fare',
+          note: (
+            <>
+              {addonsTotal > 0 && (
+                <span className="block">
+                  {formatPrice(calculatedPrice ?? 0)} trip + {formatPrice(addonsTotal)} extras
+                </span>
+              )}
+              {seasonName && <span className="block">{seasonName} pricing</span>}
+              {involvesNainitalEntry && (
+                <span className="block">
+                  Nainital entry and parking extra (approx. Rs. 300)
+                </span>
+              )}
+            </>
+          ),
+        },
+      }}
+      primary={{
+        label: 'Continue to Contact Info',
+        onClick: handleNext,
+        disabled:
+          isBlocked ||
+          !tripDate ||
+          !tripTime ||
+          !pickupLocation ||
+          priceError ||
+          availabilityStatus === 'sold_out' ||
+          capacityExceeded,
+      }}
+      secondary={{ label: 'Back', onClick: prevStep }}
+      error={error}
+    >
+      {/* Availability status. Stays in the form column rather than the rail:
+          when a date is sold out this block carries its own Call/WhatsApp
+          actions, which need room the rail doesn't have. */}
+      {checkingAvailability && tripDate && (
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-slate-300 border-t-slate-500" />
+          Checking availability…
+        </div>
+      )}
+
+      {!checkingAvailability && tripDate && availabilityStatus === 'blocked' && (
+        <BlockedDateNotice
+          date={tripDate}
+          tripLabel={packageTitle || 'your trip'}
+          pickupLocation={pickupLocation || undefined}
+          dropoffLocation={dropoffLocation || undefined}
+          message={blockedMessage}
+        />
+      )}
+
+      {!checkingAvailability && tripDate && availabilityStatus && availabilityStatus !== 'blocked' && (
+        <div className={`p-3 rounded-xl border text-sm ${getAvailabilityColor()}`}>
+          <p className="font-medium">{getAvailabilityMessage()}</p>
+
+          {availabilityStatus === 'sold_out' && (
+            <div className="flex flex-wrap gap-2 mt-3">
               <a
-                href={`/tour/${resolvedSlug}`}
+                href={generateAvailabilityInquiryWhatsAppLink(
+                  siteConfig.contact.whatsapp,
+                  { tripLabel: packageTitle || 'your trip', pickupLocation, dropoffLocation },
+                  tripDate
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors mt-1"
+                className="flex items-center gap-2 px-3 py-2 bg-whatsapp text-white rounded-md text-sm font-semibold hover:brightness-95 transition"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                View Package Details
+                <MessageCircle className="w-4 h-4" />
+                Contact on WhatsApp
               </a>
-            )}
-          </div>
-          <button
-            onClick={prevStep}
-            className="flex items-center gap-1 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Change
-          </button>
+              <a
+                href={`tel:${siteConfig.contact.phone.replace(/\s/g, '')}`}
+                data-analytics-cta="call"
+                onClick={() =>
+                  capture(ANALYTICS_EVENTS.contactCallClicked, {
+                    placement: CTA_PLACEMENTS.bookingStep2,
+                    context: 'sold_out',
+                  })
+                }
+                className="flex items-center gap-2 px-3 py-2 bg-sunshine text-white rounded-md text-sm font-semibold hover:bg-sunshine-500 transition"
+              >
+                <Phone className="w-4 h-4" />
+                Call Now
+              </a>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Date — normally already picked in Step 1 (needed there to show
-          per-vehicle pricing), so this is a read-only summary with a way
-          back to change it. The editable input is only a fallback for a
-          direct/URL entry that lands on Step 2 without a date. */}
-      <div>
-        {tripDate ? (
-          <div>
-            <label className="block text-sm font-bold text-[#2D3436] mb-2">
-              Travel Date
-            </label>
-            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border-4 border-[#2D3436] bg-[#F7F7F7]">
-              <div className="flex items-center gap-2 min-w-0">
-                <Calendar className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                <span className="font-bold text-[#2D3436]">{formatDate(tripDate)}</span>
-              </div>
-              <button
-                onClick={prevStep}
-                className="flex items-center gap-1 text-xs font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Change
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <label className="block text-sm font-bold text-[#2D3436] mb-2">
-              Select Date <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                type="date"
-                value={tripDate || ''}
-                onChange={(e) => setTripDate(e.target.value)}
-                min={getMinBookingDate()}
-                className="pl-12"
-                required
-              />
-            </div>
-          </>
-        )}
-
-        {/* Availability Status */}
-        {checkingAvailability && tripDate && (
-          <div className="mt-3 p-4 rounded-xl border-2 border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-2 text-gray-600">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
-              <span>Checking availability...</span>
-            </div>
-          </div>
-        )}
-
-        {!checkingAvailability && tripDate && availabilityStatus === 'blocked' && (
-          <BlockedDateNotice
-            date={tripDate}
-            tripLabel={packageTitle || 'your trip'}
-            pickupLocation={pickupLocation || undefined}
-            dropoffLocation={dropoffLocation || undefined}
-            message={blockedMessage}
-            className="mt-3"
-          />
-        )}
-
-        {!checkingAvailability && tripDate && availabilityStatus && availabilityStatus !== 'blocked' && (
-          <div className={`mt-3 p-4 rounded-xl border-2 ${getAvailabilityColor()}`}>
-            <p className="font-medium">{getAvailabilityMessage()}</p>
-
-            {/* Show contact buttons for sold out */}
-            {availabilityStatus === 'sold_out' && (
-              <div className="flex flex-wrap gap-3 mt-4">
-                <a
-                  href={generateAvailabilityInquiryWhatsAppLink(
-                    siteConfig.contact.whatsapp,
-                    { tripLabel: packageTitle || 'your trip', pickupLocation, dropoffLocation },
-                    tripDate
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#20BA59] transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Contact on WhatsApp
-                </a>
-                <a
-                  href={`tel:${siteConfig.contact.phone.replace(/\s/g, '')}`}
-                  data-analytics-cta="call"
-                  onClick={() =>
-                    capture(ANALYTICS_EVENTS.contactCallClicked, {
-                      placement: CTA_PLACEMENTS.bookingStep2,
-                      context: 'sold_out',
-                    })
-                  }
-                  className="flex items-center gap-2 px-4 py-2 bg-[#4D96FF] text-white rounded-xl font-bold hover:bg-[#3D86EF] transition-colors"
-                >
-                  <Phone className="w-4 h-4" />
-                  Call Now
-                </a>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {priceError && tripDate && !checkingAvailability && !fetchingPrice && (
+        <div className="p-3 rounded-xl border border-red-300 bg-red-50 text-sm text-red-800">
+          We couldn&apos;t find a price for this package, vehicle and date combination.
+          Please try a different date or vehicle, or contact us directly.
+        </div>
+      )}
 
       {!isBlocked && (
-      <>
-      {/* Price Unavailable */}
-      {tripDate && !checkingAvailability && !fetchingPrice && priceError && (
-        <div className="p-6 rounded-2xl border-4 border-red-400 bg-red-50">
-          <p className="font-medium text-red-700">
-            We couldn&apos;t find a price for this package, vehicle and date combination.
-            Please try a different date or vehicle, or contact us directly.
-          </p>
-        </div>
-      )}
-
-      {/* Price Display */}
-      {tripDate && calculatedPrice !== null && (
-        <div className="p-4 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="text-xs text-gray-600 mb-0.5">
-                {addonsTotal > 0 ? 'Base Package Price' : 'Estimated Price'}
+        <>
+          {/* Date is normally already picked in Step 1 (it's needed there to
+              show per-vehicle pricing), so it lives in the rail as a summary
+              row. This editable input is the fallback for a direct/URL entry
+              that lands on Step 2 without one. */}
+          {!tripDate && (
+            <div>
+              <label htmlFor="trip-date" className={FIELD_LABEL}>
+                Travel Date <span className="text-coral">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  id="trip-date"
+                  ref={dateRef}
+                  type="date"
+                  value={tripDate || ''}
+                  onChange={(e) => setTripDate(e.target.value)}
+                  min={getMinBookingDate()}
+                  className="pl-10"
+                  required
+                />
               </div>
-              <div className="text-2xl font-bold text-[#2D3436]">
-                {formatPrice(calculatedPrice)}
-              </div>
-              {involvesNainitalEntry && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Nainital entry and car parking charges extra (approx. Rs. 300 in total)
-                </div>
-              )}
-              {seasonName && (
-                <div className="text-xs text-gray-600 mt-0.5">
-                  {seasonName} pricing
-                </div>
-              )}
+            </div>
+          )}
 
-              {/* Addons Breakdown */}
-              {addonsTotal > 0 && (
-                <div className="mt-2.5 pt-2.5 border-t-2 border-yellow-300">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-gray-600">Selected Addons</span>
-                    <span className="text-sm font-bold text-gray-900">+{formatPrice(addonsTotal)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1.5 border-t border-yellow-300">
-                    <span className="font-bold text-gray-900">Total Amount</span>
-                    <span className="text-xl font-bold text-[#2D3436]">
-                      {formatPrice(calculatedPrice + addonsTotal)}
-                    </span>
-                  </div>
-                </div>
+          <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+            <div>
+              <label htmlFor="pickup-time" className={FIELD_LABEL}>
+                Pickup Time <span className="text-coral">*</span>
+              </label>
+              <Select
+                id="pickup-time"
+                ref={timeRef}
+                value={tripTime ?? ''}
+                onChange={(e) => setTripTime(e.target.value)}
+                required
+              >
+                <option value="" disabled>Select a pickup time</option>
+                {timeSlots.map((time) => (
+                  <option key={time} value={time}>{formatTime(time)}</option>
+                ))}
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">
+                Need another time? Message us on WhatsApp.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="passenger-count" className={FIELD_LABEL}>
+                Passengers <span className="text-coral">*</span>
+              </label>
+              <div className="relative">
+                <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  id="passenger-count"
+                  ref={passengerRef}
+                  type="number"
+                  value={passengerInput}
+                  onChange={(e) => handlePassengerChange(e.target.value)}
+                  onBlur={handlePassengerBlur}
+                  min={1}
+                  max={10}
+                  className="pl-10"
+                  aria-invalid={capacityExceeded || undefined}
+                  required
+                />
+              </div>
+              {capacityExceeded && vehicleType && (
+                <p className="text-xs text-amber-700 mt-1">
+                  This vehicle seats up to {getVehicleCapacity(vehicleType)}.{' '}
+                  <a
+                    href={`https://wa.me/${siteConfig.contact.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
+                      `Hi, I need a vehicle for ${passengerCount} passengers${
+                        tripDate ? ` on ${tripDate}` : ''
+                      }. Can you help with a larger-group arrangement?`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-analytics-cta="whatsapp"
+                    className="font-semibold text-whatsapp hover:underline"
+                  >
+                    Ask about larger groups →
+                  </a>
+                </p>
               )}
             </div>
-            {fetchingPrice && (
-              <div className="animate-spin rounded-full h-6 w-6 border-4 border-gray-300 border-t-[#FFD93D]" />
-            )}
+
+            <div>
+              <label htmlFor="pickup-location" className={FIELD_LABEL}>
+                Pickup Location <span className="text-coral">*</span>
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  id="pickup-location"
+                  ref={pickupRef}
+                  type="text"
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  placeholder="e.g. Hotel Manu Maharani, Nainital"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="dropoff-location" className={FIELD_LABEL}>
+                Drop-off Location <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  id="dropoff-location"
+                  type="text"
+                  value={dropoffLocation}
+                  onChange={(e) => setDropoffLocation(e.target.value)}
+                  placeholder="Same as pickup if not specified"
+                  className="pl-10"
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Time Selection */}
-      <div>
-        <label htmlFor="pickup-time" className="block text-sm font-bold text-[#2D3436] mb-2">
-          Pickup Time <span className="text-red-500">*</span>
-        </label>
-        <Select
-          id="pickup-time"
-          value={tripTime ?? ''}
-          onChange={(e) => setTripTime(e.target.value)}
-          required
-        >
-          <option value="" disabled>Select a pickup time</option>
-          {timeSlots.map((time) => (
-            <option key={time} value={time}>{formatTime(time)}</option>
-          ))}
-        </Select>
-        <p className="text-xs text-gray-500 mt-1.5">
-          For any other time, please contact us on WhatsApp or call us.
-        </p>
-      </div>
-
-      {/* Passenger Count */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Number of Passengers <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="number"
-            value={passengerInput}
-            onChange={(e) => handlePassengerChange(e.target.value)}
-            onBlur={handlePassengerBlur}
-            min={1}
-            max={10}
-            className="pl-12"
-            required
-          />
-        </div>
-
-        {capacityExceeded && vehicleType && (
-          <div className="mt-3 p-4 rounded-xl border-2 border-amber-500 bg-amber-50">
-            <p className="font-medium text-amber-700">
-              This vehicle seats up to {getVehicleCapacity(vehicleType)} passengers.
+          {isNainitalPickup && (
+            <p className="text-xs text-slate-500">
+              Note: pickups from Zoo Road, Birla Road or Snow View Point aren&apos;t possible.
+              We can pick you up from Mall Road, High Court, Ayarpatta, or your hotel.
             </p>
-            <a
-              href={`https://wa.me/918445206116?text=${encodeURIComponent(
-                `Hi, I need a vehicle for ${passengerCount} passengers${
-                  tripDate ? ` on ${tripDate}` : ''
-                }. Can you help with a larger-group arrangement?`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#20BA59] transition-colors"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Ask us on WhatsApp for larger-group arrangements
-            </a>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Pickup Location */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Pickup Location <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            value={pickupLocation}
-            onChange={(e) => setPickupLocation(e.target.value)}
-            placeholder="e.g., Hotel Manu Maharani, Nainital"
-            className="pl-12"
-            required
-          />
-        </div>
-        {isNainitalPickup && (
-          <p className="text-xs text-gray-500 mt-2">
-            Note: Pickups from Zoo Road, Birla Road, or Snow View Point are not possible.
-            We can easily pick you up from Mall Road, High Court, Ayarpatta, or your specific hotel.
-          </p>
-        )}
-      </div>
-
-      {/* Drop-off Location (Optional) */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Drop-off Location (Optional)
-        </label>
-        <div className="relative">
-          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            value={dropoffLocation}
-            onChange={(e) => setDropoffLocation(e.target.value)}
-            placeholder="Same as pickup (if not specified)"
-            className="pl-12"
-          />
-        </div>
-      </div>
-
-      {/* Addons Section — the wrapper box only renders once the fetch inside
-          AddonSelector confirms there's something to show, so an empty box
-          never flashes when a package has zero addons. */}
-      {tripDate && calculatedPrice !== null && seasonName && (
-        <div className={hasAddons ? 'p-6 rounded-2xl border-4 border-[#4D96FF] bg-[#E8F4F8]' : undefined}>
-          <AddonSelector
-            packageId={packageId || undefined}
-            routeId={routeId || undefined}
-            destinationId={routeContext?.destinationSlug || undefined}
-            seasonName={seasonName as 'Off-Season' | 'Season'}
-            stage="before_booking"
-            onAvailabilityChange={setHasAddons}
-          />
-        </div>
+          {/* Add-ons — collapsed by default; see the addonSummary comment. */}
+          {tripDate && calculatedPrice !== null && seasonName && (
+            <details className={hasAddons ? 'group rounded-xl border border-slate-200' : 'hidden'}>
+              <summary className="flex items-center justify-between gap-3 px-3.5 py-3 cursor-pointer list-none select-none">
+                <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  {selectedAddons.length > 0 ? (
+                    <Check className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Plus className="w-4 h-4 text-sunshine" />
+                  )}
+                  {addonSummary}
+                </span>
+                <span className="text-xs text-slate-500 group-open:hidden">Show</span>
+                <span className="text-xs text-slate-500 hidden group-open:inline">Hide</span>
+              </summary>
+              <div className="px-3.5 pb-3.5 pt-1 border-t border-slate-200">
+                <AddonSelector
+                  packageId={packageId || undefined}
+                  routeId={routeId || undefined}
+                  destinationId={routeContext?.destinationSlug || undefined}
+                  seasonName={seasonName as 'Off-Season' | 'Season'}
+                  stage="before_booking"
+                  onAvailabilityChange={setHasAddons}
+                  compact
+                />
+              </div>
+            </details>
+          )}
+        </>
       )}
-      </>
-      )}
-
-      {/* Navigation Buttons */}
-      <div className={`flex pt-6 border-t-2 border-gray-200 ${isBlocked ? 'justify-start' : 'justify-between'}`}>
-        <Button
-          onClick={prevStep}
-          variant="secondary"
-          size="lg"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
-        </Button>
-
-        {!isBlocked && (
-          <Button
-            onClick={handleNext}
-            disabled={
-              !tripDate ||
-              !tripTime ||
-              !pickupLocation ||
-              priceError ||
-              availabilityStatus === 'sold_out' ||
-              capacityExceeded
-            }
-            size="lg"
-            className="group"
-          >
-            Continue to Contact Info
-            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-          </Button>
-        )}
-      </div>
-    </div>
+    </StepShell>
   );
 }

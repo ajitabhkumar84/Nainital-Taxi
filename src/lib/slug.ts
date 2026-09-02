@@ -7,6 +7,12 @@ const MAX_LEN = 80;
 // static folder always wins over a dynamic segment) or collide with a
 // Next.js special file. "multi-day-rental" is deliberately NOT in this
 // list: it's this page's own default slug and must remain choosable.
+//
+// "booking-simple" no longer has a route folder — it was deleted 2026-09-02 —
+// but it stays reserved on purpose. It now 301s to /booking in
+// next.config.mjs, and freeing the slug would let an admin-authored custom page
+// claim a URL with real inbound history and shadow that redirect. Do not
+// "clean this up" when syncing the list against the app/ folders.
 export const RESERVED_PAGE_SLUGS: readonly string[] = [
   'admin', 'api', 'b2b', 'booking', 'booking-simple', 'cancellation-policy',
   'contact', 'destinations', 'fleet', 'lp', 'packages', 'privacy', 'quote',

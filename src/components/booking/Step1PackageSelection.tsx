@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBookingStore, VehicleType } from '@/store/bookingStore';
-import { Button, Badge, Input } from '@/components/ui';
+import { Badge, Input } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil, Calendar, MessageCircle } from 'lucide-react';
+import { Users, MapPin, Clock, ExternalLink, CheckCircle2, Pencil, Calendar, MessageCircle } from 'lucide-react';
 import {
   getVehicleTypeName,
   getVehicleCapacity,
@@ -23,6 +23,8 @@ import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import BlockedDateNotice from './BlockedDateNotice';
 import TransferRouteSelector, { TransferRoute } from './TransferRouteSelector';
+import StepShell from './StepShell';
+import { FIELD_LABEL } from './fieldStyles';
 import type { PickupLocationRow } from '@/lib/supabase/types';
 
 interface Package {
@@ -86,6 +88,12 @@ export default function Step1PackageSelection({
   const [pricesByVehicle, setPricesByVehicle] = useState<Partial<Record<VehicleType, PriceResult>>>({});
   const [pricingLoading, setPricingLoading] = useState(false);
   const [blockedInfo, setBlockedInfo] = useState<{ blocked: boolean; message?: string }>({ blocked: false });
+
+  // Targets for the scroll-to-cause on a failed handleNext — the message now
+  // renders in the sticky rail / mobile action bar rather than inline here.
+  const dateRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const vehicleRef = useRef<HTMLDivElement>(null);
 
   // Fetch every vehicle's price in one shot once a date is picked, so the
   // vehicle cards below can show a real price instead of only revealing it
@@ -233,6 +241,9 @@ export default function Step1PackageSelection({
     setLoading(false);
   }
 
+  const selectedVehiclePriceMissing =
+    !!vehicleType && !!tripDate && !pricingLoading && !pricesByVehicle[vehicleType];
+
   const handlePackageSelect = (pkg: Package) => {
     setPackage(pkg.id, pkg.title, pkg.slug);
     setSelectedPackageData(pkg);
@@ -245,9 +256,6 @@ export default function Step1PackageSelection({
       booking_type: 'tour',
     });
   };
-
-  const selectedVehiclePriceMissing =
-    !!vehicleType && !!tripDate && !pricingLoading && !pricesByVehicle[vehicleType];
 
   const handleNext = () => {
     if ((!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing) {
@@ -271,6 +279,16 @@ export default function Step1PackageSelection({
               ? 'no_date'
               : 'price_unavailable',
       });
+
+      // Point at the cause, the same way steps 2 and 3 do — the message now
+      // renders in the sticky rail / action bar, which can be well away from
+      // the control that needs attention.
+      const target = !tripDate
+        ? dateRef.current
+        : !packageId && !routeId
+          ? pickerRef.current
+          : vehicleRef.current;
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
     setError('');
@@ -283,213 +301,250 @@ export default function Step1PackageSelection({
     nextStep();
   };
 
+  const selectedPrice = vehicleType ? pricesByVehicle[vehicleType] : undefined;
+  const isBlocked = Boolean(tripDate && blockedInfo.blocked);
+
   return (
-    <div className="space-y-8">
+    <StepShell
+      rail={{
+        summary: [
+          Boolean(packageId || routeId) && {
+            label: 'Trip',
+            value: selectedPackageData?.title || packageTitle,
+            onEdit: showPicker ? undefined : () => setIsEditing(true),
+          },
+          Boolean(tripDate) && { label: 'Date', value: formatDate(tripDate!) },
+          Boolean(vehicleType) && {
+            label: 'Vehicle',
+            value: vehicleLabels[vehicleType!] ?? getVehicleTypeName(vehicleType!),
+          },
+        ],
+        price: {
+          label: 'Estimated price',
+          // Step 1's price lives in local component state, not the store —
+          // Step 2's availability check is what writes calculatedPrice. null
+          // renders a prompt rather than a misleading ₹0.
+          amount: isBlocked ? null : selectedPrice?.price ?? null,
+          loading: pricingLoading,
+          placeholder: isBlocked
+            ? 'Not bookable on this date'
+            : !tripDate
+              ? 'Pick a date to see fares'
+              : 'Choose a vehicle',
+          note: selectedPrice?.seasonName ? `${selectedPrice.seasonName} pricing` : undefined,
+        },
+      }}
+      primary={{
+        label: 'Continue to Trip Details',
+        onClick: handleNext,
+        disabled:
+          isBlocked || (!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing,
+      }}
+      error={error || null}
+    >
       {!showPicker ? (
-        <div>
-          <label className="block text-sm font-bold text-[#2D3436] mb-3">
-            Your Trip
-          </label>
-          <div className="flex items-center justify-between gap-4 p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-[#4D96FF] flex-shrink-0" />
-              <span className="font-bold text-lg text-[#2D3436]">
-                {selectedPackageData?.title || packageTitle}
-              </span>
-            </div>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-1 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors flex-shrink-0"
-            >
-              <Pencil className="w-4 h-4" />
-              Change
-            </button>
+        <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-sunshine bg-sunshine-50">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CheckCircle2 className="w-5 h-5 text-sunshine shrink-0" />
+            <span className="font-semibold text-ink truncate">
+              {selectedPackageData?.title || packageTitle}
+            </span>
           </div>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1 text-sm font-semibold text-sunshine hover:text-ink transition-colors shrink-0"
+          >
+            <Pencil className="w-4 h-4" />
+            Change
+          </button>
         </div>
       ) : (
         <>
-          <div>
-            <h2 className="text-3xl font-bold text-[#2D3436] mb-2">
-              Choose Your Adventure
-            </h2>
-            <p className="text-gray-600">
-              Select a package and your preferred vehicle
-            </p>
-          </div>
+          {/* Trip type and date share a row: the date drives the per-vehicle
+              prices below, so both belong above the picker rather than the
+              date sitting under a package list of unpredictable length. */}
+          <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+            <div>
+              <span className={FIELD_LABEL}>What are you looking for?</span>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ['tour', '🏔️', 'Tour Packages'],
+                    ['transfer', '✈️', 'Transfers'],
+                  ] as const
+                ).map(([type, emoji, label]) => (
+                  <button
+                    key={type}
+                    onClick={() => handleBookingTypeChange(type)}
+                    aria-pressed={bookingType === type}
+                    className={`
+                      h-11 px-3 rounded-md border text-sm font-semibold transition-colors
+                      inline-flex items-center justify-center gap-1.5
+                      ${
+                        bookingType === type
+                          ? 'border-sunshine bg-sunshine-50 text-ink'
+                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                      }
+                    `}
+                  >
+                    <span aria-hidden>{emoji}</span>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Booking Type Selector */}
-          <div>
-            <label className="block text-sm font-bold text-[#2D3436] mb-3">
-              What are you looking for?
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => handleBookingTypeChange('tour')}
-                className={`
-                  p-6 rounded-2xl border-4 transition-all duration-200
-                  ${
-                    bookingType === 'tour'
-                      ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
-                      : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                  }
-                `}
-              >
-                <div className="text-3xl mb-2">🏔️</div>
-                <div className="font-bold text-[#2D3436]">Tour Packages</div>
-                <div className="text-xs text-gray-500 mt-1">Sightseeing tours</div>
-              </button>
-
-              <button
-                onClick={() => handleBookingTypeChange('transfer')}
-                className={`
-                  p-6 rounded-2xl border-4 transition-all duration-200
-                  ${
-                    bookingType === 'transfer'
-                      ? 'border-[#FFD93D] bg-[#FFF8E7] shadow-[4px_4px_0px_#FFD93D]'
-                      : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                  }
-                `}
-              >
-                <div className="text-3xl mb-2">✈️</div>
-                <div className="font-bold text-[#2D3436]">Transfers</div>
-                <div className="text-xs text-gray-500 mt-1">Airport & station</div>
-              </button>
+            <div>
+              <label htmlFor="trip-date" className={FIELD_LABEL}>
+                Travel Date <span className="text-coral">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  id="trip-date"
+                  ref={dateRef}
+                  type="date"
+                  value={tripDate || ''}
+                  onChange={(e) => setTripDate(e.target.value)}
+                  min={getMinBookingDate()}
+                  className="pl-10"
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          {/* Transfers are point-to-point routes, so they get an A-to-B picker
-              rather than a list of pre-built packages. The date + vehicle
-              blocks further down already key off routeId, so they work
-              unchanged once this sets one. */}
-          {isTransfer && (
-            <TransferRouteSelector
-              pickupLocations={pickupLocations}
-              routes={transferRoutes}
-              pickup={pickupLocation}
-              dropoff={dropoffLocation}
-              onChange={handleTransferChange}
-            />
-          )}
+          <div ref={pickerRef}>
+            {/* Transfers are point-to-point routes, so they get an A-to-B picker
+                rather than a list of pre-built packages. The date + vehicle
+                blocks further down already key off routeId, so they work
+                unchanged once this sets one. */}
+            {isTransfer ? (
+              <TransferRouteSelector
+                pickupLocations={pickupLocations}
+                routes={transferRoutes}
+                pickup={pickupLocation}
+                dropoff={dropoffLocation}
+                onChange={handleTransferChange}
+              />
+            ) : (
+              bookingType && (
+                <div>
+                  <span className={FIELD_LABEL}>Select Package</span>
+                  {loading ? (
+                    <div className="py-6 text-center text-slate-500">Loading packages…</div>
+                  ) : (
+                    /*
+                      The package list is the only genuinely unbounded thing on
+                      this screen — it grows with however many packages are
+                      active. On desktop it gets its own bounded scroll pane so
+                      the page height stops depending on that count; `38vh`
+                      rather than a fixed pixel height so it adapts to the
+                      viewport instead of needing a media-query ladder.
 
-          {/* Package Selection */}
-          {bookingType && !isTransfer && (
-            <div>
-              <label className="block text-sm font-bold text-[#2D3436] mb-3">
-                Select Package
-              </label>
-              {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading packages...</div>
-              ) : (
-                <div className="grid gap-4">
-                  {packages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      className={`
-                        relative p-6 rounded-2xl border-4 transition-all duration-200
-                        ${
-                          packageId === pkg.id
-                            ? 'border-[#FFD93D] bg-gradient-to-br from-[#FFF8E7] to-[#FFF0D4] shadow-[6px_6px_0px_#FFD93D] ring-4 ring-[#FFD93D]/30'
-                            : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
-                        }
-                      `}
-                    >
-                      <button
-                        onClick={() => handlePackageSelect(pkg)}
-                        className="text-left w-full"
+                      Deliberately NOT bounded below `lg`: a nested scroll pane
+                      inside a page that also scrolls is a scroll trap on touch.
+                      On mobile the list runs to its natural length and the
+                      fixed action bar is what keeps the price and CTA reachable.
+                    */
+                    <div className="rounded-xl border border-slate-200 overflow-hidden">
+                      <div
+                        role="radiogroup"
+                        aria-label="Select package"
+                        className="lg:max-h-[min(340px,38vh)] lg:overflow-y-auto overscroll-contain snap-y divide-y divide-slate-200"
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h3 className={`font-bold text-lg mb-1 ${packageId === pkg.id ? 'text-[#2D3436]' : 'text-[#2D3436]'}`}>
-                              {pkg.title}
-                            </h3>
-                            <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
-                              {pkg.duration && (
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{pkg.duration}</span>
+                        {packages.map((pkg) => {
+                          const selected = packageId === pkg.id;
+                          return (
+                            <div
+                              key={pkg.id}
+                              className={`flex items-start gap-3 p-3 snap-start transition-colors ${
+                                selected ? 'bg-sunshine-50' : 'bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => handlePackageSelect(pkg)}
+                                className="text-left flex-1 min-w-0"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {selected && (
+                                    <CheckCircle2 className="w-4 h-4 text-sunshine shrink-0" />
+                                  )}
+                                  <h3 className="font-semibold text-ink line-clamp-1">
+                                    {pkg.title}
+                                  </h3>
+                                  {pkg.is_popular && (
+                                    <Badge variant="accent" size="sm">
+                                      Popular
+                                    </Badge>
+                                  )}
                                 </div>
-                              )}
-                              {pkg.distance && (
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{pkg.distance}</span>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500 mt-0.5">
+                                  {pkg.duration && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      {pkg.duration}
+                                    </span>
+                                  )}
+                                  {pkg.distance && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      {pkg.distance}
+                                    </span>
+                                  )}
+                                  {pkg.places_covered?.length > 0 && (
+                                    <span className="line-clamp-1">
+                                      {pkg.places_covered.slice(0, 3).join(', ')}
+                                      {pkg.places_covered.length > 3 &&
+                                        ` +${pkg.places_covered.length - 3}`}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
+                              </button>
+
+                              <a
+                                href={`/tour/${pkg.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`View full details for ${pkg.title}`}
+                                title="View full details"
+                                className="shrink-0 p-2 rounded-md text-slate-400 hover:text-sunshine hover:bg-white transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
                             </div>
-                          </div>
-                          {pkg.is_popular && (
-                            <Badge variant="accent">Popular</Badge>
-                          )}
-                        </div>
-
-                        {pkg.places_covered && pkg.places_covered.length > 0 && (
-                          <div className="text-sm text-gray-600">
-                            <span className="font-semibold">Covers:</span>{' '}
-                            {pkg.places_covered.slice(0, 3).join(', ')}
-                            {pkg.places_covered.length > 3 && ` +${pkg.places_covered.length - 3} more`}
-                          </div>
-                        )}
-                      </button>
-
-                      {/* View Details Button */}
-                      <div className="mt-4 pt-4 border-t-2 border-gray-200">
-                        <a
-                          href={`/tour/${pkg.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-semibold text-[#4D96FF] hover:text-[#2D3436] transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          View Full Details
-                        </a>
+                          );
+                        })}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              )
+            )}
+          </div>
         </>
       )}
 
-      {/* Date + Vehicle Type Selection — ungated from packageId so a
-          vehicle-only fleet arrival can show its pre-ticked chip before a
-          package is chosen */}
-      {(packageId || routeId || vehicleType) && (
-        <div className="space-y-6">
-          {/* Date Selection — collected here (rather than Step 2) so every
-              vehicle card below can show its own real, date-specific price */}
-          <div>
-            <label className="block text-sm font-bold text-[#2D3436] mb-2">
-              Select Date <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                type="date"
-                value={tripDate || ''}
-                onChange={(e) => setTripDate(e.target.value)}
-                min={getMinBookingDate()}
-                className="pl-12"
-                required
-              />
-            </div>
-          </div>
-
-          {tripDate && blockedInfo.blocked ? (
-            <BlockedDateNotice
-              date={tripDate}
-              tripLabel={packageTitle || 'your trip'}
-              message={blockedInfo.message}
-            />
-          ) : (
-            <>
-          <div>
-            <label className="block text-sm font-bold text-[#2D3436] mb-3">
-              Choose Your Vehicle
-            </label>
-            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible">
+      {/* Vehicle selection — ungated from packageId so a vehicle-only fleet
+          arrival can show its pre-ticked chip before a package is chosen. */}
+      {(packageId || routeId || vehicleType) &&
+        (isBlocked ? (
+          <BlockedDateNotice
+            date={tripDate!}
+            tripLabel={packageTitle || 'your trip'}
+            message={blockedInfo.message}
+          />
+        ) : (
+          <div ref={vehicleRef}>
+            <span className={FIELD_LABEL}>Choose Your Vehicle</span>
+            {/* Horizontal snap-carousel on phones (unchanged — it is the right
+                pattern there), a single 4-across row from lg so all four fares
+                are comparable at a glance without a second row. */}
+            <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0">
               {vehicleTypes.map((vehicle) => {
                 const routeName = packageTitle || 'your trip';
                 const formattedTripDate = tripDate ? formatDate(tripDate) : '';
@@ -519,6 +574,7 @@ export default function Step1PackageSelection({
                     role="button"
                     tabIndex={0}
                     aria-disabled={isPriceUnavailable}
+                    aria-pressed={vehicleType === vehicle.type}
                     onClick={selectVehicle}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -527,51 +583,48 @@ export default function Step1PackageSelection({
                       }
                     }}
                     className={`
-                      min-w-[260px] snap-start sm:min-w-0
-                      p-6 rounded-2xl border-4 transition-all duration-200 text-left
+                      min-w-[210px] snap-start sm:min-w-0
+                      p-3 rounded-xl border transition-colors text-left
                       ${isPriceUnavailable ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}
                       ${
                         vehicleType === vehicle.type
-                          ? 'border-[#4D96FF] bg-[#E8F4F8] shadow-[4px_4px_0px_#4D96FF]'
-                          : isPriceUnavailable
-                          ? 'border-[#2D3436] bg-white'
-                          : 'border-[#2D3436] bg-white hover:shadow-[4px_4px_0px_#2D3436]'
+                          ? 'border-sunshine bg-sunshine-50'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
                       }
                     `}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="text-3xl">{vehicle.emoji}</div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-2xl" aria-hidden>
+                        {vehicle.emoji}
+                      </span>
                       {vehicle.badge && (
                         <Badge variant="secondary" size="sm">
                           {vehicle.badge}
                         </Badge>
                       )}
                     </div>
-                    <div className="font-bold text-[#2D3436] mb-0.5 truncate">
+                    <div className="font-semibold text-ink truncate">
                       {vehicleLabels[vehicle.type] ?? getVehicleTypeName(vehicle.type)}
                     </div>
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className="text-xs text-slate-500 truncate">
                       {getVehicleModelExamples(vehicle.type)}
                     </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Users className="w-4 h-4" />
-                      <span>Up to {getVehicleCapacity(vehicle.type)} passengers</span>
+                    <div className="flex items-center gap-1 text-sm text-slate-600 mt-0.5">
+                      <Users className="w-3.5 h-3.5" />
+                      Up to {getVehicleCapacity(vehicle.type)}
                     </div>
 
                     {tripDate && (
-                      <div className="mt-3 pt-3 border-t-2 border-dashed border-gray-200">
+                      <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
                         {pricingLoading ? (
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-gray-500" />
-                            Checking price...
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-slate-300 border-t-slate-500" />
+                            Checking price…
                           </div>
                         ) : priceResult ? (
-                          <>
-                            <div className="text-xs text-gray-500">Total price</div>
-                            <div className="text-xl font-bold text-[#2D3436]">
-                              {formatPrice(priceResult.price)}
-                            </div>
-                          </>
+                          <div className="text-xl font-bold text-ink tabular-nums">
+                            {formatPrice(priceResult.price)}
+                          </div>
                         ) : (
                           <a
                             href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
@@ -593,10 +646,10 @@ export default function Step1PackageSelection({
                                 vehicle_type: vehicle.type,
                               });
                             }}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20BA59] px-3 py-1.5 rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-whatsapp hover:brightness-95 px-2.5 py-1.5 rounded-md transition"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                            Price unavailable. 💬 Tap for a live quote via WhatsApp
+                            <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                            Get a live quote
                           </a>
                         )}
                       </div>
@@ -606,30 +659,7 @@ export default function Step1PackageSelection({
               })}
             </div>
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg">
-              <p className="text-sm font-body text-red-700">{error}</p>
-            </div>
-          )}
-
-          {/* Next Button */}
-          <div className="flex justify-end pt-6 border-t-2 border-gray-200">
-            <Button
-              onClick={handleNext}
-              disabled={(!packageId && !routeId) || !vehicleType || !tripDate || selectedVehiclePriceMissing}
-              size="lg"
-              className="group"
-            >
-              Continue to Trip Details
-              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+        ))}
+    </StepShell>
   );
 }

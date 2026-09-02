@@ -3,6 +3,19 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Several pages pin a bar to the bottom of the viewport (the booking
+   * wizard's action bar, MobileEnquiryBar, the PPC StickyContactBar). Without
+   * this, an anchor jump or a programmatic scrollIntoView can park its target
+   * underneath one of them — most visibly when the booking wizard scrolls to a
+   * field that failed validation. Scroll padding applies to the scroll
+   * container, which is the document, so it has to live here rather than on a
+   * page wrapper. It only affects scroll alignment; nothing renders differently.
+   */
+  html {
+    scroll-padding-bottom: 5.5rem;
+  }
+
   body {
     @apply bg-sunrise-gradient font-body text-ink antialiased;
     min-height: 100vh;

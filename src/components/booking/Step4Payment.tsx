@@ -4,15 +4,12 @@ import { useState, useEffect } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { Button } from '@/components/ui';
 import {
-  ArrowLeft,
   Copy,
   Check,
   MessageCircle,
   Mail,
   Phone,
   CheckCircle,
-  AlertCircle,
-  Loader2,
   Shield,
   UserCheck,
   Heart,
@@ -21,6 +18,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
+import StepShell from './StepShell';
+import { FIELD_LABEL } from './fieldStyles';
 import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
@@ -61,7 +60,6 @@ export default function Step4Payment() {
   const confirmedTotal = createdTotalAmount ?? totalAmount;
   const confirmedAdvance = createdAdvanceAmount ?? advanceAmount;
   const confirmedRemaining = confirmedTotal - confirmedAdvance;
-  const confirmedAdvanceLabelKind = getAdvanceLabelKind(confirmedTotal);
 
   // Whether this trip actually incurs Nainital entry/parking charges — true
   // for every local tour package, and for any transfer that touches Nainital
@@ -70,6 +68,21 @@ export default function Step4Payment() {
     booking.bookingType === 'tour' ||
     booking.pickupLocation.toLowerCase().includes('nainital') ||
     (booking.dropoffLocation || '').toLowerCase().includes('nainital');
+
+  // Flattened so the review grid is a plain map rather than a JSX ladder with
+  // three conditional branches inlined in the middle of it.
+  const reviewRows: Array<[string, React.ReactNode]> = [
+    ['Package', booking.packageTitle || 'Custom'],
+    ['Vehicle', booking.vehicleType],
+    ['Date', formatDate(booking.tripDate || '')],
+    ['Time', booking.tripTime],
+    ['Passengers', booking.passengerCount],
+    ['Pickup', booking.pickupLocation],
+    ...(booking.seasonName ? ([['Season', booking.seasonName]] as Array<[string, React.ReactNode]>) : []),
+    ['Name', booking.customerName],
+    ['Phone', displayPhone],
+    ...(booking.customerEmail ? ([['Email', booking.customerEmail]] as Array<[string, React.ReactNode]>) : []),
+  ];
 
   // Check if booking was already created (from store)
   useEffect(() => {
@@ -303,448 +316,340 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
   };
 
   // Success State - Booking Created
+  //
+  // This screen is deliberately exempt from the wizard's one-viewport rule. It
+  // is a receipt to act on, not a form to complete: conversion already
+  // happened, so there is no friction left to remove, and the two ways to force
+  // it into a single screen (accordion the QR, or shrink it) both get between
+  // "booking created" and "pay". The QR has to stay scannable by a phone camera
+  // at arm's length.
+  //
+  // The rule it follows instead: everything needed to PAY is in the first
+  // viewport — booking ID, the advance amount, the QR and the UPI ID. The
+  // upsell, the share buttons and the contact links sit below. On mobile the
+  // share action gets its own fixed bar, because it used to sit ~1200px down
+  // the page and it is the step that actually confirms the booking.
   if (isBookingCreated && createdBookingId) {
     return (
-      <div className="space-y-8">
-        {/* Success Header */}
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-3xl font-bold text-[#2D3436] mb-2">Booking Created!</h2>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border-4 border-amber-400 bg-amber-50 px-4 py-3 shadow-[0_0_18px_rgba(251,191,36,0.55)]">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <p className="font-extrabold text-amber-800 text-base sm:text-lg">
-              Please complete the payment to confirm your booking
-            </p>
-          </div>
-        </div>
-
-        {/* Booking ID */}
-        <div className="p-6 rounded-2xl border-4 border-green-500 bg-green-50 text-center">
-          <p className="text-sm text-gray-600 mb-2">Your Booking ID</p>
-          <p className="text-4xl font-bold text-green-700 tracking-wider">{createdBookingId}</p>
-          <p className="text-sm text-gray-500 mt-2">Save this ID for future reference</p>
-        </div>
-
-        {/* Payment Summary */}
-        <div className="p-6 rounded-2xl border-4 border-[#2D3436] bg-white">
-          <h3 className="font-bold text-lg text-[#2D3436] mb-4">Payment Summary</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center pb-3 border-b-2 border-gray-200">
-              <span className="text-gray-600">Total Amount</span>
-              <span className="font-bold text-xl text-[#2D3436]">{formatPrice(confirmedTotal)}</span>
+      <StepShell
+        variant="full"
+        rail={{ summary: [] }}
+        primary={{ label: '', onClick: () => {} }}
+      >
+        <div className="space-y-5 pb-24 lg:pb-0">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 shrink-0 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
-            <div className="flex justify-between items-center py-3 bg-green-50 -mx-6 px-6 border-y-2 border-green-200">
-              <div>
-                <span className="font-bold text-green-700">Advance Payment</span>
-                {confirmedAdvanceLabelKind !== 'minimum' && (
-                  <span className="text-sm text-green-600 ml-2">
-                    {confirmedAdvanceLabelKind === 'exact' ? '(25%)' : '(Approx. 25%)'}
+            <div className="min-w-0">
+              <h2 className="text-2xl font-bold text-ink">Booking Created</h2>
+              <p className="text-sm text-amber-800 font-semibold mt-0.5">
+                Complete the payment below to confirm it.
+              </p>
+            </div>
+          </div>
+
+          {/* Pay-critical block: QR left, the numbers right. */}
+          <div className="lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-5 lg:items-start space-y-5 lg:space-y-0">
+            <div className="p-4 rounded-xl border border-sunshine bg-sunshine-50 text-center">
+              <h3 className="font-bold text-ink mb-2">Pay advance via UPI</h3>
+              <div className="inline-block p-3 bg-white rounded-xl border border-slate-200">
+                <Image
+                  src="/nainital-upi.jpg"
+                  alt="UPI QR Code"
+                  width={200}
+                  height={200}
+                  className="rounded-lg"
+                />
+              </div>
+              <p className="text-sm text-slate-500 mt-2">Scan to pay</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-xl border border-green-300 bg-green-50">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-slate-600">Your Booking ID</span>
+                  <span className="text-2xl font-bold text-green-700 tracking-wider tabular-nums">
+                    {createdBookingId}
                   </span>
-                )}
-              </div>
-              <span className="font-bold text-2xl text-green-700">
-                {formatPrice(confirmedAdvance)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center pt-3">
-              <span className="text-gray-600">Pay to Driver</span>
-              <span className="font-bold text-lg text-[#2D3436]">{formatPrice(confirmedRemaining)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* UPI Payment Details */}
-        <div className="p-6 rounded-2xl border-4 border-[#4D96FF] bg-[#E8F4F8]">
-          <h3 className="font-bold text-lg text-[#2D3436] mb-4">Pay Advance via UPI</h3>
-
-          {/* QR Code */}
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-white rounded-2xl border-4 border-[#2D3436] shadow-[4px_4px_0px_#2D3436]">
-              <Image
-                src="/nainital-upi.jpg"
-                alt="UPI QR Code"
-                width={200}
-                height={200}
-                className="rounded-xl"
-              />
-              <p className="text-center text-sm text-gray-600 mt-2">Scan to pay</p>
-            </div>
-          </div>
-
-          {/* UPI ID */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-bold text-[#2D3436] mb-2">UPI ID</label>
-              <div className="flex gap-2">
-                <div className="flex-1 px-4 py-3 bg-white rounded-xl border-4 border-[#2D3436] font-bold text-[#2D3436]">
-                  {UPI_ID}
                 </div>
-                <Button
-                  onClick={() => copyToClipboard(UPI_ID, 'upi')}
-                  variant="secondary"
-                  className="flex-shrink-0"
-                >
-                  {copiedField === 'upi' ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-[#2D3436] mb-2">Account Name</label>
-              <div className="px-4 py-3 bg-white rounded-xl border-4 border-[#2D3436] font-bold text-[#2D3436]">
-                Go Kumaon
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* After-Booking Upsell — the box/header only render once the fetch
-            inside AddonSelector confirms there's something to show, so an
-            empty box never flashes when there are no addons available. */}
-        {createdBookingId && booking.seasonName && (
-          <div className={hasAddons ? 'p-6 rounded-2xl border-4 border-purple-500 bg-purple-50' : undefined}>
-            {hasAddons && (
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">✨</span>
-                <div>
-                  <h3 className="font-bold text-lg">Upgrade Your Experience</h3>
-                  <p className="text-sm text-gray-600">Add these extras to your booking</p>
+                <div className="flex items-baseline justify-between gap-3 mt-2 pt-2 border-t border-green-200">
+                  <span className="font-semibold text-green-800">Pay now (advance)</span>
+                  <span className="text-3xl font-bold text-green-700 tabular-nums">
+                    {formatPrice(confirmedAdvance)}
+                  </span>
                 </div>
               </div>
-            )}
 
-            <AddonSelector
-              packageId={booking.packageId || undefined}
-              routeId={booking.routeId || undefined}
-              destinationId={booking.routeContext?.destinationSlug || undefined}
-              seasonName={booking.seasonName as 'Off-Season' | 'Season'}
-              stage="after_booking"
-              onAvailabilityChange={setHasAddons}
-            />
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Total amount</span>
+                  <span className="font-semibold text-ink tabular-nums">
+                    {formatPrice(confirmedTotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Pay to driver on the day</span>
+                  <span className="font-semibold text-ink tabular-nums">
+                    {formatPrice(confirmedRemaining)}
+                  </span>
+                </div>
+              </div>
 
-            {booking.selectedAddons.length > 0 && (
+              <div>
+                <label className={FIELD_LABEL}>UPI ID</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 h-11 flex items-center px-3.5 bg-slate-50 rounded-md border border-slate-300 font-semibold text-ink">
+                    {UPI_ID}
+                  </div>
+                  <Button
+                    onClick={() => copyToClipboard(UPI_ID, 'upi')}
+                    variant="secondary"
+                    className="shrink-0"
+                  >
+                    {copiedField === 'upi' ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Account name: Go Kumaon</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Share — the step that actually confirms the booking. */}
+          <div className="p-4 rounded-xl border border-whatsapp bg-green-50">
+            <h3 className="font-bold text-ink mb-1 flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-whatsapp" />
+              Send us the payment screenshot
+            </h3>
+            <p className="text-sm text-slate-600 mb-3">
+              Your booking is confirmed once we verify the payment — usually within 6 working
+              hours of receiving your message.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
               <Button
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/bookings/add-addons', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        bookingId: createdBookingId,
-                        addons: booking.selectedAddons.map(a => ({
-                          addon_id: a.id,
-                          addon_name: a.name,
-                          addon_price: a.price,
-                          season_name: a.season_name,
-                          selected_at_stage: 'after_booking'
-                        }))
-                      })
-                    });
+                onClick={handleWhatsAppShare}
+                className="bg-whatsapp hover:brightness-95 text-white"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Share on WhatsApp
+              </Button>
+              <Button onClick={handleEmailShare} variant="secondary">
+                <Mail className="w-5 h-5 mr-2" />
+                Share via Email
+              </Button>
+            </div>
+          </div>
 
-                    if (response.ok) {
-                      alert('Addons added successfully! Please update your advance payment to include the addon cost.');
-                      booking.clearAddons();
-                    } else {
+          {/* After-Booking Upsell — the box/header only render once the fetch
+              inside AddonSelector confirms there's something to show, so an
+              empty box never flashes when there are no addons available. */}
+          {booking.seasonName && (
+            <div className={hasAddons ? 'p-4 rounded-xl border border-purple-300 bg-purple-50' : undefined}>
+              {hasAddons && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">✨</span>
+                  <div>
+                    <h3 className="font-bold text-ink">Upgrade Your Experience</h3>
+                    <p className="text-sm text-slate-600">Add these extras to your booking</p>
+                  </div>
+                </div>
+              )}
+
+              <AddonSelector
+                packageId={booking.packageId || undefined}
+                routeId={booking.routeId || undefined}
+                destinationId={booking.routeContext?.destinationSlug || undefined}
+                seasonName={booking.seasonName as 'Off-Season' | 'Season'}
+                stage="after_booking"
+                onAvailabilityChange={setHasAddons}
+              />
+
+              {booking.selectedAddons.length > 0 && (
+                <Button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/bookings/add-addons', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          bookingId: createdBookingId,
+                          addons: booking.selectedAddons.map(a => ({
+                            addon_id: a.id,
+                            addon_name: a.name,
+                            addon_price: a.price,
+                            season_name: a.season_name,
+                            selected_at_stage: 'after_booking'
+                          }))
+                        })
+                      });
+
+                      if (response.ok) {
+                        alert('Addons added successfully! Please update your advance payment to include the addon cost.');
+                        booking.clearAddons();
+                      } else {
+                        alert('Failed to add addons. Please try again.');
+                      }
+                    } catch (error) {
+                      console.error('Error adding addons:', error);
                       alert('Failed to add addons. Please try again.');
                     }
-                  } catch (error) {
-                    console.error('Error adding addons:', error);
-                    alert('Failed to add addons. Please try again.');
-                  }
-                }}
-                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 border-purple-600"
-              >
-                Add to My Booking (+{formatPrice(booking.addonsTotal)})
-              </Button>
-            )}
-          </div>
-        )}
+                  }}
+                  className="w-full mt-3 bg-purple-600 hover:bg-purple-700"
+                >
+                  Add to My Booking (+{formatPrice(booking.addonsTotal)})
+                </Button>
+              )}
+            </div>
+          )}
 
-        {/* Share on WhatsApp */}
-        <div className="p-6 rounded-2xl border-4 border-[#25D366] bg-green-50">
-          <h3 className="font-bold text-lg text-[#2D3436] mb-4 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-[#25D366]" />
-            Share Payment Screenshot
-          </h3>
-          <p className="text-sm text-gray-600 mb-4">
-            After making payment, share your booking details and payment screenshot with us on
-            WhatsApp
-          </p>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Button
-              onClick={handleWhatsAppShare}
-              className="bg-[#25D366] hover:bg-[#20BA59] border-[#25D366] text-white h-auto py-4"
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+            <a
+              href={`https://wa.me/91${WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-analytics-cta="whatsapp"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md border border-slate-300 bg-white font-semibold text-ink hover:bg-slate-50 transition-colors"
             >
-              <MessageCircle className="w-5 h-5 mr-2" />
-              <div className="text-left">
-                <div className="font-bold">Share on WhatsApp</div>
-                <div className="text-xs opacity-90">Recommended</div>
-              </div>
+              <Phone className="w-4 h-4" />
+              Need help?
+            </a>
+            <Button onClick={handleNewBooking} variant="secondary" className="w-full sm:w-auto">
+              Create New Booking
             </Button>
-
-            <Button onClick={handleEmailShare} variant="secondary" className="h-auto py-4">
-              <Mail className="w-5 h-5 mr-2" />
-              <div className="text-left">
-                <div className="font-bold">Share via Email</div>
-                <div className="text-xs opacity-70">Alternative</div>
-              </div>
-            </Button>
+            <Link href="/" className="text-sm text-slate-500 underline hover:text-ink sm:ml-auto">
+              Return to homepage
+            </Link>
           </div>
+        </div>
 
-          <div className="mt-4 p-4 rounded-xl bg-white border-2 border-green-200">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-gray-700">
-                <p className="font-bold mb-1">Your booking will be confirmed once we verify &amp; confirm your payment.</p>
-                <p>You&apos;ll receive confirmation within 6 working hours after you have sent your advance payment message.</p>
+        {/* Mobile: the share action was ~1200px down this page. Pin it. */}
+        <div
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-4 pt-2.5"
+          style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-slate-500 leading-tight">Pay now</div>
+              <div className="text-base font-semibold text-ink leading-tight tabular-nums">
+                {formatPrice(confirmedAdvance)}
               </div>
             </div>
+            <Button
+              onClick={handleWhatsAppShare}
+              size="lg"
+              className="shrink-0 py-3 bg-whatsapp hover:brightness-95 text-white"
+            >
+              <MessageCircle className="w-5 h-5 mr-2" />
+              Send screenshot
+            </Button>
           </div>
         </div>
-
-        {/* Contact & New Booking */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <a
-            href={`https://wa.me/91${WHATSAPP_NUMBER}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#20BA59] transition-colors"
-          >
-            <Phone className="w-4 h-4" />
-            Need Help?
-          </a>
-          <Button onClick={handleNewBooking} variant="secondary" className="flex-1">
-            Create New Booking
-          </Button>
-        </div>
-
-        <div className="text-center">
-          <Link href="/" className="text-sm text-gray-500 underline hover:text-gray-700">
-            Return to homepage
-          </Link>
-        </div>
-      </div>
+      </StepShell>
     );
   }
 
   // Pre-submission State
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-[#2D3436] mb-2">Complete Your Booking</h2>
-        <p className="text-gray-600">Review your booking and submit to proceed with payment</p>
-      </div>
-
-      {/* Safety Trust Badges */}
-      <div className="p-4 rounded-2xl border-2 border-teal/30 bg-teal/5">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="w-5 h-5 text-teal" />
-          <span className="font-bold text-[#2D3436]">You&apos;re booking with a trusted service</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3 text-center text-xs">
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center">
-              <UserCheck className="w-4 h-4 text-teal" />
-            </div>
-            <span className="text-gray-600">Verified Drivers</span>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-coral/10 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-coral" />
-            </div>
-            <span className="text-gray-600">Well Maintained Cars</span>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-sunshine/30 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-ink" />
-            </div>
-            <span className="text-gray-600">Family-First</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Booking Summary */}
-      <div className="p-4 rounded-2xl border-4 border-[#2D3436] bg-white">
-        <h3 className="font-bold text-sm text-[#2D3436] mb-2.5">Booking Summary</h3>
-        <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Package:</span>
-            <span className="font-bold text-[#2D3436] text-right">{booking.packageTitle || 'Custom'}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Vehicle:</span>
-            <span className="font-bold text-[#2D3436]">{booking.vehicleType}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Date:</span>
-            <span className="font-bold text-[#2D3436]">{formatDate(booking.tripDate || '')}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Time:</span>
-            <span className="font-bold text-[#2D3436]">{booking.tripTime}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Passengers:</span>
-            <span className="font-bold text-[#2D3436]">{booking.passengerCount}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-600">Pickup:</span>
-            <span className="font-bold text-[#2D3436] text-right">{booking.pickupLocation}</span>
-          </div>
-          {booking.seasonName && (
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-600">Season:</span>
-              <span className="font-bold text-[#2D3436]">{booking.seasonName}</span>
-            </div>
-          )}
-
-          {/* Show selected addons */}
-          {booking.selectedAddons.length > 0 && (
-            <div className="pt-2 border-t-2 border-gray-200 mt-2">
-              <p className="text-xs text-gray-500 mb-1">ADDONS</p>
-              {booking.selectedAddons.map(addon => (
-                <div key={addon.id} className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-600">
-                    {addon.icon_emoji} {addon.name}
-                  </span>
-                  <span className="font-medium">{formatPrice(addon.price)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Payment Breakdown */}
-      <div className="p-6 rounded-2xl border-4 border-[#FFD93D] bg-[#FFF8E7]">
-        <h3 className="font-bold text-lg text-[#2D3436] mb-4">Payment Breakdown</h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="font-medium text-gray-700">Package Price</span>
-              <span className="text-xl font-bold text-gray-900">{formatPrice(booking.calculatedPrice || 0)}</span>
-            </div>
-            {booking.addonsTotal > 0 && (
-              <div className="flex justify-between">
-                <span className="font-medium text-gray-700">Addons</span>
-                <span className="text-xl font-bold text-gray-900">+{formatPrice(booking.addonsTotal)}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="pb-4 border-b-2 border-yellow-300">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700 font-bold">Total Trip Cost</span>
-              <span className="text-2xl font-bold text-[#2D3436]">{formatPrice(totalAmount)}</span>
-            </div>
-            {involvesNainitalEntry && (
-              <div className="text-xs text-gray-500 mt-1 text-right">
-                Nainital entry and car parking charges extra (approx. Rs. 300 in total)
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-between items-center py-4 bg-green-100 -mx-6 px-6 border-y-2 border-green-300">
-            <div>
-              <span className="font-bold text-green-800">Advance Payment</span>
-              <span className="text-sm text-green-600 block">
-                {advanceLabelKind === 'minimum'
+    <StepShell
+      rail={{
+        summary: [
+          { label: 'Trip', value: booking.packageTitle || 'Custom' },
+          { label: 'Vehicle', value: booking.vehicleType },
+          { label: 'Date', value: formatDate(booking.tripDate || '') },
+          { label: 'Pickup', value: `${booking.tripTime} · ${booking.pickupLocation}` },
+          { label: 'Passengers', value: booking.passengerCount },
+        ],
+        price: {
+          label: 'Total trip cost',
+          amount: totalAmount,
+          note: involvesNainitalEntry
+            ? 'Nainital entry and parking extra (approx. Rs. 300)'
+            : undefined,
+          lines: [
+            {
+              label: 'Pay now (advance)',
+              sub:
+                advanceLabelKind === 'minimum'
                   ? 'Rs 500 minimum applied'
                   : advanceLabelKind === 'exact'
                     ? '25% of total'
-                    : 'Approx. 25% of total'}
-              </span>
+                    : 'Approx. 25% of total',
+              amount: advanceAmount,
+              tone: 'advance' as const,
+            },
+            {
+              label: 'Pay to driver',
+              sub: 'On the day of the trip',
+              amount: remainingAmount,
+              tone: 'muted' as const,
+            },
+          ],
+        },
+      }}
+      primary={{
+        label: 'Submit Booking',
+        onClick: handleSubmitBooking,
+        disabled: !totalAmount,
+        loading: isSubmitting,
+        loadingLabel: 'Creating…',
+        tone: 'confirm',
+      }}
+      secondary={{ label: 'Back', onClick: booking.prevStep, disabled: isSubmitting }}
+      error={submitError}
+    >
+      {/* Booking summary repeated here rather than left only in the rail, so
+          the customer can check what they entered without their eye leaving
+          the column they have been working down. */}
+      <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+        <h3 className="font-bold text-sm text-ink mb-2">Review your booking</h3>
+        <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          {reviewRows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-3 min-w-0">
+              <dt className="text-slate-500 shrink-0">{label}</dt>
+              <dd className="font-semibold text-ink text-right break-words min-w-0">{value}</dd>
             </div>
-            <span className="text-3xl font-bold text-green-700">{formatPrice(advanceAmount)}</span>
-          </div>
+          ))}
+        </dl>
 
-          <div className="flex justify-between items-center pt-2">
-            <div>
-              <span className="text-gray-700 font-medium">Pay to Driver</span>
-              <span className="text-sm text-gray-500 block">On the day of trip</span>
-            </div>
-            <span className="text-xl font-bold text-[#2D3436]">{formatPrice(remainingAmount)}</span>
+        {booking.selectedAddons.length > 0 && (
+          <div className="pt-2 mt-2 border-t border-slate-200">
+            <p className="text-xs text-slate-500 mb-1">EXTRAS</p>
+            {booking.selectedAddons.map(addon => (
+              <div key={addon.id} className="flex justify-between text-sm">
+                <span className="text-slate-600">
+                  {addon.icon_emoji} {addon.name}
+                </span>
+                <span className="font-medium tabular-nums">{formatPrice(addon.price)}</span>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Customer Info */}
-      <div className="p-6 rounded-2xl border-4 border-gray-200 bg-gray-50">
-        <h3 className="font-bold text-lg text-[#2D3436] mb-4">Customer Details</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Name:</span>
-            <span className="font-bold text-[#2D3436]">{booking.customerName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Phone:</span>
-            <span className="font-bold text-[#2D3436]">{displayPhone}</span>
-          </div>
-          {booking.customerEmail && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Email:</span>
-              <span className="font-bold text-[#2D3436]">{booking.customerEmail}</span>
-            </div>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+        <span className="inline-flex items-center gap-1.5">
+          <UserCheck className="w-4 h-4 text-teal" />
+          Verified drivers
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Shield className="w-4 h-4 text-coral" />
+          Well maintained cars
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Heart className="w-4 h-4 text-sunshine" />
+          Family-first service
+        </span>
       </div>
-
-      {/* Error Message */}
-      {submitError && (
-        <div className="p-4 rounded-xl bg-red-50 border-2 border-red-200 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-red-800">Error</p>
-            <p className="text-sm text-red-600">{submitError}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Buttons */}
-      <div className="flex justify-between pt-6 border-t-2 border-gray-200">
-        <Button onClick={booking.prevStep} variant="secondary" size="lg" disabled={isSubmitting}>
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
-        </Button>
-
-        <Button
-          onClick={handleSubmitBooking}
-          size="lg"
-          disabled={isSubmitting || !totalAmount}
-          className="bg-green-600 hover:bg-green-700 border-green-600"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Creating Booking...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Submit Booking
-            </>
-          )}
-        </Button>
-      </div>
-
-      <div className="text-center">
-        <Link href="/" className="text-sm text-gray-500 underline hover:text-gray-700">
-          Return to homepage
-        </Link>
-      </div>
-    </div>
+    </StepShell>
   );
 }

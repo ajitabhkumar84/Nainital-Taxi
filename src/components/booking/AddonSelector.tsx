@@ -18,6 +18,15 @@ interface AddonSelectorProps {
   // border/background/header can hold off rendering that chrome until it
   // knows there's actually something to show.
   onAvailabilityChange?: (hasAddons: boolean) => void;
+  /**
+   * Drop the internal header and the "N addons selected" footer bar.
+   *
+   * Step 2 now renders this inside a collapsed <details> whose summary row
+   * already says how many extras are selected and what they cost, so both
+   * would be duplicated one line apart. Step 4's post-booking upsell still
+   * wants them, which is why this is a prop and not a removal.
+   */
+  compact?: boolean;
 }
 
 export default function AddonSelector({
@@ -27,6 +36,7 @@ export default function AddonSelector({
   seasonName,
   stage,
   onAvailabilityChange,
+  compact = false,
 }: AddonSelectorProps) {
   const [addons, setAddons] = useState<AddonWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +140,7 @@ export default function AddonSelector({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className={`flex items-center gap-3 mb-4${compact ? ' hidden' : ''}`}>
         {stage === 'before_booking' ? (
           <>
             <Gift className="w-6 h-6 text-blue-600" />
@@ -163,7 +173,7 @@ export default function AddonSelector({
       </div>
 
       {/* Summary Bar (shown only when addons are selected) */}
-      {selectedAddons.length > 0 && (
+      {!compact && selectedAddons.length > 0 && (
         <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
           <div className="flex items-center justify-between">
             <div>

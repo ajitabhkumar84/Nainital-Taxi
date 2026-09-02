@@ -135,6 +135,20 @@ const nextConfig = {
         destination: '/tour/:slug',
         permanent: true,
       },
+      {
+        // /booking-simple was a noindex prototype of a condensed 2-step wizard
+        // that never finished: its final step console.log'd the booking and
+        // rendered a success screen without ever calling /api/bookings/create,
+        // so anyone who completed it believed they had booked a taxi and had
+        // not. Deleted 2026-09-02. It was never in the sitemap and nothing
+        // linked to it, but it was a live URL, so send its traffic to the real
+        // flow rather than a 404. 'booking-simple' deliberately STAYS in
+        // RESERVED_PAGE_SLUGS (src/lib/slug.ts) — freeing the slug would let an
+        // admin-authored custom page claim a URL with real inbound history.
+        source: '/booking-simple',
+        destination: '/booking',
+        permanent: true,
+      },
 
       // ----------------------------------------------------------------------
       // WordPress -> Next.js migration (nainitaltaxi.in). `source` values omit

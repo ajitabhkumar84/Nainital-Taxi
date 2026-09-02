@@ -136,21 +136,36 @@ export default function SeasonalHero({
       />
       {/* Scrim: darker on the left where the headline sits, lighter toward the widget */}
       <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/55 to-ink/25" />
-      <div className="absolute inset-0 bg-gradient-to-b from-ink/20 via-transparent to-ink/30 lg:hidden" />
+      <div className="absolute inset-0 bg-gradient-to-b from-ink/20 via-transparent to-ink/30 md:hidden" />
 
-      <div className="relative z-10 container mx-auto px-4 pt-24 pb-10 lg:pt-28 lg:pb-14">
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_420px] lg:gap-12 lg:items-center lg:min-h-[520px]">
+      {/*
+        The widget is the point of this hero, so it goes side-by-side with the
+        headline from `md` rather than `lg`. Between 768 and 1024 the old
+        breakpoint stacked a full-height headline block on top of it, which put
+        the first field below the fold on iPads and small laptops for no reason
+        — the two-column layout fits comfortably at that width.
+
+        pt-20 (80px) still clears the fixed Header, which is py-3.5 / ~68px tall.
+      */}
+      <div className="relative z-10 container mx-auto px-4 pt-20 pb-8 lg:pt-24 lg:pb-10">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_400px] md:gap-8 lg:gap-10 md:items-center md:min-h-[440px]">
           {/* Copy */}
           <div>
-            <h1 className="text-[34px] leading-[1.1] md:text-5xl md:leading-[1.08] font-display font-semibold text-white tracking-tight mb-4 max-w-xl">
+            <h1 className="text-[34px] leading-[1.1] md:text-5xl md:leading-[1.08] font-display font-semibold text-white tracking-tight mb-3 md:mb-4 max-w-xl">
               {title}
             </h1>
-            <p className="text-base md:text-lg text-white/85 mb-6 max-w-lg">
+            <p className="text-base md:text-lg text-white/85 mb-4 md:mb-6 max-w-lg">
               {subtitle}
             </p>
+            {/* Phones show the first two figures only. The full set wraps to
+                two lines at 360px, and every line here pushes the booking
+                widget's first field further under the fold. */}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-white/75">
               {TRUST_FIGURES.map((figure, i) => (
-                <span key={figure} className="flex items-center gap-x-2">
+                <span
+                  key={figure}
+                  className={i > 1 ? 'hidden md:flex items-center gap-x-2' : 'flex items-center gap-x-2'}
+                >
                   {i > 0 && <span className="text-white/30">&middot;</span>}
                   {figure}
                 </span>

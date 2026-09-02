@@ -51,6 +51,15 @@ export const CTA_PLACEMENTS = {
   blockedDateNotice: 'blocked_date_notice',
   bookingStep1: 'booking_step_1',
   bookingStep2: 'booking_step_2',
+  /**
+   * The "Need help?" WhatsApp link in the booking wizard's sticky summary rail
+   * (desktop) and its mobile action bar. It exists because /booking is now in
+   * GlobalContactWidgets' SUPPRESSED_PREFIXES — the global FloatingWhatsApp and
+   * MobileEnquiryBar occupied exactly the space the wizard's own sticky rail and
+   * action bar now use. Expect `mobile_bar` volume on /booking to go to zero and
+   * turn up here instead; that is the migration, not a regression.
+   */
+  bookingRail: 'booking_rail',
   bookingWidget: 'booking_widget',
   bookingConfirmation: 'booking_confirmation',
   quoteResult: 'quote_result',

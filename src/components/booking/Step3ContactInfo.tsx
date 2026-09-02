@@ -1,15 +1,24 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
-import { Button, Input } from '@/components/ui';
-import { validatePhone } from '@/lib/booking';
-import { ArrowRight, ArrowLeft, User, Mail, MessageSquare } from 'lucide-react';
+import { Input } from '@/components/ui';
+import { validatePhone, formatDate } from '@/lib/booking';
+import { formatPrice } from '@/lib/pricing';
+import { User, Mail, MessageSquare } from 'lucide-react';
+import StepShell from './StepShell';
+import { FIELD_LABEL } from './fieldStyles';
 import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { bookingProperties } from '@/lib/analytics/properties';
 
 export default function Step3ContactInfo() {
   const {
+    packageTitle,
+    tripDate,
+    tripTime,
+    calculatedPrice,
+    addonsTotal,
     customerName,
     customerPhone,
     customerCountryCode,
@@ -26,31 +35,62 @@ export default function Step3ContactInfo() {
 
   const isInternational = customerCountryCode !== '91';
 
+  const [error, setError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  // Clear a standing message as soon as the user edits any of the fields it
+  // could have been about, so a corrected form doesn't keep accusing itself.
+  useEffect(() => {
+    setError(null);
+  }, [customerName, customerPhone, customerEmail, customerCountryCode]);
+
+  /**
+   * Point the user at the field that failed.
+   *
+   * The message renders in the sticky rail (desktop) or the fixed action bar
+   * (mobile), which can be a long way from the offending input — on a phone it
+   * may be off-screen entirely. The inline message says *what* is wrong; this
+   * says *where*. preventScroll on the focus call stops it fighting the smooth
+   * scroll that is already in flight.
+   */
+  const failWith = (
+    message: string,
+    reason: string,
+    field: React.RefObject<HTMLInputElement>
+  ) => {
+    setError(message);
+    capture(ANALYTICS_EVENTS.bookingValidationFailed, {
+      ...bookingProperties(useBookingStore.getState()),
+      step: 3,
+      reason,
+    });
+    field.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    field.current?.focus({ preventScroll: true });
+  };
+
   // Contact details are PII and never travel as event properties — see the
   // note at the top of src/lib/analytics/properties.ts. The events below carry
   // only the shape of the failure (which field, which format), never a value.
   const handleNext = () => {
     if (!customerName || !customerPhone) {
-      alert('Please fill in all required fields');
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 3,
-        reason: !customerName ? 'no_name' : 'no_phone',
-      });
+      failWith(
+        'Please enter your name and phone number.',
+        !customerName ? 'no_name' : 'no_phone',
+        !customerName ? nameRef : phoneRef
+      );
       return;
     }
 
     if (!validatePhone(customerPhone, customerCountryCode)) {
-      alert(
+      failWith(
         isInternational
-          ? 'Please enter a valid phone number, including your country code'
-          : 'Please enter a valid 10-digit phone number'
+          ? 'Please enter a valid phone number, including your country code.'
+          : 'Please enter a valid 10-digit phone number.',
+        'invalid_phone',
+        phoneRef
       );
-      capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-        ...bookingProperties(useBookingStore.getState()),
-        step: 3,
-        reason: 'invalid_phone',
-      });
       return;
     }
 
@@ -58,16 +98,12 @@ export default function Step3ContactInfo() {
     if (customerEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(customerEmail)) {
-        alert('Please enter a valid email address');
-        capture(ANALYTICS_EVENTS.bookingValidationFailed, {
-          ...bookingProperties(useBookingStore.getState()),
-          step: 3,
-          reason: 'invalid_email',
-        });
+        failWith('Please enter a valid email address.', 'invalid_email', emailRef);
         return;
       }
     }
 
+    setError(null);
     capture(ANALYTICS_EVENTS.bookingStepCompleted, {
       ...bookingProperties(useBookingStore.getState()),
       step: 3,
@@ -76,168 +112,151 @@ export default function Step3ContactInfo() {
     nextStep();
   };
 
+  const total = calculatedPrice !== null ? calculatedPrice + addonsTotal : null;
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-[#2D3436] mb-2">
-          Your Contact Details
-        </h2>
-        <p className="text-gray-600">
-          We&apos;ll use these details to confirm your booking
-        </p>
-      </div>
-
-      {/* Full Name */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Full Name <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Enter your full name"
-            className="pl-12"
-            required
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          As per your ID proof
-        </p>
-      </div>
-
-      {/* Phone Number */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Phone Number <span className="text-red-500">*</span>
-        </label>
-        {isInternational ? (
-          <Input
-            type="tel"
-            value={customerPhone}
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^\d+\s-]/g, '');
-              setCustomerPhone(value);
-            }}
-            placeholder="+1 415 555 2671"
-            required
-          />
-        ) : (
-          <div className="flex">
-            <div className="flex items-center justify-center h-11 px-4 bg-slate-50 border border-r-0 border-slate-300 rounded-l-md font-bold text-[#2D3436]">
-              +91
-            </div>
+    <StepShell
+      rail={{
+        summary: [
+          Boolean(packageTitle) && { label: 'Trip', value: packageTitle },
+          Boolean(tripDate) && { label: 'Date', value: formatDate(tripDate!) },
+          Boolean(tripTime) && { label: 'Pickup', value: tripTime },
+        ],
+        price: {
+          label: 'Total trip cost',
+          amount: total,
+          note: addonsTotal > 0 ? `Includes ${formatPrice(addonsTotal)} of extras` : undefined,
+        },
+      }}
+      primary={{
+        label: 'Continue to Payment',
+        onClick: handleNext,
+        disabled: !customerName || !customerPhone,
+      }}
+      secondary={{ label: 'Back', onClick: prevStep }}
+      error={error}
+    >
+      <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+        {/* Full Name — kept first in DOM order so the wizard's per-step
+            auto-focus lands here rather than on the phone field. */}
+        <div>
+          <label htmlFor="customer-name" className={FIELD_LABEL}>
+            Full Name <span className="text-coral">*</span>
+          </label>
+          <div className="relative">
+            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
             <Input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => {
-                // Only allow numbers
-                const value = e.target.value.replace(/\D/g, '');
-                if (value.length <= 10) {
-                  setCustomerPhone(value);
-                }
-              }}
-              placeholder="9876543210"
-              className="rounded-l-none pl-4"
-              maxLength={10}
+              id="customer-name"
+              ref={nameRef}
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Name as per your ID proof"
+              className="pl-10"
               required
             />
           </div>
-        )}
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-gray-500">
-            We&apos;ll send booking confirmation on WhatsApp
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setCustomerCountryCode(isInternational ? '91' : 'INTL');
-              setCustomerPhone('');
-            }}
-            className="text-xs font-semibold text-[#4D96FF] hover:underline whitespace-nowrap ml-3"
-          >
-            {isInternational ? 'Booking within India? Use +91' : 'Booking from outside India?'}
-          </button>
         </div>
-      </div>
 
-      {/* Email Address (Optional) */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Email Address (Optional)
-        </label>
-        <div className="relative">
-          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="email"
-            value={customerEmail}
-            onChange={(e) => setCustomerEmail(e.target.value)}
-            placeholder="your.email@example.com"
-            className="pl-12"
-          />
+        {/* Phone Number */}
+        <div>
+          <label htmlFor="customer-phone" className={FIELD_LABEL}>
+            Phone Number <span className="text-coral">*</span>
+          </label>
+          {isInternational ? (
+            <Input
+              id="customer-phone"
+              ref={phoneRef}
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^\d+\s-]/g, '');
+                setCustomerPhone(value);
+              }}
+              placeholder="+1 415 555 2671"
+              required
+            />
+          ) : (
+            <div className="flex">
+              <div className="flex items-center justify-center h-11 px-3 bg-slate-100 border border-r-0 border-slate-300 rounded-l-md font-semibold text-ink">
+                +91
+              </div>
+              <Input
+                id="customer-phone"
+                ref={phoneRef}
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => {
+                  // Only allow numbers
+                  const value = e.target.value.replace(/\D/g, '');
+                  if (value.length <= 10) {
+                    setCustomerPhone(value);
+                  }
+                }}
+                placeholder="9876543210"
+                className="rounded-l-none"
+                maxLength={10}
+                required
+              />
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3 mt-1">
+            <p className="text-xs text-slate-500">Confirmation comes on WhatsApp</p>
+            <button
+              type="button"
+              onClick={() => {
+                setCustomerCountryCode(isInternational ? '91' : 'INTL');
+                setCustomerPhone('');
+              }}
+              className="text-xs font-semibold text-sunshine hover:underline whitespace-nowrap"
+            >
+              {isInternational ? 'Use +91' : 'Outside India?'}
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          We&apos;ll send booking details via email too
-        </p>
-      </div>
 
-      {/* Special Requests */}
-      <div>
-        <label className="block text-sm font-bold text-[#2D3436] mb-2">
-          Special Requests (Optional)
-        </label>
-        <div className="relative">
-          <MessageSquare className="absolute left-4 top-4 text-gray-400 w-5 h-5" />
-          <textarea
-            value={specialRequests}
-            onChange={(e) => setSpecialRequests(e.target.value)}
-            placeholder="e.g., Need child seat, Extra luggage space, Specific pickup time, etc."
-            className="w-full pl-12 pr-4 py-3 rounded-xl border-4 border-[#2D3436] focus:border-[#4D96FF] focus:outline-none font-medium text-[#2D3436] placeholder-gray-400 transition-colors resize-none"
-            rows={4}
-          />
+        {/* Email Address (Optional) */}
+        <div className="sm:col-span-2">
+          <label htmlFor="customer-email" className={FIELD_LABEL}>
+            Email Address <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+            <Input
+              id="customer-email"
+              ref={emailRef}
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="your.email@example.com"
+              className="pl-10"
+            />
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Let us know if you have any special requirements
-        </p>
-      </div>
 
-      {/* Privacy Note */}
-      <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
-        <div className="flex gap-3">
-          <div className="text-blue-500 mt-0.5">🔒</div>
-          <div className="text-sm text-blue-700">
-            <p className="font-bold mb-1">Your privacy is protected</p>
-            <p className="text-xs">
-              We&apos;ll only use your contact details for this booking and important updates.
-              We never share your information with third parties.
-            </p>
+        {/* Special Requests */}
+        <div className="sm:col-span-2">
+          <label htmlFor="special-requests" className={FIELD_LABEL}>
+            Special Requests <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <div className="relative">
+            <MessageSquare className="absolute left-3.5 top-3 text-slate-400 w-4 h-4 pointer-events-none" />
+            <textarea
+              id="special-requests"
+              value={specialRequests}
+              onChange={(e) => setSpecialRequests(e.target.value)}
+              placeholder="Child seat, extra luggage space, a different pickup time…"
+              className="w-full pl-10 pr-3.5 py-3 min-h-[76px] border border-slate-300 rounded-md bg-slate-50 font-body text-ink placeholder:text-slate-400 focus:outline-none focus:border-sunshine focus:ring-4 focus:ring-sunshine-50 transition-colors resize-y"
+              rows={2}
+            />
           </div>
         </div>
       </div>
 
-      {/* Navigation Buttons */}
-      <div className="flex justify-between pt-6 border-t-2 border-gray-200">
-        <Button
-          onClick={prevStep}
-          variant="secondary"
-          size="lg"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
-        </Button>
-
-        <Button
-          onClick={handleNext}
-          disabled={!customerName || !customerPhone}
-          size="lg"
-          className="group"
-        >
-          Continue to Payment
-          <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-        </Button>
-      </div>
-    </div>
+      <p className="text-xs text-slate-500">
+        🔒 We use your details only for this booking and important updates, and never
+        share them with third parties.
+      </p>
+    </StepShell>
   );
 }
