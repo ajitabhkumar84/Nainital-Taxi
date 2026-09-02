@@ -6,6 +6,22 @@
  */
 
 /**
+ * The live UPI handle. Hardcoded rather than read from admin_settings.upi_id
+ * because it must match the QR code baked into public/nainital-upi.jpg — an
+ * admin editing the settings field would change the text a customer copies
+ * without changing the code they scan, sending the two to different accounts.
+ * Changing the handle therefore means replacing that image too, and updating
+ * the DEFAULT_SETTINGS fallback in src/app/admin/settings/page.tsx.
+ *
+ * 2026-09-02: hoisted here from Step4Payment.tsx. The booking confirmation
+ * email now embeds the same QR and handle, and CLAUDE.md already flags three
+ * disagreeing copies of this string as known debt — a fourth copy in
+ * notifications.ts would have been the one that silently drifts, because
+ * nobody reads their own confirmation email.
+ */
+export const UPI_ID = 'gokumaon@ptyes';
+
+/**
  * Generate a unique booking ID in format NT-YYYYMMDD-XXXX
  * Example: NT-20241230-A7B3
  */

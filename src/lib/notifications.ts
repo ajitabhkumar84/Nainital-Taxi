@@ -5,7 +5,15 @@
  * Sends booking confirmations, payment verifications, and admin alerts.
  */
 
-import { formatPrice, formatDate, formatTime, getVehicleDisplayName } from './booking';
+import {
+  formatPrice,
+  formatDate,
+  formatTime,
+  getVehicleDisplayName,
+  calculateAdvanceAmount,
+  getAdvanceLabelKind,
+  UPI_ID,
+} from './booking';
 import { SITE_URL } from './siteUrl';
 
 // Configuration
@@ -15,12 +23,47 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'bookings@nainitaltaxi.in';
 const BUSINESS_NAME = 'Nainital Taxi';
 const BUSINESS_PHONE = '8445206116';
 const BUSINESS_WHATSAPP = '918445206116';
-const WEBSITE_URL = process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
+
+// Deliberately SITE_URL, not process.env.NEXT_PUBLIC_SITE_URL — same reasoning
+// as siteUrl.ts, which exists precisely to stop this. That var is localhost:3000
+// in .env.local and resolves to the *deployment's* .vercel.app URL on Vercel, so
+// reading it here put a .vercel.app link in the footer of live customer emails
+// (2026-09-02). The production origin is a constant; keep it one.
+const WEBSITE_URL = SITE_URL;
+
+// Where guest replies should land. FROM_EMAIL is a send-only Resend identity —
+// without an explicit Reply-To, a customer hitting "Reply" on a confirmation
+// mails an inbox nobody reads.
+const GUEST_REPLY_TO = 'taxinainital@gmail.com';
+
+// The UPI QR shown on the checkout screen (public/nainital-upi.jpg), served from
+// the production origin so Resend can fetch it. Attached by content_id rather
+// than linked as a remote <img>: Gmail and Outlook block remote images from
+// unknown senders by default, which is exactly the case for a first
+// confirmation email, and a blocked QR is an unpayable booking.
+const UPI_QR_URL = `${SITE_URL}/nainital-upi.jpg`;
+const UPI_QR_CID = 'nainital-upi-qr';
+const UPI_QR_FILENAME = 'nainital-upi-qr.jpg';
+
+interface EmailAttachment {
+  filename: string;
+  /** Public URL Resend fetches server-side. Preferred over `content` here: the
+   *  file lives in public/, which is NOT reliably readable from a route
+   *  handler's filesystem on Vercel (it is served statically, not traced into
+   *  the lambda bundle). */
+  path?: string;
+  /** Base64 alternative to `path`. */
+  content?: string;
+  /** Referenced from the HTML as `cid:<value>` to render inline. */
+  content_id?: string;
+}
 
 interface EmailOptions {
   to: string;
   subject: string;
   html: string;
+  replyTo?: string;
+  attachments?: EmailAttachment[];
 }
 
 /**
@@ -57,6 +100,57 @@ interface BookingData {
   status: string;
   payment_status: string;
   special_requests?: string | null;
+  // Everything below is optional so the shape stays compatible with a bare
+  // `bookings` row spread. /api/bookings/create passes the extras explicitly —
+  // base_price and addons are computed there and never persisted as columns.
+  base_price?: number;
+  addons_total?: number;
+  addons?: Array<{ addon_name: string; addon_price: number }>;
+  season_name?: string | null;
+  package_id?: string | null;
+  route_id?: string | null;
+  booking_source?: string | null;
+}
+
+/**
+ * The customer's number in the digits-only, country-code-prefixed form the
+ * wa.me and tel: schemes require (e.g. 919876543210). Two things to get right:
+ *
+ * - India ('91', the default) stores a bare 10-digit number, so the dial code
+ *   has to be prepended. The international fallback stores the customer's full
+ *   self-typed number, already complete.
+ * - Everything that is not a digit is then stripped. normalizePhone() only
+ *   removes spaces, dashes and a leading '+', so a number typed as
+ *   "+91 (98765) 43210" still reaches the DB carrying parentheses — and wa.me
+ *   silently fails to open a chat on anything but a clean digit string.
+ */
+function toDialableNumber(
+  phone: string,
+  countryCode?: string | null
+): string {
+  const withCode = !countryCode || countryCode === '91' ? `91${phone}` : phone;
+  return withCode.replace(/\D/g, '');
+}
+
+/**
+ * The advance the customer is actually asked for. Must go through
+ * calculateAdvanceAmount() — it floors to the nearest Rs 50, and the ad-hoc
+ * `Math.round(final_price * 0.25)` these templates used until 2026-09-02 did
+ * not, so a Rs 4,300 booking told the customer Rs 1,075 in the confirmation
+ * email and Rs 1,050 on the checkout screen. advance_amount is not a column the
+ * create route writes, so the fallback was always the branch taken.
+ */
+function resolveAdvance(booking: BookingData): number {
+  return booking.advance_amount || calculateAdvanceAmount(booking.final_price);
+}
+
+/** Label for the advance figure that does not claim an exact 25% when the
+ *  round-down or the Rs 500 floor made it something else. */
+function advanceLabel(totalAmount: number): string {
+  const kind = getAdvanceLabelKind(totalAmount);
+  if (kind === 'exact') return 'Advance Payment (25%)';
+  if (kind === 'approx') return 'Advance Payment (approx. 25%)';
+  return 'Advance Payment (minimum)';
 }
 
 type SendResult = { ok: true } | { ok: false; reason: string };
@@ -86,6 +180,11 @@ async function sendEmailWithResult(options: EmailOptions): Promise<SendResult> {
         to: options.to,
         subject: options.subject,
         html: options.html,
+        // Spread conditionally rather than sending null/[]: Resend rejects an
+        // empty-string reply_to outright, and a bookings-without-email guest
+        // legitimately has no address to reply to.
+        ...(options.replyTo ? { reply_to: options.replyTo } : {}),
+        ...(options.attachments?.length ? { attachments: options.attachments } : {}),
       }),
     });
 
@@ -115,7 +214,7 @@ async function sendEmail(options: EmailOptions): Promise<boolean> {
  * Generate booking confirmation email HTML
  */
 function generateBookingConfirmationEmail(booking: BookingData): string {
-  const advanceAmount = booking.advance_amount || Math.max(Math.round(booking.final_price * 0.25), 500);
+  const advanceAmount = resolveAdvance(booking);
   const remainingAmount = booking.final_price - advanceAmount;
 
   return `
@@ -209,7 +308,7 @@ function generateBookingConfirmationEmail(booking: BookingData): string {
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #28a745; font-weight: 600;">Advance Payment (25%)</td>
+          <td style="padding: 8px 0; color: #28a745; font-weight: 600;">${advanceLabel(booking.final_price)}</td>
           <td style="padding: 8px 0; color: #28a745; font-weight: bold; text-align: right; font-size: 18px;">
             ${formatPrice(advanceAmount)}
           </td>
@@ -218,6 +317,51 @@ function generateBookingConfirmationEmail(booking: BookingData): string {
           <td style="padding: 8px 0; color: #666;">Remaining (Pay to Driver)</td>
           <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">
             ${formatPrice(remainingAmount)}
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Pay Now: the QR from the checkout screen, so the booking stays payable
+         after the customer closes the tab. The image is a cid: attachment
+         (see UPI_QR_CID) because remote images are blocked by default in Gmail
+         and Outlook for a sender the customer has never mailed before. The UPI
+         ID and amount are repeated as plain text below it so payment is still
+         possible if no image renders at all. -->
+    <div style="padding: 24px; border-top: 1px solid #eee;">
+      <h2 style="margin: 0 0 4px; color: #2D3436; font-size: 18px;">Pay Your Advance</h2>
+      <p style="margin: 0 0 16px; color: #666; font-size: 14px;">
+        Scan this QR with any UPI app, or use the ID below.
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="vertical-align: top; padding-right: 16px;" width="220">
+            <div style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; text-align: center;">
+              <img src="cid:${UPI_QR_CID}"
+                   alt="UPI QR code for ${escapeHtml(UPI_ID)}"
+                   width="196" height="196"
+                   style="display: block; width: 196px; height: 196px; margin: 0 auto; border-radius: 8px;">
+            </div>
+            <p style="margin: 8px 0 0; text-align: center; font-size: 12px; color: #999;">
+              Can't see the code?
+              <a href="${UPI_QR_URL}" style="color: #4D96FF;">Open it here</a>
+            </p>
+          </td>
+          <td style="vertical-align: top;">
+            <div style="padding: 14px; background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 10px;">
+              <p style="margin: 0; color: #166534; font-size: 13px; font-weight: 600;">Pay now (advance)</p>
+              <p style="margin: 4px 0 0; color: #15803d; font-size: 26px; font-weight: bold;">
+                ${formatPrice(advanceAmount)}
+              </p>
+            </div>
+            <p style="margin: 14px 0 4px; color: #666; font-size: 13px;">UPI ID</p>
+            <p style="margin: 0; padding: 10px 12px; background-color: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; color: #2D3436; font-size: 15px; font-weight: 600; word-break: break-all;">
+              ${escapeHtml(UPI_ID)}
+            </p>
+            <p style="margin: 14px 0 0; color: #666; font-size: 13px;">
+              Quote booking ID <strong style="color: #2D3436;">${booking.booking_id}</strong> with your payment.
+            </p>
           </td>
         </tr>
       </table>
@@ -352,14 +496,31 @@ function generatePaymentVerifiedEmail(booking: BookingData): string {
  * Generate admin notification email HTML
  */
 function generateAdminNewBookingEmail(booking: BookingData): string {
-  const advanceAmount = booking.advance_amount || Math.max(Math.round(booking.final_price * 0.25), 500);
-  // India ('91', the default) stores a bare 10-digit number, so the dial
-  // code has to be prepended for a working wa.me/tel link. The international
-  // fallback stores the customer's full self-typed number, already complete.
-  const fullCustomerPhone =
-    !booking.customer_country_code || booking.customer_country_code === '91'
-      ? `91${booking.customer_phone}`
-      : booking.customer_phone;
+  const advanceAmount = resolveAdvance(booking);
+  const remainingAmount = booking.final_price - advanceAmount;
+  const dialable = toDialableNumber(booking.customer_phone, booking.customer_country_code);
+  const displayPhone = `+${dialable}`;
+
+  // route_id and package_id are mutually exclusive (see bookingLink.ts), so
+  // which one is set is what distinguishes a point-to-point transfer from a
+  // tour package. Worth stating outright: the two are serviced differently and
+  // package_name alone ("Kathgodam to Nainital") does not always make it clear.
+  const isTransfer = Boolean(booking.route_id);
+  const tripKind = isTransfer ? 'Transfer' : 'Tour package';
+  const referenceId = booking.route_id || booking.package_id || null;
+
+  const addons = booking.addons || [];
+  const addonsTotal =
+    booking.addons_total ?? addons.reduce((sum, a) => sum + a.addon_price, 0);
+  // Falls back to subtracting addons so the row is still right for a caller
+  // that did not pass base_price explicitly.
+  const basePrice = booking.base_price ?? booking.final_price - addonsTotal;
+
+  const row = (label: string, value: string) => `
+        <tr>
+          <td style="padding: 8px 0; color: #666; width: 40%; vertical-align: top;">${escapeHtml(label)}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${value}</td>
+        </tr>`;
 
   return `
 <!DOCTYPE html>
@@ -375,18 +536,32 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
     <div style="background-color: #FF6B6B; padding: 24px; text-align: center;">
       <h1 style="margin: 0; color: #fff; font-size: 24px;">New Booking Alert!</h1>
       <p style="margin: 8px 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">
-        ${booking.booking_id}
+        ${booking.booking_id} &middot; ${escapeHtml(tripKind)}
       </p>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Awaiting-payment banner. The booking row exists but nothing has been
+         paid yet: this fires the moment the customer reaches the QR screen. -->
+    <div style="padding: 12px 24px; background-color: #FFF3CD; text-align: center;">
+      <p style="margin: 0; color: #856404; font-size: 13px; font-weight: 600;">
+        Customer is on the payment screen &mdash; advance of ${formatPrice(advanceAmount)} not yet confirmed.
+      </p>
+    </div>
+
+    <!-- Quick Actions. wa.me requires a digits-only number including the
+         country code; toDialableNumber() guarantees that shape. -->
     <div style="padding: 16px; background-color: #f8f9fa; text-align: center;">
-      <a href="https://wa.me/${escapeHtml(fullCustomerPhone)}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
+      <a href="https://wa.me/${dialable}" style="display: inline-block; padding: 10px 20px; background-color: #25D366; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 8px; font-size: 14px;">
         WhatsApp
       </a>
-      <a href="tel:+${escapeHtml(fullCustomerPhone)}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+      <a href="tel:+${dialable}" style="display: inline-block; padding: 10px 20px; background-color: #4D96FF; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; margin-right: 8px;">
         Call
       </a>
+      ${booking.customer_email ? `
+      <a href="mailto:${escapeHtml(booking.customer_email)}" style="display: inline-block; padding: 10px 20px; background-color: #2D3436; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+        Email
+      </a>
+      ` : ''}
     </div>
 
     <!-- Customer Details -->
@@ -395,20 +570,11 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
         Customer Details
       </h2>
       <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 8px 0; color: #666; width: 40%;">Name</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.customer_name)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Phone</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.customer_phone)}</td>
-        </tr>
-        ${booking.customer_email ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Email</td>
-          <td style="padding: 8px 0; color: #2D3436;">${escapeHtml(booking.customer_email)}</td>
-        </tr>
-        ` : ''}
+        ${row('Name', escapeHtml(booking.customer_name))}
+        ${row('Phone', `<a href="https://wa.me/${dialable}" style="color: #2D3436; text-decoration: none;">${escapeHtml(displayPhone)}</a>`)}
+        ${booking.customer_email
+          ? row('Email', `<a href="mailto:${escapeHtml(booking.customer_email)}" style="color: #2D3436;">${escapeHtml(booking.customer_email)}</a>`)
+          : row('Email', '<span style="color: #999; font-weight: 400;">Not provided</span>')}
       </table>
     </div>
 
@@ -418,37 +584,40 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
         Trip Details
       </h2>
       <table style="width: 100%; border-collapse: collapse;">
+        ${row('Booking type', escapeHtml(tripKind))}
+        ${row('Package', escapeHtml(booking.package_name))}
+        ${row('Vehicle', escapeHtml(getVehicleDisplayName(booking.vehicle_type)))}
+        ${row('Date', formatDate(booking.booking_date))}
+        ${row('Time', formatTime(booking.pickup_time))}
+        ${row('Pickup', escapeHtml(booking.pickup_location))}
+        ${booking.dropoff_location ? row('Drop-off', escapeHtml(booking.dropoff_location)) : ''}
+        ${row('Passengers', String(booking.passengers))}
+        ${booking.season_name ? row('Season', escapeHtml(booking.season_name)) : ''}
+      </table>
+    </div>
+
+    <!-- Add-ons the customer selected before booking. Rendered explicitly even
+         when empty: "no add-ons" and "add-ons section missing from the email"
+         look identical otherwise, and the difference is money. -->
+    <div style="padding: 0 24px 24px;">
+      <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px;">
+        Add-ons
+      </h2>
+      ${addons.length > 0 ? `
+      <table style="width: 100%; border-collapse: collapse;">
+        ${addons.map((addon) => `
         <tr>
-          <td style="padding: 8px 0; color: #666; width: 40%;">Package</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.package_name)}</td>
-        </tr>
+          <td style="padding: 8px 0; color: #2D3436; border-bottom: 1px solid #f1f5f9;">${escapeHtml(addon.addon_name)}</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right; border-bottom: 1px solid #f1f5f9;">${formatPrice(addon.addon_price)}</td>
+        </tr>`).join('')}
         <tr>
-          <td style="padding: 8px 0; color: #666;">Vehicle</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(getVehicleDisplayName(booking.vehicle_type))}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Date</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${formatDate(booking.booking_date)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Time</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${formatTime(booking.pickup_time)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Pickup</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.pickup_location)}</td>
-        </tr>
-        ${booking.dropoff_location ? `
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Drop-off</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${escapeHtml(booking.dropoff_location)}</td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Passengers</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: 600;">${booking.passengers}</td>
+          <td style="padding: 8px 0; color: #666;">Add-ons total</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: bold; text-align: right;">${formatPrice(addonsTotal)}</td>
         </tr>
       </table>
+      ` : `
+      <p style="margin: 0; color: #999; font-size: 14px;">None selected.</p>
+      `}
     </div>
 
     <!-- Pricing -->
@@ -456,8 +625,16 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
       <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px;">Pricing</h2>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0; color: #666;">Total Amount</td>
-          <td style="padding: 8px 0; color: #2D3436; font-weight: bold; text-align: right; font-size: 18px;">
+          <td style="padding: 8px 0; color: #666;">Base fare</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">${formatPrice(basePrice)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Add-ons</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">${formatPrice(addonsTotal)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600; border-top: 1px solid #e2e8f0;">Total Amount</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: bold; text-align: right; font-size: 18px; border-top: 1px solid #e2e8f0;">
             ${formatPrice(booking.final_price)}
           </td>
         </tr>
@@ -467,6 +644,10 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
             ${formatPrice(advanceAmount)}
           </td>
         </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Balance (pay to driver)</td>
+          <td style="padding: 8px 0; color: #2D3436; font-weight: 600; text-align: right;">${formatPrice(remainingAmount)}</td>
+        </tr>
       </table>
     </div>
 
@@ -474,16 +655,33 @@ function generateAdminNewBookingEmail(booking: BookingData): string {
     <!-- Special Requests -->
     <div style="padding: 24px;">
       <h2 style="margin: 0 0 8px; color: #2D3436; font-size: 16px;">Special Requests</h2>
-      <p style="margin: 0; padding: 12px; background-color: #fff3cd; border-radius: 6px; color: #856404;">
+      <p style="margin: 0; padding: 12px; background-color: #fff3cd; border-radius: 6px; color: #856404; white-space: pre-wrap;">
         ${escapeHtml(booking.special_requests)}
       </p>
     </div>
     ` : ''}
 
+    <!-- Reference -->
+    <div style="padding: 0 24px 24px;">
+      <h2 style="margin: 0 0 16px; color: #2D3436; font-size: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px;">
+        Reference
+      </h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        ${row('Booking ID', escapeHtml(booking.booking_id))}
+        ${referenceId ? row(isTransfer ? 'Route ID' : 'Package ID', `<span style="font-family: monospace; font-size: 12px; font-weight: 400;">${escapeHtml(referenceId)}</span>`) : ''}
+        ${row('Row ID', `<span style="font-family: monospace; font-size: 12px; font-weight: 400;">${escapeHtml(booking.id)}</span>`)}
+        ${booking.booking_source ? row('Source', escapeHtml(booking.booking_source)) : ''}
+        ${row('Status', `${escapeHtml(booking.status)} / payment ${escapeHtml(booking.payment_status)}`)}
+      </table>
+    </div>
+
     <!-- Footer -->
     <div style="padding: 16px; background-color: #2D3436; text-align: center;">
       <p style="margin: 0; color: #aaa; font-size: 12px;">
         Nainital Taxi Admin | ${new Date().toLocaleString('en-IN')}
+      </p>
+      <p style="margin: 6px 0 0; color: #aaa; font-size: 12px;">
+        ${booking.customer_email ? 'Reply to this email to reach the customer directly.' : 'No customer email on file &mdash; use WhatsApp or call.'}
       </p>
     </div>
   </div>
@@ -505,6 +703,17 @@ export async function sendBookingConfirmation(booking: BookingData): Promise<boo
     to: booking.customer_email,
     subject: `Booking Received - ${booking.booking_id} | ${BUSINESS_NAME}`,
     html: generateBookingConfirmationEmail(booking),
+    replyTo: GUEST_REPLY_TO,
+    // Both inline and saveable: content_id makes it render in the body without
+    // tripping remote-image blocking, and it still lands in the attachment bar
+    // so the customer can reopen the QR after closing the email.
+    attachments: [
+      {
+        filename: UPI_QR_FILENAME,
+        path: UPI_QR_URL,
+        content_id: UPI_QR_CID,
+      },
+    ],
   });
 }
 
@@ -521,6 +730,7 @@ export async function sendPaymentVerified(booking: BookingData): Promise<boolean
     to: booking.customer_email,
     subject: `Booking Confirmed - ${booking.booking_id} | ${BUSINESS_NAME}`,
     html: generatePaymentVerifiedEmail(booking),
+    replyTo: GUEST_REPLY_TO,
   });
 }
 
@@ -532,6 +742,9 @@ export async function sendAdminNotification(booking: BookingData): Promise<boole
     to: ADMIN_EMAIL,
     subject: `New Booking: ${booking.booking_id} - ${booking.customer_name}`,
     html: generateAdminNewBookingEmail(booking),
+    // Hitting Reply on the alert mails the customer. Omitted entirely when they
+    // booked without an email — Resend rejects an empty reply_to.
+    replyTo: booking.customer_email || undefined,
   });
 }
 
@@ -798,6 +1011,7 @@ export async function sendContactEnquiry(
       to: recipient?.trim() || ADMIN_EMAIL,
       subject: `New Contact Enquiry - ${data.name}`,
       html: generateContactEnquiryAdminEmail(data),
+      replyTo: data.email?.trim() || undefined,
     });
 
     // Send auto-reply only if customer provided email
@@ -806,6 +1020,7 @@ export async function sendContactEnquiry(
         to: data.email,
         subject: `We Received Your Enquiry | ${BUSINESS_NAME}`,
         html: generateContactAutoReplyEmail(data),
+        replyTo: GUEST_REPLY_TO,
       });
       if (!autoReplyResult.ok) {
         console.error('[notifications] Auto-reply email failed:', autoReplyResult.reason);

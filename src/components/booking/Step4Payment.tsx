@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind } from '@/lib/booking';
+import { calculateAdvanceAmount, formatPrice, formatDate, getAdvanceLabelKind, UPI_ID } from '@/lib/booking';
 import AddonSelector from './AddonSelector';
 import StepShell from './StepShell';
 import { FIELD_LABEL } from './fieldStyles';
@@ -24,13 +24,8 @@ import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { bookingProperties, CTA_PLACEMENTS } from '@/lib/analytics/properties';
 
-// The live UPI handle. Hardcoded rather than read from admin_settings.upi_id
-// because it must match the QR code baked into public/nainital-upi.jpg below —
-// an admin editing the settings field would change the text a customer copies
-// without changing the code they scan, sending the two to different accounts.
-// Changing the handle therefore means replacing that image too, and updating
-// the DEFAULT_SETTINGS fallback in src/app/admin/settings/page.tsx.
-const UPI_ID = 'gokumaon@ptyes';
+// UPI_ID now lives in @/lib/booking so the confirmation email can render the
+// same handle beside the same QR image — see the comment on it there.
 const WHATSAPP_NUMBER = '8445206116';
 
 export default function Step4Payment() {

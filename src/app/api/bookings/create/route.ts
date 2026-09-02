@@ -320,17 +320,36 @@ export async function POST(request: NextRequest) {
     // Generate a readable booking reference from UUID
     const bookingRef = `NT-${booking.id.slice(0, 8).toUpperCase()}`;
 
-    // Send confirmation email to customer (non-blocking)
-    if (body.customerEmail) {
-      sendBookingConfirmation({ ...booking, booking_id: bookingRef }).catch((err) => {
-        console.error('Failed to send confirmation email:', err);
-      });
-    }
+    // The payload both emails render. The `booking` row supplies most of it;
+    // advance_amount, base_price and the addon line items are computed above
+    // and are not columns, so they have to be passed explicitly.
+    //
+    // advance_amount especially: without it the templates fall back to their
+    // own arithmetic, which disagreed with calculateAdvanceAmount() and quoted
+    // the customer an advance Rs 25 off what the checkout screen showed.
+    const emailPayload = {
+      ...booking,
+      booking_id: bookingRef,
+      advance_amount: advanceAmount,
+      base_price: pricing.price,
+      addons: addonRecords.map((addon) => ({
+        addon_name: addon.addon_name,
+        addon_price: addon.addon_price,
+      })),
+    };
 
-    // Send notification to admin (non-blocking)
-    sendAdminNotification({ ...booking, booking_id: bookingRef }).catch((err) => {
-      console.error('Failed to send admin notification:', err);
-    });
+    // Awaited, not fire-and-forget. These were floating promises with a bare
+    // .catch() sitting above the return, which reads as "non-blocking" but on
+    // Vercel means the send is racing the response: the lambda can freeze the
+    // instant NextResponse.json() is returned, killing the in-flight request to
+    // Resend. That silently dropped admin alerts in production. allSettled
+    // because a failed email must never fail a booking that is already
+    // committed to the database — and both senders already swallow and log
+    // their own errors, so nothing here can reject.
+    await Promise.allSettled([
+      body.customerEmail ? sendBookingConfirmation(emailPayload) : Promise.resolve(false),
+      sendAdminNotification(emailPayload),
+    ]);
 
     // Return success response — the authoritative amounts, never body.totalAmount
     return NextResponse.json({
