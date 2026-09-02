@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
@@ -39,6 +39,30 @@ const baseUrl = SITE_URL;
 // This is the sole fallback now, referenced explicitly so there's always
 // exactly one favicon source.
 const DEFAULT_FAVICON = "/favicon.ico";
+
+/**
+ * `interactiveWidget: 'resizes-content'` is the load-bearing part.
+ *
+ * By default (`resizes-visual`) an on-screen keyboard shrinks only the *visual*
+ * viewport, so a `position: fixed; bottom: 0` element stays pinned to the
+ * bottom of the unchanged layout viewport — i.e. behind the keyboard, where
+ * nobody can see or tap it. That is what hid the booking wizard's Continue
+ * button while a field was focused.
+ *
+ * `resizes-content` shrinks the layout viewport too, so the booking action bar
+ * settles directly above the keyboard on Android with no JS at all. iOS Safari
+ * ignores this key, which is why StepShell also does a visualViewport-based
+ * correction — the two are complementary, and the correction computes to zero
+ * wherever this directive is honoured.
+ *
+ * Everything else here matches what Next.js emitted by default before this
+ * export existed, so no other page's behaviour changes.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const faviconUrl = (await getFaviconUrl()) ?? DEFAULT_FAVICON;

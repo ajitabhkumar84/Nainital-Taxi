@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ArrowLeft, Loader2, MessageCircle, Pencil, Lock } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { formatPrice } from '@/lib/pricing';
@@ -115,30 +115,93 @@ export default function StepShell({
 }: StepShellProps) {
   const { config: siteConfig } = useSiteConfig();
   const formRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
 
   /**
-   * A `fixed bottom-0` bar and a virtual keyboard are a known-bad pair: iOS
-   * Safari resizes the visual viewport but not the layout viewport, so the bar
-   * rides up and covers the field being typed into. Rather than chase
-   * visualViewport resize events (which behave differently on iOS and Android),
-   * hide the bar outright while a field inside the form column has focus. The
-   * bar exists to keep the price and CTA reachable while *reading*; while
-   * *typing*, the field matters more, and blur restores it immediately.
+   * Keep the action bar above the on-screen keyboard — never hide it.
+   *
+   * The first cut of this hid the bar while any field had focus, on the theory
+   * that the field matters more than the CTA while typing. That was wrong: it
+   * meant Continue vanished for the whole time someone was filling the form,
+   * and the only way to get it back was to tap into dead space to blur the
+   * field. Losing the primary action mid-task is a worse failure than the
+   * overlap it was avoiding.
+   *
+   * So: the bar always renders, and it moves instead.
+   *
+   * `window.innerHeight - visualViewport.height - visualViewport.offsetTop` is
+   * how much of the layout viewport an on-screen widget is covering. It is
+   * self-correcting across platforms, which is why one formula covers both:
+   *   - Android honours `interactive-widget=resizes-content` (set in
+   *     app/layout.tsx), so the layout viewport shrinks with the keyboard and
+   *     this evaluates to ~0 — no transform, the bar is already in the right
+   *     place.
+   *   - iOS Safari ignores that directive and shrinks only the visual viewport,
+   *     so this evaluates to the keyboard height and the bar is lifted by it.
+   *
+   * `scroll` is listened to as well as `resize` because iOS reports keyboard
+   * changes as visual-viewport scrolls when the page is already scrolled.
    */
-  const [fieldFocused, setFieldFocused] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const sync = () => {
+      const bar = barRef.current;
+      if (!bar) return;
+      const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // The 1px threshold avoids a transform from sub-pixel rounding on
+      // browsers where the two viewports differ by a hair at rest.
+      bar.style.transform = overlap > 1 ? `translateY(-${overlap}px)` : '';
+    };
+
+    sync();
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+    return () => {
+      vv.removeEventListener('resize', sync);
+      vv.removeEventListener('scroll', sync);
+    };
+  }, []);
+
+  /**
+   * With the bar now sitting above the keyboard rather than hiding, it can
+   * cover the field that was just focused. Browsers do their own scroll on
+   * focus, but they aim to put the field anywhere visible — they know nothing
+   * about our bar — so a field near the bottom routinely lands underneath it.
+   *
+   * Only intervene when the field is actually obscured. Scrolling on every
+   * focus would yank the page around while tabbing between fields that were
+   * already perfectly visible. The delay lets the keyboard animation and the
+   * browser's own focus scroll finish first, so this isn't fighting them.
+   */
   useEffect(() => {
     const node = formRef.current;
     if (!node) return;
-    const isField = (t: EventTarget | null) =>
-      t instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName);
-    const onIn = (e: FocusEvent) => isField(e.target) && setFieldFocused(true);
-    const onOut = (e: FocusEvent) => isField(e.target) && setFieldFocused(false);
-    node.addEventListener('focusin', onIn);
-    node.addEventListener('focusout', onOut);
-    return () => {
-      node.removeEventListener('focusin', onIn);
-      node.removeEventListener('focusout', onOut);
+
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target;
+      if (
+        !(target instanceof HTMLElement) ||
+        !/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)
+      ) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        const visibleHeight = window.visualViewport?.height ?? window.innerHeight;
+        const barHeight = barRef.current?.offsetHeight ?? 0;
+        const rect = target.getBoundingClientRect();
+        const safeBottom = visibleHeight - barHeight - 8;
+
+        if (rect.bottom > safeBottom || rect.top < 0) {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }, 300);
     };
+
+    node.addEventListener('focusin', onFocusIn);
+    return () => node.removeEventListener('focusin', onFocusIn);
   }, []);
 
   const rows = rail.summary.filter(isRow);
@@ -323,11 +386,17 @@ export default function StepShell({
         </aside>
       </div>
 
-      {/* Mobile action bar — mirrors the rail's price + actions. */}
+      {/*
+        Mobile action bar — mirrors the rail's price + actions.
+
+        Always rendered, including while a field has focus; the effect above
+        lifts it clear of the keyboard rather than hiding it. `will-change`
+        keeps the transform on the compositor so it tracks the keyboard
+        animation instead of stuttering behind it.
+      */}
       <div
-        className={`lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-4 pt-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] ${
-          fieldFocused ? 'hidden' : ''
-        }`}
+        ref={barRef}
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-4 pt-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] will-change-transform"
         style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom))' }}
       >
         {error && (
