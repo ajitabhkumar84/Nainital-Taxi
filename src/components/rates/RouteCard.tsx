@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui";
-import { buildBookingUrl } from "@/lib/bookingLink";
-import { VEHICLE_ORDER } from "@/lib/pricing";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatPrice, getVehicleShortName } from "@/lib/pricing";
+import { routeDetailsHref } from "@/lib/routeLinks";
+import { cheapestFare, priceFor } from "./RateCalculator";
 import type { VehicleType } from "@/store/bookingStore";
 import type { RouteWithCategory, RoutePricing } from "@/lib/supabase/types";
 
@@ -11,101 +13,98 @@ type RouteWithPricing = RouteWithCategory & { pricing?: RoutePricing[] };
 
 interface RouteCardProps {
   route: RouteWithPricing;
-  vehicleLabels: Record<VehicleType, string>;
+  /** Vehicle currently selected in the calculator — the row prices against it. */
+  vehicle: VehicleType;
+  date: string;
+  /** True when this route is the one loaded in the calculator above. */
+  active: boolean;
+  onSelect: (route: RouteWithPricing) => void;
 }
 
 /**
- * One route on /rates. Replaces the old table-row layout with a card that
- * shows a full per-vehicle price matrix instead of a single "starts from"
- * figure, so a visitor can compare vehicle options without clicking through.
- * `vehicleLabels` is resolved once by the parent RouteBrowser (see its
- * comment on why useVehicleLabels() isn't called per-card) and passed down.
+ * One route on /rates, as a list row rather than a card.
+ *
+ * Replaces the old 2x2 grid of per-vehicle price boxes. That grid showed four
+ * fares per route labelled with the raw admin `vehicle_category_labels`
+ * strings ("DZIRE,AMAZE,XCENT(4PAX)"), which cost roughly 230px of height per
+ * route and put four numbers in front of someone who wanted one. Now the
+ * calculator above owns the vehicle choice and every row shows that vehicle's
+ * fare, so a phone screen fits ten routes instead of two.
+ *
+ * Tapping the row does not navigate: it loads the route into the calculator
+ * (see RouteBrowser), keeping one price surface on the page. The separate
+ * details link is the only navigation, and it is a real anchor so it stays
+ * crawlable.
  */
-export default function RouteCard({ route, vehicleLabels }: RouteCardProps) {
-  const activePrices = (route.pricing || []).filter((p) => p.is_active && p.price > 0);
+export default function RouteCard({ route, vehicle, date, active, onSelect }: RouteCardProps) {
+  const price = priceFor(route, vehicle, date);
+  const fallback = price === null ? cheapestFare(route, date) : null;
+  const detailsHref = routeDetailsHref(route);
 
-  // Per-vehicle price = cheapest active row for that vehicle type, collapsing
-  // Off-Season/Season into one figure — a full season x vehicle breakdown
-  // doesn't fit a compact browse card (see plan notes).
-  const priceFor = (vt: VehicleType): number | null => {
-    const prices = activePrices.filter((p) => p.vehicle_type === vt).map((p) => p.price);
-    return prices.length > 0 ? Math.min(...prices) : null;
-  };
-
-  const available = VEHICLE_ORDER.filter((vt) => priceFor(vt) !== null);
-
-  const cheapest = activePrices.length > 0
-    ? activePrices.reduce((a, b) => (b.price < a.price ? b : a))
-    : null;
-
-  const bookingUrl = buildBookingUrl({
-    routeId: route.id,
-    packageType: "transfer",
-    packageTitle: `${route.pickup_location} to ${route.drop_location}`,
-    ...(cheapest ? { vehicle: cheapest.vehicle_type } : {}),
-    pickup: route.pickup_location,
-    dropoff: route.drop_location,
-  });
-
-  // Prefer the linked /destinations/[slug] page (richer tourist content) when
-  // set; otherwise fall back to this route's own /routes/[slug] SEO landing
-  // page when the admin has opted it in and it's actually live — a route with
-  // show_as_route_page=true but is_active=false 404s, so it must not be linked.
-  const detailsHref = route.destination_slug
-    ? `/destinations/${route.destination_slug}`
-    : route.show_as_route_page && route.is_active
-    ? `/routes/${route.slug}`
-    : null;
-  const bookingEnabled = route.enable_online_booking;
+  const meta = [
+    route.distance ? `${route.distance} km` : null,
+    route.duration,
+    route.enable_online_booking ? null : "on request",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
-      <div>
-        <div className="text-[15px] font-display font-semibold text-ink">
-          {route.pickup_location} → {route.drop_location}
-        </div>
-        <div className="text-sm text-slate-500 tabular-nums mt-1">
-          {route.distance ? `${route.distance} km` : "—"}
-          {route.duration ? ` • ${route.duration}` : ""}
-        </div>
-      </div>
-
-      {available.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2">
-          {available.map((vt) => (
-            <div
-              key={vt}
-              className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"
-            >
-              <div className="text-[11px] uppercase tracking-wide text-slate-500 truncate">
-                {vehicleLabels[vt]}
-              </div>
-              <div className="text-sm font-semibold text-ink tabular-nums">
-                ₹{priceFor(vt)!.toLocaleString("en-IN")}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-sm text-slate-400">On request</div>
+    <li
+      className={cn(
+        "flex items-center gap-2 border-b border-slate-200 transition-colors",
+        active && "bg-sunshine-50"
       )}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(route)}
+        aria-current={active ? "true" : undefined}
+        className="flex min-h-[60px] flex-1 items-center gap-3 py-3 pl-1 pr-1 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-display text-[14.5px] font-semibold leading-snug text-ink">
+            {route.pickup_location} <span className="font-normal text-slate-400">→</span>{" "}
+            {route.drop_location}
+          </span>
+          {meta && (
+            <span className="mt-0.5 block text-xs tabular-nums text-slate-500">{meta}</span>
+          )}
+        </span>
 
-      <div className="flex flex-col sm:flex-row gap-2 mt-1 pt-3 border-t border-slate-200">
-        {detailsHref && (
-          <Button variant="outline" size="sm" asChild className="min-h-[44px]">
-            <Link href={detailsHref}>View Details</Link>
-          </Button>
-        )}
-        {bookingEnabled ? (
-          <Button variant="primary" size="sm" asChild className="min-h-[44px]">
-            <Link href={bookingUrl}>Book Now</Link>
-          </Button>
-        ) : (
-          <Button variant="primary" size="sm" asChild className="min-h-[44px]">
-            <Link href="/contact">Enquire</Link>
-          </Button>
-        )}
-      </div>
-    </div>
+        <span className="shrink-0 text-right">
+          {price !== null ? (
+            <>
+              <span className="block text-[15.5px] font-semibold leading-tight tabular-nums text-ink">
+                {formatPrice(price)}
+              </span>
+              <span className="block text-[11px] text-slate-500">
+                {getVehicleShortName(vehicle)}
+              </span>
+            </>
+          ) : fallback !== null ? (
+            <>
+              <span className="block text-[15.5px] font-semibold leading-tight tabular-nums text-slate-500">
+                {formatPrice(fallback)}
+              </span>
+              <span className="block text-[11px] text-slate-400">from</span>
+            </>
+          ) : (
+            <span className="block text-[13px] font-medium text-slate-400">On request</span>
+          )}
+        </span>
+
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+      </button>
+
+      {detailsHref && (
+        <Link
+          href={detailsHref}
+          className="shrink-0 self-stretch px-2 py-3 text-[11.5px] font-semibold text-sunshine underline underline-offset-2 sm:px-3"
+        >
+          Details
+        </Link>
+      )}
+    </li>
   );
 }

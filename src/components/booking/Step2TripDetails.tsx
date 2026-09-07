@@ -415,6 +415,10 @@ export default function Step2TripDetails() {
                   Nainital entry and parking extra (approx. Rs. 300)
                 </span>
               )}
+              {/* Unconditional, unlike the Nainital entry line above: every
+                  route we run climbs a ghat section, and a customer who only
+                  learns this from the driver reads it as a broken car. */}
+              <span className="block">AC does not work on Hills</span>
             </>
           ),
         },

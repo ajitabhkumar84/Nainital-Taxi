@@ -567,9 +567,19 @@ Please confirm my booking. I will share the payment screenshot shortly.`;
         price: {
           label: 'Total trip cost',
           amount: totalAmount,
-          note: involvesNainitalEntry
-            ? 'Nainital entry and parking extra (approx. Rs. 300)'
-            : undefined,
+          // Same caveats as step 2's rail, repeated here because this is the
+          // screen where money is actually committed — a disclaimer that
+          // appears earlier and then vanishes at checkout is worse than none.
+          note: (
+            <>
+              {involvesNainitalEntry && (
+                <span className="block">
+                  Nainital entry and parking extra (approx. Rs. 300)
+                </span>
+              )}
+              <span className="block">AC does not work on Hills</span>
+            </>
+          ),
           lines: [
             {
               label: 'Pay now (advance)',

@@ -304,6 +304,44 @@ export default function Step1PackageSelection({
   const selectedPrice = vehicleType ? pricesByVehicle[vehicleType] : undefined;
   const isBlocked = Boolean(tripDate && blockedInfo.blocked);
 
+  // The date field is defined once and rendered at a single, fixed position in
+  // the tree — never inside the showPicker ternary below — so toggling
+  // "Change" (which flips showPicker) can never unmount/remount the
+  // underlying <input type="date">. Rendering it from two different branches
+  // of that ternary would make React treat them as two distinct elements and
+  // remount the input on every toggle, which drops focus and can dismiss a
+  // native mobile date-picker mid-interaction. Keeping one stable JSX
+  // position (only its wrapper's className changes) avoids that entirely.
+  //
+  // This field must be visible regardless of showPicker in the first place
+  // because a "Book Now" arrival from a tour/route/destination page sets
+  // packageId/routeId (via buildBookingUrl) but never vehicle/date, which
+  // makes showPicker false on mount. The vehicle grid further down is NOT
+  // gated by showPicker, so vehicle cards kept rendering with no control left
+  // on screen to ever set tripDate, and handleNext's disabled check requires
+  // tripDate — the CTA was silently stuck forever for every package/route
+  // "Book Now" entry point site-wide (2026-09-07).
+  const dateField = (
+    <div>
+      <label htmlFor="trip-date" className={FIELD_LABEL}>
+        Travel Date <span className="text-coral">*</span>
+      </label>
+      <div className="relative">
+        <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+        <Input
+          id="trip-date"
+          ref={dateRef}
+          type="date"
+          value={tripDate || ''}
+          onChange={(e) => setTripDate(e.target.value)}
+          min={getMinBookingDate()}
+          className="pl-10"
+          required
+        />
+      </div>
+    </div>
+  );
+
   return (
     <StepShell
       rail={{
@@ -359,174 +397,156 @@ export default function Step1PackageSelection({
           </button>
         </div>
       ) : (
-        <>
-          {/* Trip type and date share a row: the date drives the per-vehicle
-              prices below, so both belong above the picker rather than the
-              date sitting under a package list of unpredictable length. */}
-          <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3">
-            <div>
-              <span className={FIELD_LABEL}>What are you looking for?</span>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ['tour', '🏔️', 'Tour Packages'],
-                    ['transfer', '✈️', 'Transfers'],
-                  ] as const
-                ).map(([type, emoji, label]) => (
-                  <button
-                    key={type}
-                    onClick={() => handleBookingTypeChange(type)}
-                    aria-pressed={bookingType === type}
-                    className={`
-                      h-11 px-3 rounded-md border text-sm font-semibold transition-colors
-                      inline-flex items-center justify-center gap-1.5
-                      ${
-                        bookingType === type
-                          ? 'border-sunshine bg-sunshine-50 text-ink'
-                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                      }
-                    `}
-                  >
-                    <span aria-hidden>{emoji}</span>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="trip-date" className={FIELD_LABEL}>
-                Travel Date <span className="text-coral">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-                <Input
-                  id="trip-date"
-                  ref={dateRef}
-                  type="date"
-                  value={tripDate || ''}
-                  onChange={(e) => setTripDate(e.target.value)}
-                  min={getMinBookingDate()}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+        <div>
+          <span className={FIELD_LABEL}>What are you looking for?</span>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ['tour', '🏔️', 'Tour Packages'],
+                ['transfer', '✈️', 'Transfers'],
+              ] as const
+            ).map(([type, emoji, label]) => (
+              <button
+                key={type}
+                onClick={() => handleBookingTypeChange(type)}
+                aria-pressed={bookingType === type}
+                className={`
+                  h-11 px-3 rounded-md border text-sm font-semibold transition-colors
+                  inline-flex items-center justify-center gap-1.5
+                  ${
+                    bookingType === type
+                      ? 'border-sunshine bg-sunshine-50 text-ink'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                  }
+                `}
+              >
+                <span aria-hidden>{emoji}</span>
+                {label}
+              </button>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div ref={pickerRef}>
-            {/* Transfers are point-to-point routes, so they get an A-to-B picker
-                rather than a list of pre-built packages. The date + vehicle
-                blocks further down already key off routeId, so they work
-                unchanged once this sets one. */}
-            {isTransfer ? (
-              <TransferRouteSelector
-                pickupLocations={pickupLocations}
-                routes={transferRoutes}
-                pickup={pickupLocation}
-                dropoff={dropoffLocation}
-                onChange={handleTransferChange}
-              />
-            ) : (
-              bookingType && (
-                <div>
-                  <span className={FIELD_LABEL}>Select Package</span>
-                  {loading ? (
-                    <div className="py-6 text-center text-slate-500">Loading packages…</div>
-                  ) : (
-                    /*
-                      The package list is the only genuinely unbounded thing on
-                      this screen — it grows with however many packages are
-                      active. On desktop it gets its own bounded scroll pane so
-                      the page height stops depending on that count; `38vh`
-                      rather than a fixed pixel height so it adapts to the
-                      viewport instead of needing a media-query ladder.
+      {/* Always mounted at this one position — see the comment above
+          dateField's definition. sm:max-w-xs applies whether the picker is
+          collapsed or expanded, since it no longer shares a two-column grid
+          with the trip-type toggle that used to constrain its width. */}
+      <div className="sm:max-w-xs">{dateField}</div>
 
-                      Deliberately NOT bounded below `lg`: a nested scroll pane
-                      inside a page that also scrolls is a scroll trap on touch.
-                      On mobile the list runs to its natural length and the
-                      fixed action bar is what keeps the price and CTA reachable.
-                    */
-                    <div className="rounded-xl border border-slate-200 overflow-hidden">
-                      <div
-                        role="radiogroup"
-                        aria-label="Select package"
-                        className="lg:max-h-[min(340px,38vh)] lg:overflow-y-auto overscroll-contain snap-y divide-y divide-slate-200"
-                      >
-                        {packages.map((pkg) => {
-                          const selected = packageId === pkg.id;
-                          return (
-                            <div
-                              key={pkg.id}
-                              className={`flex items-start gap-3 p-3 snap-start transition-colors ${
-                                selected ? 'bg-sunshine-50' : 'bg-white hover:bg-slate-50'
-                              }`}
+      {showPicker && (
+        <div ref={pickerRef}>
+          {/* Transfers are point-to-point routes, so they get an A-to-B picker
+              rather than a list of pre-built packages. The date + vehicle
+              blocks further down already key off routeId, so they work
+              unchanged once this sets one. */}
+          {isTransfer ? (
+            <TransferRouteSelector
+              pickupLocations={pickupLocations}
+              routes={transferRoutes}
+              pickup={pickupLocation}
+              dropoff={dropoffLocation}
+              onChange={handleTransferChange}
+            />
+          ) : (
+            bookingType && (
+              <div>
+                <span className={FIELD_LABEL}>Select Package</span>
+                {loading ? (
+                  <div className="py-6 text-center text-slate-500">Loading packages…</div>
+                ) : (
+                  /*
+                    The package list is the only genuinely unbounded thing on
+                    this screen — it grows with however many packages are
+                    active. On desktop it gets its own bounded scroll pane so
+                    the page height stops depending on that count; `38vh`
+                    rather than a fixed pixel height so it adapts to the
+                    viewport instead of needing a media-query ladder.
+
+                    Deliberately NOT bounded below `lg`: a nested scroll pane
+                    inside a page that also scrolls is a scroll trap on touch.
+                    On mobile the list runs to its natural length and the
+                    fixed action bar is what keeps the price and CTA reachable.
+                  */
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div
+                      role="radiogroup"
+                      aria-label="Select package"
+                      className="lg:max-h-[min(340px,38vh)] lg:overflow-y-auto overscroll-contain snap-y divide-y divide-slate-200"
+                    >
+                      {packages.map((pkg) => {
+                        const selected = packageId === pkg.id;
+                        return (
+                          <div
+                            key={pkg.id}
+                            className={`flex items-start gap-3 p-3 snap-start transition-colors ${
+                              selected ? 'bg-sunshine-50' : 'bg-white hover:bg-slate-50'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => handlePackageSelect(pkg)}
+                              className="text-left flex-1 min-w-0"
                             >
-                              <button
-                                type="button"
-                                role="radio"
-                                aria-checked={selected}
-                                onClick={() => handlePackageSelect(pkg)}
-                                className="text-left flex-1 min-w-0"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {selected && (
-                                    <CheckCircle2 className="w-4 h-4 text-sunshine shrink-0" />
-                                  )}
-                                  <h3 className="font-semibold text-ink line-clamp-1">
-                                    {pkg.title}
-                                  </h3>
-                                  {pkg.is_popular && (
-                                    <Badge variant="accent" size="sm">
-                                      Popular
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500 mt-0.5">
-                                  {pkg.duration && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="w-3.5 h-3.5" />
-                                      {pkg.duration}
-                                    </span>
-                                  )}
-                                  {pkg.distance && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <MapPin className="w-3.5 h-3.5" />
-                                      {pkg.distance}
-                                    </span>
-                                  )}
-                                  {pkg.places_covered?.length > 0 && (
-                                    <span className="line-clamp-1">
-                                      {pkg.places_covered.slice(0, 3).join(', ')}
-                                      {pkg.places_covered.length > 3 &&
-                                        ` +${pkg.places_covered.length - 3}`}
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
+                              <div className="flex items-center gap-2 min-w-0">
+                                {selected && (
+                                  <CheckCircle2 className="w-4 h-4 text-sunshine shrink-0" />
+                                )}
+                                <h3 className="font-semibold text-ink line-clamp-1">
+                                  {pkg.title}
+                                </h3>
+                                {pkg.is_popular && (
+                                  <Badge variant="accent" size="sm">
+                                    Popular
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-500 mt-0.5">
+                                {pkg.duration && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    {pkg.duration}
+                                  </span>
+                                )}
+                                {pkg.distance && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                    {pkg.distance}
+                                  </span>
+                                )}
+                                {pkg.places_covered?.length > 0 && (
+                                  <span className="line-clamp-1">
+                                    {pkg.places_covered.slice(0, 3).join(', ')}
+                                    {pkg.places_covered.length > 3 &&
+                                      ` +${pkg.places_covered.length - 3}`}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
 
-                              <a
-                                href={`/tour/${pkg.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`View full details for ${pkg.title}`}
-                                title="View full details"
-                                className="shrink-0 p-2 rounded-md text-slate-400 hover:text-sunshine hover:bg-white transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            <a
+                              href={`/tour/${pkg.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`View full details for ${pkg.title}`}
+                              title="View full details"
+                              className="shrink-0 p-2 rounded-md text-slate-400 hover:text-sunshine hover:bg-white transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              )
-            )}
-          </div>
-        </>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
       )}
 
       {/* Vehicle selection — ungated from packageId so a vehicle-only fleet
@@ -553,6 +573,31 @@ export default function Step1PackageSelection({
                 const selectVehicle = () => {
                   if (isPriceUnavailable) return;
                   setVehicleType(vehicle.type);
+
+                  // Vehicle can be picked before a date (the chip shows as
+                  // selected; its price appears once a date is added) — that's
+                  // pre-existing, intentional behavior, not something this
+                  // nudge should block. But with the date field now living
+                  // above this grid rather than a click away, someone who
+                  // taps a vehicle first should be steered straight to it
+                  // rather than left to wonder why "Continue" never responds.
+                  if (!tripDate) {
+                    dateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    dateRef.current?.focus();
+                    // .focus() alone typically only draws a focus ring on
+                    // <input type="date"> without opening the calendar UI, on
+                    // both mobile and desktop browsers. showPicker() actively
+                    // pops it open. Wrapped in try/catch: unsupported
+                    // browsers are already skipped by `?.()`, but even where
+                    // it exists it can throw (e.g. not called from a user
+                    // gesture, or a restricted context) — focus() above is
+                    // still a reasonable fallback if it does.
+                    try {
+                      dateRef.current?.showPicker?.();
+                    } catch {
+                      // no-op
+                    }
+                  }
 
                   // The price comes from local `pricesByVehicle`, not the
                   // store: on step 1 the store's calculatedPrice is still null

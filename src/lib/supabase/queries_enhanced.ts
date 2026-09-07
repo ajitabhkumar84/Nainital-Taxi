@@ -1123,10 +1123,23 @@ export interface CategoryWithRoutes extends RouteCategory {
  * /quote (its other caller) sees no change.
  *
  * Ties on display_order are broken by created_at so the grouping is stable
- * across renders. Any failure (e.g. route_categories not yet migrated —
- * see the schema-drift note on getTransferRoutes above) degrades to an
- * empty result rather than throwing, so /rates renders its empty state
- * instead of a 500.
+ * across renders.
+ *
+ * 2026-09-07: this used to fetch route_categories first and bail out to an
+ * empty result the instant that query failed — which happened for real,
+ * because route_categories/routes.category_id aren't part of the core
+ * schema bootstrap (see the schema-drift note on getTransferRoutes above)
+ * and can be missing or RLS-unconfigured on a given deploy. /rates went
+ * fully blank while routes/route_pricing (core tables) were fine and the
+ * admin panel showed routes correctly, since the admin API never touches
+ * route_categories. Rewritten so routes/route_pricing are fetched first and
+ * unconditionally, with category data layered on afterwards, best-effort:
+ * any route_categories problem now degrades to a single synthesized
+ * "All Routes" bucket instead of hiding real, active routes. The `routes`
+ * query also no longer embeds `category:route_categories(*)` — that embed
+ * throws a PostgREST PGRST200 ("relationship not found") if route_categories
+ * is missing or not yet in PostgREST's schema cache, which took the routes
+ * query itself down too. The category is joined in plain JS instead.
  */
 export const getRoutesWithCategories = cache(
   unstable_cache(
@@ -1136,73 +1149,129 @@ export const getRoutesWithCategories = cache(
 }> => {
   const empty = { categories: [], allRoutes: [] };
 
+  let routes: RouteWithCategory[];
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: categories, error: categoriesError } = await (supabase.from as any)('route_categories')
+    const { data, error } = await (supabase.from as any)('routes')
       .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true }) as { data: RouteCategory[] | null; error: unknown };
-
-    if (categoriesError || !categories) {
-      if (categoriesError) console.error('Error fetching route categories:', categoriesError);
-      return empty;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: routes, error: routesError } = await (supabase.from as any)('routes')
-      .select('*, category:route_categories(*)')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('created_at', { ascending: true }) as { data: RouteWithCategory[] | null; error: unknown };
 
-    if (routesError || !routes) {
-      if (routesError) console.error('Error fetching routes:', routesError);
+    if (error || !data) {
+      if (error) console.error('Error fetching routes:', error);
       return empty;
     }
-
-    const routeIds = routes.map((r) => r.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: pricing, error: pricingError } = await (supabase.from as any)('route_pricing')
-      .select('*')
-      .in('route_id', routeIds)
-      .eq('is_active', true) as { data: RoutePricing[] | null; error: unknown };
-
-    if (pricingError) console.error('Error fetching route pricing:', pricingError);
-
-    const routesWithPricing = routes.map((route) => ({
-      ...route,
-      pricing: (pricing || []).filter((p) => p.route_id === route.id),
-    }));
-
-    const categorizedRoutes: CategoryWithRoutes[] = categories.map((category) => ({
-      ...category,
-      routes: routesWithPricing.filter((r) => r.category_id === category.id),
-    }));
-
-    const uncategorizedRoutes = routesWithPricing.filter((r) => !r.category_id);
-    if (uncategorizedRoutes.length > 0) {
-      categorizedRoutes.push({
-        id: 'uncategorized',
-        category_name: 'Other Routes',
-        category_slug: 'other-routes',
-        category_description: null,
-        icon: 'road',
-        display_order: 999,
-        is_active: true,
-        created_at: '',
-        updated_at: '',
-        routes: uncategorizedRoutes,
-      });
-    }
-
-    return {
-      categories: categorizedRoutes.filter((c) => c.routes.length > 0),
-      allRoutes: routesWithPricing,
-    };
+    routes = data;
   } catch (error) {
     console.error('Error fetching routes with categories:', error);
     return empty;
   }
+
+  if (routes.length === 0) return empty;
+
+  const routeIds = routes.map((r) => r.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pricing, error: pricingError } = await (supabase.from as any)('route_pricing')
+    .select('*')
+    .in('route_id', routeIds)
+    .eq('is_active', true) as { data: RoutePricing[] | null; error: unknown };
+
+  if (pricingError) console.error('Error fetching route pricing:', pricingError);
+
+  const routesWithPricing = routes.map((route) => ({
+    ...route,
+    pricing: (pricing || []).filter((p) => p.route_id === route.id),
+  }));
+
+  // route_categories is fetched independently and best-effort: a missing
+  // table, missing RLS policy, or unseeded data must not blank out /rates
+  // when there are real routes to show.
+  let activeCategories: RouteCategory[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from as any)('route_categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true }) as { data: RouteCategory[] | null; error: unknown };
+
+    if (error) {
+      console.warn('route_categories unavailable, falling back to "All Routes":', error);
+    } else if (data) {
+      activeCategories = data;
+    }
+  } catch (error) {
+    console.warn('route_categories unavailable, falling back to "All Routes":', error);
+  }
+
+  // Real ISO timestamps, not '' — a component or SEO/structured-data helper
+  // could pass category.created_at into new Date(...), and an empty string
+  // there throws RangeError: Invalid time value the moment .toISOString()
+  // (or similar) is called on the result.
+  const now = new Date().toISOString();
+  const allRoutesBucket = (routesForBucket: typeof routesWithPricing): CategoryWithRoutes => ({
+    id: 'all',
+    category_name: 'All Routes',
+    category_slug: 'all-routes',
+    category_description: null,
+    icon: 'road',
+    display_order: 0,
+    is_active: true,
+    created_at: now,
+    updated_at: now,
+    routes: routesForBucket,
+  });
+
+  if (activeCategories.length === 0) {
+    // Table missing, unseeded, every category inactive/deleted, or the
+    // query above failed — every active route still belongs on /rates.
+    return { categories: [allRoutesBucket(routesWithPricing)], allRoutes: routesWithPricing };
+  }
+
+  const categoryById = new Map(activeCategories.map((c) => [c.id, c]));
+  const routesWithJoinedCategory = routesWithPricing.map((r) => ({
+    ...r,
+    category: (r.category_id && categoryById.get(r.category_id)) || null,
+  }));
+
+  const categorizedRoutes: CategoryWithRoutes[] = activeCategories.map((category) => ({
+    ...category,
+    routes: routesWithJoinedCategory.filter((r) => r.category_id === category.id),
+  }));
+
+  // Orphaned routes: no category_id, OR a category_id that doesn't resolve
+  // to an active category. Previously only the null case was caught here,
+  // so a category toggled inactive (not deleted — deletion nulls the FK via
+  // ON DELETE SET NULL and was already handled) silently dropped its routes
+  // from /rates instead of demoting them to "Other Routes".
+  const activeCategoryIds = new Set(activeCategories.map((c) => c.id));
+  const orphanedRoutes = routesWithJoinedCategory.filter(
+    (r) => !r.category_id || !activeCategoryIds.has(r.category_id)
+  );
+  if (orphanedRoutes.length > 0) {
+    categorizedRoutes.push({
+      id: 'uncategorized',
+      category_name: 'Other Routes',
+      category_slug: 'other-routes',
+      category_description: null,
+      icon: 'road',
+      display_order: 999,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+      routes: orphanedRoutes,
+    });
+  }
+
+  const nonEmptyCategories = categorizedRoutes.filter((c) => c.routes.length > 0);
+
+  return {
+    // Belt-and-braces: if every bucket ended up empty despite real active
+    // routes existing, still show them synthesized rather than rendering
+    // /rates' empty state.
+    categories: nonEmptyCategories.length > 0 ? nonEmptyCategories : [allRoutesBucket(routesWithJoinedCategory)],
+    allRoutes: routesWithJoinedCategory,
+  };
     },
     ['routes-with-categories'],
     // Three tables feed this (routes, route_categories, route_pricing), so all

@@ -395,6 +395,49 @@ export function getVehicleTypeName(vehicleType: VehicleType): string {
 }
 
 /**
+ * Short, customer-facing vehicle name — "Sedan", "SUV", "Innova Crysta",
+ * "Premium SUV".
+ *
+ * Deliberately NOT the admin-editable `vehicle_category_labels` setting that
+ * useVehicleLabels() reads. That value is the operator's own internal
+ * shorthand ("DZIRE,AMAZE,XCENT(4PAX)", "NORMAL INNOVA(7PAX)") and it was
+ * being rendered verbatim to visitors on /rates. A fare table is a place
+ * where the label has to read like a product, so /rates uses these names plus
+ * getVehicleModelExamples() as the subtitle instead. Every other surface
+ * still honours the admin setting.
+ *
+ * Also deliberately shorter than getVehicleTypeName() above, which carries a
+ * seat count in the string and is too long for a filter chip or a list row.
+ */
+export function getVehicleShortName(vehicleType: VehicleType): string {
+  const names: Record<VehicleType, string> = {
+    sedan: 'Sedan',
+    suv_normal: 'SUV',
+    suv_deluxe: 'Innova Crysta',
+    suv_luxury: 'Premium SUV',
+  };
+  return names[vehicleType];
+}
+
+/**
+ * Which `route_pricing.season_name` applies to an ISO date.
+ *
+ * This is the *display-side* rule only. /api/bookings/create always recomputes
+ * the price server-side against the `seasons` table (see resolveSeason above),
+ * and that remains the number anyone is actually charged — this exists so a
+ * fare table can show the right figure without a round trip per row.
+ *
+ * There is a second copy of this month check in
+ * src/components/BookingWidget.tsx's calculateTransferPrice(). Worth
+ * collapsing into this one, but that touches the booking path, so it is left
+ * alone here — if you change the months, change both.
+ */
+export function seasonNameForDate(isoDate: string): 'Season' | 'Off-Season' {
+  const month = new Date(isoDate).getMonth() + 1;
+  return month >= 3 && month <= 6 ? 'Season' : 'Off-Season';
+}
+
+/**
  * Get vehicle capacity
  */
 export function getVehicleCapacity(vehicleType: VehicleType): number {

@@ -496,6 +496,16 @@ export interface OneWayTaxiSettings {
   seo_title: string;
   seo_description: string;
 
+  // Server-rendered editorial block, added by
+  // supabase/add_rates_seo_content.sql. This is the only part of /rates that
+  // Googlebot sees without running JS (the calculator and route list are a
+  // client component), so getOneWayTaxiSettings() falls back to the literals
+  // in DEFAULT_ONE_WAY_TAXI_SETTINGS below whenever the column is missing,
+  // NULL or blank — the page must never render without them.
+  seo_intro_heading: string;
+  /** Paragraphs separated by a blank line. Plain text, never rendered as HTML. */
+  seo_intro_body: string;
+
   created_at: string;
   updated_at: string;
 }
@@ -518,6 +528,19 @@ export const DEFAULT_ONE_WAY_TAXI_SETTINGS: Omit<
   seo_title: "One-Way Taxi Fares & Routes | Nainital Taxi",
   seo_description:
     "Transparent one-way taxi fares from Nainital to Kathgodam, Delhi, Pantnagar and more. Fixed rates, no hidden charges, professional drivers.",
+
+  seo_intro_heading: "Taxi fares in Nainital and the Kumaon hills, explained",
+
+  // Kept identical to the seed in supabase/add_rates_seo_content.sql. This is
+  // the copy that actually ships when the migration hasn't been run — /rates
+  // renders the full editorial block and all six FAQs out of the box.
+  seo_intro_body: [
+    "Every fare on this page is a fixed point-to-point price, not a meter reading and not a per-kilometre estimate. You see the number before you book, and it is the number the driver collects. Fuel, the driver's allowance and the vehicle's commercial permit are inside it. Toll, parking and Uttarakhand state tax are charged at actuals on the day, because those are receipts we hand over rather than margin we keep.",
+    "The Kathgodam to Nainital run is the one most guests book first — a short climb of well-surfaced ghat road that is best driven in daylight. From Nainital, Bhimtal, Mukteshwar, Almora and Ranikhet are all comfortable single transfers. Kausani, Jim Corbett and the longer Delhi legs are full-day drives, so tell us your train or flight time and we will set the pick-up around it rather than the other way round.",
+    "Fares move with the calendar. Mid-March to June is peak season across Kumaon — every car in the valley is committed and drivers run longer days, so rates rise. July to February is off-season and noticeably cheaper. Set your travel date in the fare calculator above and it applies the correct season automatically, so you are never comparing a summer quote against a winter one by accident.",
+    "Choose the vehicle by luggage as much as by headcount. A Sedan carries four adults and two large bags comfortably. An SUV is the sensible choice for six on hill roads. The Innova Crysta gives the best ride quality on the Bhowali ghat, and the Premium SUV is what we send for airport pick-ups and long Delhi runs. Every car is a commercial-permit vehicle with a driver who has run these roads for years.",
+  ].join("\n\n"),
+
 };
 
 export interface Availability {

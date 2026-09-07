@@ -1,13 +1,15 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
 import { Car, Phone, Search, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { useVehicleLabels } from "@/hooks/useVehicleLabels";
+import { tomorrowIso } from "@/lib/bookingLink";
 import type { CategoryWithRoutes } from "@/lib/supabase";
 import type { RouteWithCategory, RoutePricing } from "@/lib/supabase/types";
+import type { VehicleType } from "@/store/bookingStore";
+import RateCalculator from "./RateCalculator";
 import RouteCard from "./RouteCard";
 
 type RouteWithPricing = RouteWithCategory & { pricing?: RoutePricing[] };
@@ -17,31 +19,59 @@ interface RouteBrowserProps {
 }
 
 /**
- * Client-only piece of /rates: search + which tab is active. The route data
- * itself is passed in already-fetched from the server component
- * (src/app/rates/page.tsx) — every category's routes render into the DOM
- * on first paint, and switching tabs only toggles a `hidden` class, so
- * nothing here depends on JS running for the content to exist.
+ * Client-only piece of /rates: the fare calculator, the search box and which
+ * tab is active. The route data itself is passed in already-fetched from the
+ * server component (src/app/rates/page.tsx) — every category's routes render
+ * into the DOM on first paint and switching tabs only toggles a `hidden`
+ * class, so nothing here depends on JS running for the content to exist.
+ *
+ * The editorial copy, the crawlable route/destination links and the FAQ block
+ * deliberately live in the server component instead, not in here: this file is
+ * a Client Component, and prose behind a 'use client' boundary is prose
+ * Googlebot has to render JS to reach.
+ *
+ * Vehicle, date and time are held here rather than inside RateCalculator
+ * because the route rows price against them too — picking "Innova Crysta"
+ * once reprices the entire list, which is what removed the old four-box
+ * pricing grid from every card.
  */
 export default function RouteBrowser({ categories }: RouteBrowserProps) {
   const [active, setActive] = useState<string>("all");
   const [query, setQuery] = useState("");
   // The input itself always reflects `query` so typing never lags; the value
-  // actually used to filter/re-render the card grid trails behind via
+  // actually used to filter/re-render the rows trails behind via
   // useDeferredValue so React can keep the keystroke responsive on low-end
-  // mobile even while re-rendering dozens of pricing-grid cards below.
+  // mobile even while re-rendering dozens of rows below.
   const deferredQuery = useDeferredValue(query);
 
-  const allRoutes = useMemo(
-    () => categories.flatMap((c) => c.routes),
-    [categories]
-  );
+  const allRoutes = useMemo(() => categories.flatMap((c) => c.routes), [categories]);
 
-  // Vehicle labels are resolved once here (not inside RouteCard) because
-  // useVehicleLabels' cache is time-based with no in-flight-request guard —
-  // one hook call per card would fire a duplicate admin-settings fetch per
-  // card on first paint of a route-heavy category.
-  const { labels: vehicleLabels } = useVehicleLabels();
+  // Calculator state, shared with every row.
+  const [vehicle, setVehicle] = useState<VehicleType>("sedan");
+  const [date, setDate] = useState<string>(() => tomorrowIso());
+  const [time, setTime] = useState("09:00");
+  const [pickup, setPickup] = useState("");
+  const [dropoff, setDropoff] = useState("");
+
+  const handlePickupChange = useCallback((value: string) => {
+    setPickup(value);
+    // The old drop is almost never a leg we price from the new pick-up, and
+    // leaving it set would show "no fare for this route" rather than an empty
+    // field the user can act on.
+    setDropoff("");
+  }, []);
+
+  // Tapping a row loads it into the calculator instead of navigating, so the
+  // page keeps exactly one price surface. Scrolling is what makes that legible
+  // on a phone, where the calculator is off-screen by the time you are reading
+  // the list.
+  const handleSelectRoute = useCallback((route: RouteWithPricing) => {
+    setPickup(route.pickup_location);
+    setDropoff(route.drop_location);
+    document
+      .getElementById("fare-calculator")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const trimmedQuery = query.trim();
   const trimmedDeferred = deferredQuery.trim();
@@ -59,17 +89,15 @@ export default function RouteBrowser({ categories }: RouteBrowserProps) {
 
   if (categories.length === 0) {
     return (
-      <div className="max-w-xl mx-auto rounded-lg border border-slate-200 bg-white p-12 text-center">
-        <Car className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-        <h3 className="text-xl font-display font-semibold text-ink mb-2">
-          No routes available
-        </h3>
-        <p className="text-slate-500 mb-6">
+      <div className="mx-auto max-w-xl rounded-lg border border-slate-200 bg-white p-12 text-center">
+        <Car className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+        <h3 className="mb-2 font-display text-xl font-semibold text-ink">No routes available</h3>
+        <p className="mb-6 text-slate-500">
           We&apos;re updating our routes. Please check back soon or contact us directly.
         </p>
         <Button variant="primary" size="md" asChild>
           <Link href="/contact">
-            <Phone className="w-4 h-4 mr-2" />
+            <Phone className="mr-2 h-4 w-4" />
             Contact Us
           </Link>
         </Button>
@@ -86,111 +114,154 @@ export default function RouteBrowser({ categories }: RouteBrowserProps) {
       isSearching && id !== "all" && "opacity-40 pointer-events-none"
     );
 
+  const rowProps = { vehicle, date, pickup, dropoff, onSelect: handleSelectRoute };
+
   return (
-    <div>
-      {/* Filter bar — sticky from md: up only, so a phone screen isn't
-          permanently eaten by a pinned bar above the cards. */}
-      <div className="md:sticky md:top-20 md:z-40 mb-8 rounded-lg border border-slate-200 bg-white/95 backdrop-blur-sm p-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by pickup or drop location…"
-            className="w-full pl-9 pr-9 py-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sunshine focus:outline-none"
-          />
-          {query.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="Clear search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-ink"
-            >
-              <X className="w-4 h-4" />
-            </button>
+    <div className="grid gap-8 lg:grid-cols-12 lg:items-start lg:gap-10">
+      {/* Calculator — sticky beside the list from lg: up, stacked above it below that. */}
+      <div className="lg:col-span-5 lg:sticky lg:top-20 xl:col-span-4">
+        <RateCalculator
+          routes={allRoutes}
+          pickup={pickup}
+          dropoff={dropoff}
+          date={date}
+          time={time}
+          vehicle={vehicle}
+          onPickupChange={handlePickupChange}
+          onDropoffChange={setDropoff}
+          onDateChange={setDate}
+          onTimeChange={setTime}
+          onVehicleChange={setVehicle}
+        />
+      </div>
+
+      <div className="lg:col-span-7 xl:col-span-8">
+        <h2 className="font-display text-lg font-semibold tracking-tight text-ink">
+          Or browse our fixed fares
+        </h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-slate-500">
+          Tap any route to load it into the calculator. Fares shown are for the vehicle selected
+          there.
+        </p>
+
+        {/* Filter bar */}
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white/95 p-4 backdrop-blur-sm">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by pickup or drop location…"
+              aria-label="Search routes"
+              className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-sunshine"
+            />
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 overflow-x-auto border-t border-slate-200 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-max gap-6">
+              <button type="button" onClick={() => setActive("all")} className={tabClass("all")}>
+                All routes <span className="tabular-nums text-slate-400">{allRoutes.length}</span>
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => setActive(category.id)}
+                  disabled={isSearching}
+                  className={tabClass(category.id)}
+                >
+                  {category.category_name}{" "}
+                  <span className="tabular-nums text-slate-400">{category.routes.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {isSearching && (
+            <p className="mt-2 text-xs text-slate-400">
+              Showing results across all categories — clear search to browse by category.
+            </p>
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="border-t border-slate-200 mt-3 pt-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex gap-6 min-w-max">
-            <button type="button" onClick={() => setActive("all")} className={tabClass("all")}>
-              All routes{" "}
-              <span className="text-slate-400 tabular-nums">{allRoutes.length}</span>
-            </button>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => setActive(category.id)}
-                disabled={isSearching}
-                className={tabClass(category.id)}
-              >
-                {category.category_name}{" "}
-                <span className="text-slate-400 tabular-nums">{category.routes.length}</span>
-              </button>
-            ))}
-          </div>
+        {/* Results */}
+        <div className="mt-4">
+          {isSearching ? (
+            searchResults.length > 0 ? (
+              <RouteList routes={searchResults} visible {...rowProps} />
+            ) : (
+              <NoSearchResults query={trimmedQuery} />
+            )
+          ) : (
+            <>
+              <RouteList routes={allRoutes} visible={active === "all"} {...rowProps} />
+              {categories.map((category) => (
+                <RouteList
+                  key={category.id}
+                  routes={category.routes}
+                  visible={active === category.id}
+                  {...rowProps}
+                />
+              ))}
+            </>
+          )}
         </div>
-        {isSearching && (
-          <p className="text-xs text-slate-400 mt-2">
-            Showing results across all categories — clear search to browse by category.
-          </p>
-        )}
       </div>
-
-      {/* Results */}
-      {isSearching ? (
-        searchResults.length > 0 ? (
-          <RouteGrid routes={searchResults} vehicleLabels={vehicleLabels} visible />
-        ) : (
-          <NoSearchResults query={trimmedQuery} />
-        )
-      ) : (
-        <>
-          <RouteGrid routes={allRoutes} vehicleLabels={vehicleLabels} visible={active === "all"} />
-          {categories.map((category) => (
-            <RouteGrid
-              key={category.id}
-              routes={category.routes}
-              vehicleLabels={vehicleLabels}
-              visible={active === category.id}
-            />
-          ))}
-        </>
-      )}
     </div>
   );
 }
 
-function RouteGrid({
+function RouteList({
   routes,
-  vehicleLabels,
   visible,
+  vehicle,
+  date,
+  pickup,
+  dropoff,
+  onSelect,
 }: {
   routes: RouteWithPricing[];
-  vehicleLabels: ReturnType<typeof useVehicleLabels>["labels"];
   visible: boolean;
+  vehicle: VehicleType;
+  date: string;
+  pickup: string;
+  dropoff: string;
+  onSelect: (route: RouteWithPricing) => void;
 }) {
   return (
-    <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4", !visible && "hidden")}>
+    <ul className={cn("border-t border-slate-200", !visible && "hidden")}>
       {routes.map((route) => (
-        <RouteCard key={route.id} route={route} vehicleLabels={vehicleLabels} />
+        <RouteCard
+          key={route.id}
+          route={route}
+          vehicle={vehicle}
+          date={date}
+          active={route.pickup_location === pickup && route.drop_location === dropoff}
+          onSelect={onSelect}
+        />
       ))}
-    </div>
+    </ul>
   );
 }
 
 function NoSearchResults({ query }: { query: string }) {
   return (
-    <div className="max-w-xl mx-auto rounded-lg border border-slate-200 bg-white p-12 text-center">
-      <Search className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-      <h3 className="text-xl font-display font-semibold text-ink mb-2">
+    <div className="mx-auto max-w-xl rounded-lg border border-slate-200 bg-white p-12 text-center">
+      <Search className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+      <h3 className="mb-2 font-display text-xl font-semibold text-ink">
         No routes found for &ldquo;{query}&rdquo;
       </h3>
-      <p className="text-slate-500 mb-6">
+      <p className="mb-6 text-slate-500">
         Contact us for a custom quote — we can arrange most routes on request.
       </p>
       <Button variant="whatsapp" size="md" asChild>

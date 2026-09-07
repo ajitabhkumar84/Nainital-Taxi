@@ -129,6 +129,12 @@ export default function InstantQuotePage() {
   };
 
   const selectedVehicleInfo = VEHICLE_TYPES.find(v => v.value === selectedVehicle);
+  // The route the quote was actually run against — used to carry pickup/
+  // drop through to /booking instead of quoteResult.route.from/to, which are
+  // the API's formatted display labels rather than the raw location values
+  // buildBookingUrl's pickup/dropoff params expect (the same values RouteCard
+  // and DestinationPricingTable already send).
+  const selectedRouteInfo = routes.find((r) => r.id === selectedRoute);
 
   return (
     <>
@@ -318,9 +324,13 @@ export default function InstantQuotePage() {
                     <div className="space-y-3 pt-4">
                       <Link
                         href={buildBookingUrl({
+                          routeId: selectedRoute,
+                          packageTitle: quoteResult.route.name,
+                          packageType: 'transfer',
                           vehicle: selectedVehicle as VehicleType,
                           date: selectedDate,
-                          packageType: 'transfer',
+                          pickup: selectedRouteInfo?.from_location,
+                          dropoff: selectedRouteInfo?.to_location,
                         })}
                         className="block"
                       >

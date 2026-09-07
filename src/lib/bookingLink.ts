@@ -25,7 +25,14 @@ export interface BookingEntry {
 const VEHICLE_TYPES: readonly VehicleType[] = ['sedan', 'suv_normal', 'suv_deluxe', 'suv_luxury'];
 const PACKAGE_TYPES: readonly BookingType[] = ['tour', 'transfer'];
 
-function tomorrowIso(): string {
+/**
+ * Earliest date the booking flow accepts. Exported so a UI that *builds* an
+ * entry URL (the /rates fare calculator) can seed and min-bound its date input
+ * from the same value isValidFutureDate() below validates against — computing
+ * it independently, e.g. from local time rather than UTC, produced dates that
+ * this module then silently dropped.
+ */
+export function tomorrowIso(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().split('T')[0];
