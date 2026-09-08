@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, MapPin, Car, Send, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { CTA_PLACEMENTS } from '@/lib/analytics/properties';
+import { toISODateLocal } from '@/lib/seasonality';
 
 interface ContactFormProps {
   formTitle?: string;
@@ -21,6 +22,11 @@ export default function ContactForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  // Resolved after mount, local-midnight — a server-derived `min` would
+  // mismatch a visitor's actual calendar day on hydration (see
+  // MultiDayPricingSection.tsx for the same pattern).
+  const [today, setToday] = useState('');
+  useEffect(() => setToday(toISODateLocal(new Date())), []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -246,6 +252,7 @@ export default function ContactForm({
                   id="date"
                   name="date"
                   required
+                  min={today || undefined}
                   className="w-full px-4 py-3 rounded-xl border-3 border-ink/20 focus:border-teal focus:ring-0 transition-all font-body"
                 />
               </div>

@@ -6,6 +6,7 @@ import {
   validatePhone,
   normalizePhone,
   validateEmail,
+  validateName,
 } from '@/lib/booking';
 import {
   sendBookingConfirmation,
@@ -188,6 +189,14 @@ export async function POST(request: NextRequest) {
     if (!body.packageId && !body.routeId) {
       return NextResponse.json(
         { error: 'A package or vehicle selection is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate name
+    if (!validateName(body.customerName)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid name' },
         { status: 400 }
       );
     }

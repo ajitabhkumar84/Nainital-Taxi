@@ -6,6 +6,10 @@ import { ArrowRight, Info } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { buildBookingUrl, tomorrowIso } from "@/lib/bookingLink";
+import { formatDate } from "@/lib/booking";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { WhatsAppCTA } from "@/components/analytics/ContactCTA";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 import {
   VEHICLE_ORDER,
   formatPrice,
@@ -15,6 +19,7 @@ import {
   seasonNameForDate,
 } from "@/lib/pricing";
 import { routeDetailsHref } from "@/lib/routeLinks";
+import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
 import type { VehicleType } from "@/store/bookingStore";
 import type { RouteWithCategory, RoutePricing } from "@/lib/supabase/types";
 
@@ -100,6 +105,9 @@ export default function RateCalculator({
   onVehicleChange,
 }: RateCalculatorProps) {
   const minDate = tomorrowIso();
+  const { config: siteConfig } = useSiteConfig();
+  const phoneNumber =
+    siteConfig?.header?.phoneNumber || DEFAULT_SITE_CONFIG.header.phoneNumber;
 
   const pickups = useMemo(
     () => Array.from(new Set(routes.map((r) => r.pickup_location))).sort(),
@@ -335,6 +343,19 @@ export default function RateCalculator({
           <Button variant="secondary" size="md" disabled className="min-h-[44px] w-full">
             Book this fare
           </Button>
+        )}
+
+        {route && price !== null && (
+          <WhatsAppCTA
+            href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+              `Hi, I'd like to know more about this fare:\n\nRoute: ${route.pickup_location} to ${route.drop_location}\nDate: ${formatDate(date)}\nVehicle: ${getVehicleShortName(vehicle)}\nFare: ${formatPrice(price)}`
+            )}`}
+            placement={CTA_PLACEMENTS.ratesCalculator}
+            context="fare_result"
+            className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-md border border-white/20 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Ask about this fare on WhatsApp
+          </WhatsAppCTA>
         )}
       </div>
 

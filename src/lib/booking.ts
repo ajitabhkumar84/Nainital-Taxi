@@ -5,6 +5,8 @@
  * Based on Kathgodam Taxi implementation pattern.
  */
 
+import { tomorrowIso } from './bookingLink';
+
 /**
  * The live UPI handle. Hardcoded rather than read from admin_settings.upi_id
  * because it must match the QR code baked into public/nainital-upi.jpg — an
@@ -123,6 +125,17 @@ export function validateEmail(email: string): boolean {
 }
 
 /**
+ * Validate a customer name. Deliberately loose — this is a taxi booking form,
+ * not an ID check: reject only the empty/too-short/no-letters cases, not real
+ * names that happen to be short or unusual.
+ */
+export function validateName(name: string): boolean {
+  const trimmed = name.trim();
+  if (trimmed.length < 2 || trimmed.length > 100) return false;
+  return /[a-zA-Z]/.test(trimmed);
+}
+
+/**
  * Get display name for vehicle type
  */
 export function getVehicleDisplayName(vehicleType: string): string {
@@ -178,14 +191,13 @@ export function formatTime(timeStr: string): string {
 }
 
 /**
- * Earliest selectable booking date (tomorrow), as an ISO YYYY-MM-DD string —
- * shared by every date picker in the booking flow so the cutoff rule only
- * lives in one place.
+ * Earliest selectable booking date (tomorrow), as an ISO YYYY-MM-DD string.
+ * Delegates to bookingLink.ts's tomorrowIso() — the canonical implementation
+ * (isValidFutureDate() there depends on it) — so this wrapper exists only to
+ * avoid touching the existing call sites' imports.
  */
 export function getMinBookingDate(): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().split('T')[0];
+  return tomorrowIso();
 }
 
 /**

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { Input } from '@/components/ui';
-import { validatePhone, formatDate } from '@/lib/booking';
+import { validatePhone, validateName, formatDate } from '@/lib/booking';
 import { formatPrice } from '@/lib/pricing';
 import { User, Mail, MessageSquare } from 'lucide-react';
 import StepShell from './StepShell';
@@ -83,6 +83,11 @@ export default function Step3ContactInfo() {
       return;
     }
 
+    if (!validateName(customerName)) {
+      failWith('Please enter your full name.', 'invalid_name', nameRef);
+      return;
+    }
+
     if (!validatePhone(customerPhone, customerCountryCode)) {
       failWith(
         isInternational
@@ -151,7 +156,7 @@ export default function Step3ContactInfo() {
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Name as per your ID proof"
+              placeholder="Passenger name"
               className="pl-10"
               required
             />

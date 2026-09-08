@@ -6,6 +6,7 @@ import FooterClient from "@/components/ui/FooterClient";
 import { Car, Calendar, MapPin, IndianRupee, Phone, MessageCircle, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { buildBookingUrl } from "@/lib/bookingLink";
+import { toISODateLocal } from "@/lib/seasonality";
 import type { VehicleType } from "@/store/bookingStore";
 import { capture } from '@/lib/analytics/capture';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/events';
@@ -52,12 +53,17 @@ export default function InstantQuotePage() {
   const [loading, setLoading] = useState(false);
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
   const [error, setError] = useState('');
+  // Resolved after mount, local-midnight, so a visitor west of UTC (all of
+  // India) doesn't get a UTC "today" that is still yesterday for them — see
+  // MultiDayPricingSection.tsx for the same pattern.
+  const [minDate, setMinDate] = useState('');
 
   useEffect(() => {
     fetchRoutes();
     // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = toISODateLocal(new Date());
     setSelectedDate(today);
+    setMinDate(today);
   }, []);
 
   const fetchRoutes = async () => {
@@ -225,7 +231,7 @@ export default function InstantQuotePage() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={minDate || undefined}
                   className="w-full px-4 py-3 rounded-lg border-2 border-ink font-body text-ink focus:outline-none focus:border-teal"
                 />
               </div>

@@ -64,6 +64,13 @@ export const CTA_PLACEMENTS = {
   bookingConfirmation: 'booking_confirmation',
   quoteResult: 'quote_result',
   /**
+   * The "couldn't find your route" WhatsApp CTAs on /rates — both the closing
+   * block and RouteBrowser's empty search state, since they're the same intent.
+   */
+  ratesNoMatch: 'rates_no_match',
+  /** The context-aware WhatsApp CTA next to a calculated fare in RateCalculator. */
+  ratesCalculator: 'rates_calculator',
+  /**
    * Emitted by the delegated listener in GlobalContactWidgets for any anchor
    * that has not been migrated to <CallCTA>/<WhatsAppCTA> yet. Seeing this
    * value in PostHog is the to-do list for the next migration pass — that is

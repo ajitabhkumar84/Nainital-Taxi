@@ -29,8 +29,62 @@ npm run start
 npm run lint     # next lint
 ```
 
-There is **no test suite** and no CI. `npm run build` plus `npm run lint` are
-the only automated checks — run both before considering a change done.
+There is **no test suite** and no CI.
+
+## Never run the app — the owner does that
+
+**Claude must not start a server, open a browser, or drive the UI.** This
+machine is slow, and a background dev/prod server or a browser-automation
+session is heavy enough to kill the Claude Code session outright. Specifically,
+never do any of the following:
+
+- `npm run dev`, `npm run start`, or anything else that binds a port
+  (localhost:3000 especially). Not in the foreground, not backgrounded, not
+  "just to check one thing".
+- `curl`/`fetch` against a locally started server. If nothing may start a
+  server, there is nothing to curl.
+- Browser automation of any kind — `claude-in-chrome`, Playwright, Puppeteer —
+  including screenshots, clicking through the booking flow, or reading console
+  logs from a live page.
+
+**Instead: hand the owner a numbered manual-verification checklist** — which
+URL to open, what to click, and what they should see (including the states
+that are easy to miss: the empty state, the "on request" route, a blocked
+date). They will run it and report back. Write the checklist as something a
+person can follow without reading the diff.
+
+### What Claude may run
+
+| Command | Safe? | Notes |
+|---|---|---|
+| `npx tsc --noEmit` | yes | Preferred check. Does not touch `.next`. |
+| `npm run lint` | yes | Does not touch `.next`. |
+| `npm run build` | **ask first** | Overwrites `.next`. See the warning below. |
+| `npm run dev` / `npm run start` | **never** | See above. |
+
+`npm run build` and `next dev` share the `.next` directory and will corrupt
+each other's output. If the owner has a dev server running, a build silently
+replaces its compiled chunks and CSS; the owner then sees an unstyled site or
+stale code and reasonably assumes the last edit broke something. So: say you
+want to build and let the owner stop their dev server first, or accept
+`tsc --noEmit` + `lint` as sufficient and let the build happen on their side.
+
+### Never kill processes by name or pattern
+
+No `taskkill /F /IM node.exe`, no `pkill -f next`, no wildcard process kills.
+The owner's editor, dev server and other tooling are all `node.exe`. If a
+process genuinely must be stopped, find its PID and command line first
+(`Get-CimInstance Win32_Process -Filter "Name='node.exe'"`), confirm it is the
+right one, and stop it by PID.
+
+> Both rules above are written from incidents on 2026-09-07. A
+> `taskkill /F /IM node.exe` killed the owner's dev server mid-write and left
+> `.next` with no CSS, which looked exactly like a global layout regression and
+> cost a round trip to diagnose. Separately, a `pkill -f "next start"` reported
+> success but silently did nothing on Windows, leaving a stale production
+> server holding port 3000 for five hours — it kept serving a pre-edit build,
+> so the owner was told a change was live while their browser showed the old
+> text. Neither server should have been started in the first place.
 
 ## Layout
 

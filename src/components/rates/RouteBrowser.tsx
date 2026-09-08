@@ -6,6 +6,8 @@ import { Car, Phone, Search, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { tomorrowIso } from "@/lib/bookingLink";
+import { WhatsAppCTA } from "@/components/analytics/ContactCTA";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 import type { CategoryWithRoutes } from "@/lib/supabase";
 import type { RouteWithCategory, RoutePricing } from "@/lib/supabase/types";
 import type { VehicleType } from "@/store/bookingStore";
@@ -265,13 +267,15 @@ function NoSearchResults({ query }: { query: string }) {
         Contact us for a custom quote — we can arrange most routes on request.
       </p>
       <Button variant="whatsapp" size="md" asChild>
-        <Link
-          href="https://wa.me/918445206116?text=Hi,%20I%20need%20a%20custom%20taxi%20route"
-          target="_blank"
-          rel="noopener noreferrer"
+        <WhatsAppCTA
+          href={`https://wa.me/918445206116?text=${encodeURIComponent(
+            `Hi, I need a custom taxi route. I searched for "${query}" but couldn't find it — is this route available?`
+          )}`}
+          placement={CTA_PLACEMENTS.ratesNoMatch}
+          context="no_search_results"
         >
           WhatsApp Us
-        </Link>
+        </WhatsAppCTA>
       </Button>
     </div>
   );

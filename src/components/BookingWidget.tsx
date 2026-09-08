@@ -8,7 +8,8 @@ import { getPrice } from "@/lib/supabase";
 import { getVehicleCapacity, getAvailabilityForDate } from "@/lib/pricing";
 import type { Package } from "@/lib/supabase";
 import type { Route, RoutePricing, PickupLocationRow } from "@/lib/supabase/types";
-import { buildBookingUrl } from "@/lib/bookingLink";
+import { buildBookingUrl, tomorrowIso } from "@/lib/bookingLink";
+import { formatDate } from "@/lib/booking";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useVehicleLabels } from "@/hooks/useVehicleLabels";
 import { DEFAULT_SITE_CONFIG } from "@/lib/supabase/types";
@@ -18,6 +19,7 @@ import BlockedDateNotice from "@/components/booking/BlockedDateNotice";
 import { capture } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
+import { WhatsAppCTA } from "@/components/analytics/ContactCTA";
 
 type VehicleType = "sedan" | "suv_normal" | "suv_deluxe" | "suv_luxury";
 
@@ -406,10 +408,41 @@ export default function BookingWidget({ pickupLocations, tourPackages }: Booking
   // Step2TripDetails' minDate exactly. min={today} would let a same-day date
   // reach the /booking URL, where isValidFutureDate silently drops it,
   // leaving Step 2's date field mysteriously empty.
-  const tomorrowDate = new Date();
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const minDate = tomorrowDate.toISOString().split("T")[0];
+  const minDate = tomorrowIso();
   const dropLocations = getDropLocations();
+
+  // WhatsApp message for the "Or WhatsApp us" link below, built from
+  // whichever tab is active so it always reflects what's on screen — see
+  // priceInfo above, which is shared by both tabs.
+  const whatsappMessage =
+    activeTab === "tours"
+      ? [
+          "Hi, I'd like to book a taxi:",
+          "",
+          `Package: ${selectedTourPackage?.title || tourPackage || "Not selected"}`,
+          `Vehicle: ${(tourVehicle && vehicleLabels[tourVehicle]) || tourVehicle || "Not selected"}`,
+          `Date: ${tourDate ? formatDate(tourDate) : "Not selected"}`,
+          `Passengers: ${tourPassengers}`,
+          priceInfo && !priceInfo.isBlockedDate
+            ? `Estimated fare: ₹${priceInfo.price.toLocaleString()}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : [
+          "Hi, I'd like to book a taxi:",
+          "",
+          `Pickup: ${transferFrom || "Not selected"}`,
+          `Drop: ${transferTo || "Not selected"}`,
+          `Vehicle: ${(transferVehicle && vehicleLabels[transferVehicle]) || transferVehicle || "Not selected"}`,
+          `Date: ${transferDate ? formatDate(transferDate) : "Not selected"}`,
+          `Passengers: ${transferPassengers}`,
+          priceInfo && !priceInfo.isBlockedDate
+            ? `Estimated fare: ₹${priceInfo.price.toLocaleString()}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
 
   return (
     <Card className="w-full">
@@ -803,15 +836,15 @@ export default function BookingWidget({ pickupLocations, tourPackages }: Booking
         </div>
       )}
 
-      <a
-        href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}`}
-        target="_blank"
-        rel="noopener noreferrer"
+      <WhatsAppCTA
+        href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`}
+        placement={CTA_PLACEMENTS.bookingWidget}
+        context={activeTab === "tours" ? "tour_widget" : "transfer_widget"}
         className="mt-6 flex items-center justify-center gap-1.5 text-sm text-slate-500 hover:text-ink transition-colors"
       >
         <MessageCircle className="w-4 h-4 text-whatsapp" />
         Or WhatsApp us on {phoneNumber}
-      </a>
+      </WhatsAppCTA>
     </Card>
   );
 }

@@ -9,6 +9,8 @@ import { getRoutesWithCategories } from "@/lib/supabase";
 import { getOneWayTaxiSettings } from "@/lib/oneWayTaxi";
 import { routeDetailsHref } from "@/lib/routeLinks";
 import { VEHICLE_ORDER, formatPrice, seasonNameForDate } from "@/lib/pricing";
+import { WhatsAppCTA } from "@/components/analytics/ContactCTA";
+import { CTA_PLACEMENTS } from "@/lib/analytics/properties";
 import type { RouteWithCategory, RoutePricing } from "@/lib/supabase/types";
 
 type RouteWithPricing = RouteWithCategory & { pricing?: RoutePricing[] };
@@ -240,13 +242,13 @@ export default async function RatesPage() {
             </p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button variant="whatsapp" size="md" asChild className="min-h-[44px]">
-                <Link
-                  href="https://wa.me/918445206116?text=Hi,%20I%20need%20a%20custom%20taxi%20route"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <WhatsAppCTA
+                  href="https://wa.me/918445206116?text=Hi%2C%20I%20need%20a%20custom%20taxi%20route"
+                  placement={CTA_PLACEMENTS.ratesNoMatch}
+                  context="closing_cta"
                 >
                   WhatsApp Us
-                </Link>
+                </WhatsAppCTA>
               </Button>
               <Button variant="outline" size="md" asChild className="min-h-[44px]">
                 <Link href="tel:+918445206116">
