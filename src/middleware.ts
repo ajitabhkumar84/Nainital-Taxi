@@ -71,11 +71,29 @@ export async function middleware(request: NextRequest) {
   // than growing its own check, so there is one place to audit.
   const isCalendarSyncApi = pathname.startsWith('/api/calendar-sync');
   const isAdminSurface = pathname.startsWith('/admin');
+  // Vercel Cron hits this path with no session — Bearer CRON_SECRET is the
+  // whole auth story, so it's checked and returned on immediately, before it
+  // can fall through the "public site route" pass-through below.
+  const isCronApi = pathname.startsWith('/api/cron');
   // Header/footer/contact config is public, non-sensitive data the homepage
   // itself needs (logo, nav links, phone number) — only the GET is public;
   // POST/PUT (writes) stay behind the admin gate below.
   const isPublicSiteConfigRead =
     pathname === '/api/admin/site-config' && request.method === 'GET';
+
+  // Checked before the public-route pass-through below: /api/cron/* is a
+  // privileged endpoint outside /api/admin/, so per CLAUDE.md invariant #4 it
+  // is gated here rather than growing its own bespoke check. Vercel
+  // automatically sends `Authorization: Bearer $CRON_SECRET` on cron
+  // invocations once that env var is set (Vercel's documented pattern).
+  if (isCronApi) {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get('authorization');
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return withCsp(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+    }
+    return withCsp(next());
+  }
 
   // Public site route (the vast majority of the newly-widened matcher) —
   // no auth gate, just the CSP/nonce headers.

@@ -39,6 +39,13 @@ interface CreateBookingRequest {
   selectedAddons?: SelectedAddon[];
   seasonName?: string;
   specialRequests?: string;
+  // When true, resolves real availability + server-side pricing and returns
+  // it without inserting a row or sending any email — used by the weekly
+  // audit cron (src/lib/reports/weeklyAuditData.ts) to measure booking
+  // latency without creating a fake booking. Reveals nothing a visitor
+  // couldn't already see by walking the real wizard to step 4 without
+  // submitting, so it needs no extra auth or rate limit.
+  dryRun?: boolean;
 }
 
 interface ResolvedPricing {
@@ -257,6 +264,18 @@ export async function POST(request: NextRequest) {
 
     const totalAmount = pricing.price + addonsTotal;
     const advanceAmount = calculateAdvanceAmount(totalAmount);
+
+    if (body.dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        totalAmount,
+        advanceAmount,
+        remainingAmount: totalAmount - advanceAmount,
+        seasonName: pricing.seasonName,
+        packageName: pricing.packageName,
+      });
+    }
 
     const normalizedPhone = normalizePhone(body.customerPhone, customerCountryCode);
 

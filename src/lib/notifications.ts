@@ -72,7 +72,7 @@ interface EmailOptions {
  * (e.g. ?packageTitle=<img onerror=...>), and the server never validates
  * their content beyond what's needed for pricing/lookup.
  */
-function escapeHtml(value: unknown): string {
+export function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -153,7 +153,7 @@ function advanceLabel(totalAmount: number): string {
   return 'Advance Payment (minimum)';
 }
 
-type SendResult = { ok: true } | { ok: false; reason: string };
+export type SendResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * Send email via Resend API, reporting *why* a failure happened (invalid/missing
@@ -746,6 +746,17 @@ export async function sendAdminNotification(booking: BookingData): Promise<boole
     // booked without an email — Resend rejects an empty reply_to.
     replyTo: booking.customer_email || undefined,
   });
+}
+
+/**
+ * Send the weekly operational/analytics audit report to the admin inbox.
+ * Thin wrapper over the same sendEmailWithResult() every other admin email
+ * uses — no new Resend-calling code, no new env var (reuses ADMIN_EMAIL).
+ * The caller (src/app/api/cron/weekly-audit/route.ts) has already rendered
+ * the HTML via renderWeeklyAuditEmail(), which never throws itself.
+ */
+export async function sendWeeklyAuditEmail(html: string, subject: string): Promise<SendResult> {
+  return sendEmailWithResult({ to: ADMIN_EMAIL, subject, html });
 }
 
 /**

@@ -337,6 +337,13 @@ referenced in `src/` are:
 **Recommended in production:** `UPSTASH_REDIS_REST_URL` / `_TOKEN` (or
 `KV_REST_API_URL` / `_TOKEN`) — without these rate limiting is off and fails
 open. `RESEND_API_KEY`, `FROM_EMAIL`, `ADMIN_EMAIL` for booking emails.
+`POSTHOG_PERSONAL_API_KEY` + `POSTHOG_PROJECT_ID` (server-only, never
+`NEXT_PUBLIC_`-prefixed — distinct from the write-only `NEXT_PUBLIC_POSTHOG_KEY`
+above) and `CRON_SECRET` for the weekly operational/analytics email
+(`src/app/api/cron/weekly-audit/route.ts`, triggered by Vercel Cron per
+`vercel.json`); without the PostHog pair that report's analytics section just
+reports itself as unconfigured. `POSTHOG_HOST` is optional, only needed for a
+project on PostHog's EU cloud.
 
 **Optional:** `GOOGLE_API_KEY`, `GOOGLE_CALENDAR_ID`, `NEXT_PUBLIC_SITE_URL`.
 
